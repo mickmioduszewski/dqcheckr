@@ -1,0 +1,206 @@
+---
+title: "Data Quality Report"
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    toc: true
+    toc_float: true
+params:
+  dataset_name: ""
+  file_name: ""
+  file_path: ""
+  run_timestamp: ""
+  df: NULL
+  qc_results: NULL
+  cp_results: NULL
+  custom_results: NULL
+  snapshot_history: NULL
+  config: NULL
+  overall_status: ""
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(kableExtra)
+library(ggplot2)
+library(dplyr)
+
+status_colour <- function(s) {
+  switch(s,
+    FAIL = "red",
+    WARN = "orange",
+    PASS = "green",
+    INFO = "grey",
+    "grey"
+  )
+}
+
+badge_html <- function(s) {
+  col <- switch(s, FAIL = "#d9534f", WARN = "#f0ad4e", PASS = "#5cb85c", "#777")
+  sprintf('<span style="background:%s;color:#fff;padding:4px 10px;border-radius:4px;font-weight:bold;">%s</span>', col, s)
+}
+
+results_to_df <- function(results) {
+  if (length(results) == 0) return(data.frame())
+  do.call(rbind, lapply(results, function(r) {
+    data.frame(
+      `Check ID`   = r$check_id,
+      `Check Name` = r$check_name,
+      Column       = ifelse(is.na(r$column), "—", r$column),
+      Status       = r$status,
+      Observed     = r$observed,
+      Threshold    = ifelse(is.na(r$threshold), "—", r$threshold),
+      Message      = r$message,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+  }))
+}
+
+status_order <- c(FAIL = 1, WARN = 2, PASS = 3, INFO = 4)
+
+sort_results_df <- function(df) {
+  if (nrow(df) == 0) return(df)
+  df[order(status_order[df$Status]), ]
+}
+
+colour_status_col <- function(df) {
+  df$Status <- kableExtra::cell_spec(
+    df$Status,
+    color = sapply(df$Status, status_colour),
+    bold  = TRUE
+  )
+  df
+}
+```
+
+## 1. Header
+
+**Dataset**: `r params$dataset_name`
+**File**: `r params$file_name`
+**Run time**: `r params$run_timestamp`
+**Overall status**: `r knitr::raw_html(badge_html(params$overall_status))`
+
+---
+
+## 2. File summary
+
+```{r file-summary}
+fsize <- tryCatch(file.info(params$file_path)$size, error = function(e) NA)
+fsize_str <- if (!is.na(fsize)) {
+  sprintf("%.1f KB", fsize / 1024)
+} else {
+  "N/A"
+}
+
+summary_df <- data.frame(
+  Item  = c("Row count", "Column count", "File size", "Format", "Encoding"),
+  Value = c(
+    as.character(nrow(params$df)),
+    as.character(ncol(params$df)),
+    fsize_str,
+    toupper(params$config$format %||% "CSV"),
+    params$config$encoding %||% "UTF-8"
+  ),
+  stringsAsFactors = FALSE
+)
+
+kableExtra::kbl(summary_df, col.names = c("Item", "Value")) |>
+  kableExtra::kable_styling(full_width = FALSE)
+```
+
+---
+
+## 3. Quality checks
+
+```{r qc-table}
+qc_df <- results_to_df(params$qc_results)
+if (nrow(qc_df) > 0) {
+  qc_df <- sort_results_df(qc_df)
+  qc_df <- colour_status_col(qc_df)
+  kableExtra::kbl(qc_df, escape = FALSE) |>
+    kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+} else {
+  cat("No quality check results.")
+}
+```
+
+---
+
+```{r custom-section, results='asis'}
+if (length(params$custom_results) > 0) {
+  cat("## 4. Custom checks\n\n")
+  cc_df <- results_to_df(params$custom_results)
+  cc_df <- sort_results_df(cc_df)
+  cc_df <- colour_status_col(cc_df)
+  print(kableExtra::kbl(cc_df, escape = FALSE) |>
+    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")))
+  cat("\n\n---\n\n")
+}
+```
+
+```{r comparison-section, results='asis'}
+if (length(params$cp_results) > 0) {
+  cat("## 5. Version comparison\n\n")
+
+  top_result <- params$cp_results[[which.min(
+    sapply(params$cp_results, \(r) status_order[r$status])
+  )]]
+  cat(sprintf("**Summary**: %s\n\n", top_result$message))
+
+  cp_df <- results_to_df(params$cp_results)
+  cp_df <- sort_results_df(cp_df)
+  cp_df <- colour_status_col(cp_df)
+  print(kableExtra::kbl(cp_df, escape = FALSE) |>
+    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")))
+  cat("\n\n---\n\n")
+}
+```
+
+```{r trend-section, results='asis'}
+hist <- params$snapshot_history
+if (!is.null(hist) && nrow(hist) >= 2) {
+  cat("## 6. Historical trend\n\n")
+
+  hist$run_timestamp <- as.POSIXct(hist$run_timestamp)
+  hist <- hist[order(hist$run_timestamp), ]
+
+  p1 <- ggplot(hist, aes(x = run_timestamp, y = row_count)) +
+    geom_line() + geom_point() +
+    labs(title = "Row count over last runs", x = "Run time", y = "Row count") +
+    theme_minimal()
+
+  hist_long <- tidyr::pivot_longer(
+    hist[, c("run_timestamp", "check_pass_count",
+             "check_warn_count", "check_fail_count")],
+    cols = -run_timestamp,
+    names_to  = "type",
+    values_to = "count"
+  )
+  hist_long$type <- gsub("check_|_count", "", hist_long$type)
+
+  p2 <- ggplot(hist_long, aes(x = run_timestamp, y = count, fill = type)) +
+    geom_col(position = "stack") +
+    scale_fill_manual(values = c(pass = "#5cb85c", warn = "#f0ad4e", fail = "#d9534f")) +
+    labs(title = "Check outcomes over last runs", x = "Run time", y = "Count",
+         fill = "Status") +
+    theme_minimal()
+
+  print(gridExtra::grid.arrange(p1, p2, ncol = 2))
+  cat("\n\n---\n\n")
+}
+```
+
+## 7. Appendix — Column statistics
+
+```{r appendix}
+if (!is.null(params$df) && !is.null(params$config)) {
+  col_stats <- dqcheckr:::compute_col_stats(params$df, params$config,
+                                             params$qc_results)
+  names(col_stats) <- c("Column", "Stat", "Value", "Threshold", "Severity")
+  kableExtra::kbl(col_stats) |>
+    kableExtra::kable_styling(bootstrap_options = c("striped", "condensed"),
+                              full_width = TRUE)
+}
+```

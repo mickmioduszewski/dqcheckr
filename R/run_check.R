@@ -1,0 +1,86 @@
+#' Run a full data quality check pipeline
+#'
+#' Orchestrates the complete dqcheckr pipeline: loads configuration, detects
+#' files, runs QC and comparison checks, writes a snapshot to SQLite, and
+#' renders an HTML report.
+#'
+#' @param dataset_name Character. Name of the dataset; must match a YAML config
+#'   file \code{<dataset_name>.yml} in \code{config_dir}.
+#' @param config_dir Character. Path to the directory containing
+#'   \code{dqcheckr.yml} and the dataset YAML file. Defaults to \code{"."}.
+#' @param open_report Logical. Whether to open the HTML report in the browser
+#'   after rendering (only takes effect in interactive sessions).
+#'
+#' @return Invisibly, a named list with:
+#'   \describe{
+#'     \item{status}{Overall status string: \code{"PASS"}, \code{"WARN"},
+#'       \code{"FAIL"}, or \code{"INFO"}.}
+#'     \item{report_path}{Absolute path to the rendered HTML report.}
+#'     \item{snapshot_id}{Integer row ID of the snapshot written to SQLite,
+#'       or \code{NULL} if the write failed.}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' result <- run_dq_check("my_dataset", config_dir = "config")
+#' result$status
+#' }
+#'
+#' @export
+run_dq_check <- function(dataset_name,
+                         config_dir   = ".",
+                         open_report  = TRUE) {
+  config <- load_config(dataset_name, config_dir)
+
+  files   <- detect_files(config)
+  df_curr <- read_dataset(files$current, config)
+  df_prev <- if (!is.null(files$previous))
+    read_dataset(files$previous, config)
+  else
+    NULL
+
+  qc_results     <- run_qc_checks(df_curr, config)
+  cp_results     <- if (!is.null(df_prev))
+    run_comparison_checks(df_curr, df_prev, config)
+  else
+    list()
+  custom_results <- run_custom_checks(df_curr, config)
+
+  db_path     <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
+                               mustWork = FALSE)
+  snapshot_id <- write_snapshot(
+    db_path, dataset_name,
+    basename(files$current),
+    df_curr, qc_results, cp_results, custom_results, config
+  )
+
+  snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)
+
+  report_path <- render_report(
+    dataset_name     = dataset_name,
+    file_name        = basename(files$current),
+    file_path        = files$current,
+    df               = df_curr,
+    qc_results       = qc_results,
+    cp_results       = cp_results,
+    custom_results   = custom_results,
+    snapshot_history = snapshot_history,
+    config           = config,
+    output_dir       = config$report_output_dir %||% "reports/",
+    open_report      = open_report
+  )
+
+  status <- overall_status(c(qc_results, cp_results, custom_results))
+  all_r  <- c(qc_results, cp_results, custom_results)
+  n_warn <- sum(vapply(all_r, \(r) r$status == "WARN", logical(1)))
+  n_fail <- sum(vapply(all_r, \(r) r$status == "FAIL", logical(1)))
+
+  message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s",
+                  dataset_name, status, n_warn, n_fail, report_path))
+
+  invisible(list(
+    status      = status,
+    report_path = report_path,
+    snapshot_id = snapshot_id
+  ))
+}

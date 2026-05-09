@@ -1,0 +1,67 @@
+# Example per-dataset configuration for dqcheckr
+# Save as <dataset_name>.yml in your config directory.
+
+dataset_name: "customer_accounts"
+
+# Path to the folder containing incoming files.
+# The two most recently modified files will be used (current and previous).
+folder: "data/incoming/customer_accounts/"
+
+# File format: csv or fwf (fixed-width)
+format: csv
+
+# File encoding (default: UTF-8)
+encoding: "UTF-8"
+
+# Field delimiter for CSV files (default: comma)
+delimiter: ","
+
+# Fixed-width field widths (fwf only; omit for csv)
+# fwf_widths: [10, 20, 5, 10, 15, 10]
+
+# Fixed-width column names (fwf only; omit for csv)
+# fwf_col_names: [id, name, country_code, account_status, account_balance, created_date]
+
+# ── Explicit file paths ───────────────────────────────────────────────────────
+# Override folder-scan detection. If current_file is set but previous_file is
+# omitted, the run proceeds in single-file mode (no version comparison).
+# current_file: "data/incoming/customer_accounts/20260410.csv"
+# previous_file: "data/incoming/customer_accounts/20260401.csv"
+
+# ── Schema contract ───────────────────────────────────────────────────────────
+# Columns expected in every delivery. SC-01 flags extras; SC-02 flags absences.
+expected_columns:
+  - id
+  - name
+  - country_code
+  - account_status
+  - account_balance
+  - created_date
+
+# ── Key columns ───────────────────────────────────────────────────────────────
+# Each key column must contain unique values (QC-12).
+key_columns:
+  - id
+
+# ── Rule overrides ────────────────────────────────────────────────────────────
+# Override any default_rule for this dataset only.
+rule_overrides:
+  max_missing_rate: 0.02
+  max_row_count_change_pct: 0.05
+  max_non_numeric_rate: 0.005
+  min_row_count: 1000
+
+# ── Per-column rules ──────────────────────────────────────────────────────────
+column_rules:
+  country_code:
+    allowed_values: ["GB", "US", "DE", "FR"]
+    pattern: "^[A-Z]{2}$"
+  account_status:
+    allowed_values: ["ACTIVE", "CLOSED", "SUSPENDED"]
+  account_balance:
+    min_value: 0
+    max_value: 1000000
+
+# ── Custom checks ─────────────────────────────────────────────────────────────
+# Path to an R file that defines custom_checks(df) returning a list of dq_result objects.
+# custom_checks_file: "custom/customer_accounts_checks.R"

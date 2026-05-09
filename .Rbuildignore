@@ -1,0 +1,8 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^PLAN\.md$
+^PROGRESS\.md$
+^makedata\.R$
+^demonstrations$
+^.*\.sqlite$
+^README\.md$

@@ -1,0 +1,25 @@
+# R build artefacts
+*.Rcheck/
+*.tar.gz
+*.zip
+
+# R session data
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# knitr / rmarkdown cache
+**/*_cache/
+**/*_files/
+
+# SQLite databases (demo/test output)
+*.sqlite
+
+# Compiled code
+src/*.o
+src/*.so
+src/*.dll
+
+# macOS
+.DS_Store
