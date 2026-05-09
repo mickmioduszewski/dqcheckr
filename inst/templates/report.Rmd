@@ -159,14 +159,18 @@ if (length(params$cp_results) > 0) {
 }
 ```
 
-```{r trend-section, results='asis'}
+```{r trend-header, results='asis'}
 hist <- params$snapshot_history
-if (!is.null(hist) && nrow(hist) >= 2) {
-  cat("## 6. Historical trend\n\n")
-
+show_trend <- !is.null(hist) && nrow(hist) >= 2
+if (show_trend) {
   hist$run_timestamp <- as.POSIXct(hist$run_timestamp)
   hist <- hist[order(hist$run_timestamp), ]
+  cat("## 6. Historical trend\n\n")
+}
+```
 
+```{r trend-plot, fig.width=10, fig.height=4}
+if (show_trend) {
   p1 <- ggplot(hist, aes(x = run_timestamp, y = row_count)) +
     geom_line() + geom_point() +
     labs(title = "Row count over last runs", x = "Run time", y = "Row count") +
@@ -188,9 +192,12 @@ if (!is.null(hist) && nrow(hist) >= 2) {
          fill = "Status") +
     theme_minimal()
 
-  print(gridExtra::grid.arrange(p1, p2, ncol = 2))
-  cat("\n\n---\n\n")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
 }
+```
+
+```{r trend-footer, results='asis'}
+if (show_trend) cat("\n\n---\n\n")
 ```
 
 ## 7. Appendix — Column statistics
