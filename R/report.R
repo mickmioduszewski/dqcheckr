@@ -38,6 +38,9 @@ render_report <- function(dataset_name, file_name, file_path, df,
     quiet = TRUE
   )
 
+  files_dir <- sub("\\.html$", "_files", out)
+  if (dir.exists(files_dir)) unlink(files_dir, recursive = TRUE)
+
   if (open_report && interactive()) utils::browseURL(out)
 
   invisible(out)
