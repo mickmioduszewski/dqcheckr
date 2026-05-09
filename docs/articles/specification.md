@@ -1,0 +1,515 @@
+# dqcheckr — Software Specification
+
+**Version**: 0.0.1 **Author**: Mick Mioduszewski **Date**: 10 April 2026
+
+------------------------------------------------------------------------
+
+## Part A — Purpose and Intent
+
+### Why this exists
+
+The analytics organisation ingests external datasets from multiple
+suppliers on a recurring basis. Verifying that each new delivery is
+complete, structurally correct, and consistent with prior deliveries is
+currently slow and largely manual. Analysts spend time on repetitive
+visual inspection instead of higher-value work, and quality problems
+risk being missed or caught late.
+
+### What we are building
+
+`dqcheckr` is a purpose-built R package that automates this verification
+process. For each dataset arrival it produces a single, plain-English
+HTML report that tells data management staff:
+
+1.  Whether the file is structurally sound (columns, types, row count as
+    expected).
+2.  Whether data values are within acceptable bounds and free of obvious
+    errors.
+3.  How this delivery compares to the previous one — what has changed,
+    what has drifted.
+4.  How this delivery compares to a defined schema contract, if one
+    exists.
+
+Results are also stored in a local SQLite database so that quality
+trends can be tracked over time across many deliveries.
+
+### Design principles
+
+- **Owned and evolvable.** The tool is first-party R code, not a thin
+  wrapper around a third-party API. Every check is directly readable and
+  modifiable.
+- **Plain English outputs.** Reports are written for data management
+  staff, not engineers. No R code, no package names, no jargon.
+- **Fail loudly.** Errors in configuration, custom checks, or parsing
+  stop the run with a clear message. Nothing is silently skipped.
+- **Non-destructive.** The tool reads files and writes reports and
+  database records. It never modifies, moves, or deletes source files.
+
+------------------------------------------------------------------------
+
+## Part B — Business-Level Description
+
+### B.1 How it is used
+
+A data officer runs a single command for each arriving dataset:
+
+``` r
+
+run_dq_check("customer_accounts")
+```
+
+The tool finds the two most recent files in the dataset’s folder, checks
+the newer one, compares it to the older one, writes a timestamped HTML
+report to a reports folder, and prints a one-line summary to the
+console. The report opens automatically in the browser.
+
+Files can also be identified explicitly by naming a current and a
+previous file, rather than relying on folder modification times.
+
+Scale: the tool is designed for up to 10 dataset arrivals per day across
+all dataset types.
+
+### B.2 What is checked
+
+**Data completeness**
+
+- Any column with too many missing values is flagged.
+- Any column that is entirely empty is an error.
+- If the file has fewer rows than the configured minimum, it is an
+  error.
+
+**Data validity**
+
+- Columns expected to contain only specific values (e.g. country codes,
+  status flags) are checked against a permitted list. Unexpected values
+  are an error.
+- Numeric columns expected to fall within a range are checked.
+  Out-of-range values are an error.
+- Columns expected to match a format (e.g. a postcode pattern) are
+  checked by regular expression. Violations are an error.
+
+**Data integrity**
+
+- Columns designated as keys (e.g. a unique ID column) are checked for
+  duplicates. Duplicates are an error.
+- Rows that are entirely identical to another row in the same file are
+  flagged as a warning.
+
+**Data consistency**
+
+- The inferred data type of each column is recorded. A type change
+  between deliveries is flagged.
+- Non-numeric values in a column that should be numeric are flagged
+  (warning if any present; error if too many).
+
+**Schema contract** *(when an expected column list is configured)*
+
+- Columns present in the file but not in the expected list are an error.
+- Columns in the expected list but absent from the file are an error.
+
+**Custom checks** *(when a custom checks file is configured for a
+dataset)*
+
+- Organisation-specific rules written in R are run against the file.
+  Results appear alongside the standard checks.
+
+### B.3 What is compared to the previous delivery
+
+- **Row count**: a large change (increase or decrease) is flagged.
+- **Schema**: new columns, dropped columns, and type changes are
+  flagged.
+- **Missing rates**: columns where the proportion of missing values has
+  increased significantly are flagged.
+- **Numeric distributions**: columns where the average value has shifted
+  significantly are flagged.
+- **Non-numeric contamination**: columns where the proportion of bad
+  (non-numeric) values has increased are flagged.
+- **Distinct values**: new values that have appeared and values that
+  have disappeared in categorical columns are listed.
+- **Column order**: a change in the order of columns is a warning for
+  CSV files and an error for fixed-width files (where column order
+  determines parsing).
+
+### B.4 What is produced
+
+**HTML report** — one file per run, self-contained (no internet required
+to view). Contains:
+
+1.  A header showing dataset name, file name, run time, and an overall
+    status badge (green = all clear, amber = warnings, red = failures).
+2.  A file summary (row count, column count, file size, format,
+    encoding).
+3.  A quality checks table listing every check, its status, what was
+    observed, the threshold, and a plain-English explanation. Failures
+    and warnings appear first.
+4.  A custom checks table (if configured).
+5.  A version comparison section showing what changed since the previous
+    delivery, with a plain-English narrative summary at the top.
+6.  A historical trend section showing row count and check outcomes
+    across the last 10 runs (appears once at least two runs have been
+    recorded).
+7.  An appendix with a full column-level statistics table.
+
+**SQLite database** — a single database shared across all datasets.
+Records summary statistics for every run, enabling long-term trend
+queries without reading the source files again.
+
+------------------------------------------------------------------------
+
+## Part C — Technical Specification
+
+### C.1 Package structure
+
+    dqcheckr/
+    ├── R/
+    │   ├── run_check.R          # main entry point: run_dq_check()
+    │   ├── ingest.R             # read CSV / FWF; trim whitespace
+    │   ├── snapshot.R           # SQLite read/write
+    │   ├── checks_generic.R     # QC-01..14 and SC-01..02
+    │   ├── checks_custom.R      # source and call custom_checks(df)
+    │   ├── compare.R            # CP-01..08
+    │   ├── report.R             # rmarkdown::render() wrapper
+    │   └── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+    ├── inst/
+    │   ├── templates/report.Rmd
+    │   └── config/
+    │       ├── dqcheckr.yml
+    │       └── example_dataset.yml
+    ├── tests/testthat/
+    │   ├── test-utils.R
+    │   ├── test-checks.R
+    │   ├── test-compare.R
+    │   └── test-ingest.R
+    ├── DESCRIPTION
+    └── NAMESPACE
+
+### C.2 Configuration
+
+**Global config — `dqcheckr.yml`**
+
+``` yaml
+snapshot_db: "data/snapshots.sqlite"
+report_output_dir: "reports/"
+
+default_rules:
+  # Single-snapshot thresholds
+  max_missing_rate: 0.05            # FAIL if column missing rate exceeds this
+  max_non_numeric_rate: 0.01        # FAIL if non-numeric rate in numeric column exceeds this
+  min_row_count: 0                  # FAIL if row count below this (0 = disabled)
+
+  # Version comparison thresholds
+  max_row_count_change_pct: 0.10
+  max_numeric_mean_shift_pct: 0.20
+  max_missing_rate_change_pp: 2.0   # percentage points
+  max_non_numeric_rate_change_pp: 1.0
+
+  # Schema flags
+  flag_new_columns: true
+  flag_dropped_columns: true
+  flag_type_changes: true
+  flag_column_order_change: true    # WARN for CSV, FAIL for FWF
+```
+
+**Per-dataset config — `<dataset_name>.yml`**
+
+``` yaml
+dataset_name: "customer_accounts"
+folder: "data/incoming/customer_accounts/"
+format: csv                 # csv | fwf
+encoding: "UTF-8"
+delimiter: ","              # csv only
+fwf_widths: ~               # fwf only
+fwf_col_names: ~            # fwf only
+
+# Optional: explicit file paths override folder-scan version detection
+# current_file: "data/incoming/customer_accounts/20260410.csv"
+# previous_file: "data/incoming/customer_accounts/20260401.csv"
+
+# Optional: schema contract
+expected_columns:
+  - id
+  - name
+  - country_code
+  - account_status
+  - account_balance
+  - created_date
+
+# Optional: key columns that must be unique
+key_columns:
+  - id
+
+# Optional rule overrides (merged over global defaults)
+rule_overrides:
+  max_missing_rate: 0.02
+  max_row_count_change_pct: 0.05
+  max_non_numeric_rate: 0.005
+  min_row_count: 1000
+
+# Optional per-column rules
+column_rules:
+  country_code:
+    allowed_values: ["GB", "US", "DE", "FR"]
+    pattern: "^[A-Z]{2}$"
+  account_status:
+    allowed_values: ["ACTIVE", "CLOSED", "SUSPENDED"]
+  account_balance:
+    min_value: 0
+    max_value: 1000000
+
+# Optional custom checks
+custom_checks_file: "custom/customer_accounts_checks.R"
+```
+
+### C.3 File version detection
+
+Two modes:
+
+1.  **Folder scan (default)**: the two most recently modified files in
+    `folder` are used. Newest = current, second-newest = previous.
+2.  **Explicit naming**: if `current_file` (and optionally
+    `previous_file`) are set in the dataset config, those paths are used
+    directly. Useful when file naming conventions do not reflect
+    delivery order, or when re-running a check for a specific pair of
+    files.
+
+If only a current file is available (either via folder scan or explicit
+config), the run proceeds in single-file mode: version comparison and
+vs-previous schema checks are skipped.
+
+### C.4 Ingestion and whitespace trimming
+
+1.  File is read entirely as character columns via
+    [`readr::read_delim()`](https://readr.tidyverse.org/reference/read_delim.html)
+    or
+    [`readr::read_fwf()`](https://readr.tidyverse.org/reference/read_fwf.html).
+2.  Leading and trailing whitespace is trimmed from every value
+    immediately after reading.
+3.  The trimmed data frame is used for all subsequent checks and
+    comparisons. The raw file is never modified.
+
+### C.5 Type inference
+
+Applied to each column of the trimmed data frame. Rules applied in
+order:
+
+| Priority | Condition | Inferred type |
+|----|----|----|
+| 1 | All non-null/non-empty values parse as a known date format | `date` |
+| 2 | ≥ 90% of non-null/non-empty values coerce to numeric | `numeric` |
+| 3 | Otherwise | `character` |
+| — | All values null or empty | `unknown` |
+
+Known date formats tested: `%Y-%m-%d`, `%d/%m/%Y`, `%m/%d/%Y`, `%Y%m%d`,
+`%d-%m-%Y`.
+
+The 90% threshold means a column with up to 10% bad (non-numeric) values
+is still classified as numeric, making those bad values visible to
+QC-11.
+
+### C.6 Quality checks
+
+Each check returns one or more `dq_result` objects:
+
+``` r
+
+dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, message)
+# status: "PASS" | "WARN" | "FAIL" | "INFO"
+```
+
+**Single-snapshot checks (QC series)**
+
+| ID | Name | Applies to | FAIL condition | WARN condition |
+|----|----|----|----|----|
+| QC-01 | Missing rate | Every column | `missing_rate > max_missing_rate` | — |
+| QC-02 | Empty column | Every column | Column is 100% empty | — |
+| QC-03 | Duplicate rows | Table | — | Any fully-duplicate rows exist |
+| QC-04 | Row count | Table | — | — (INFO) |
+| QC-05 | Column count | Table | — | — (INFO) |
+| QC-06 | Inferred type | Every column | — | — (INFO) |
+| QC-07 | Numeric range | Numeric columns | — | — (INFO: min/max/mean/SD) |
+| QC-08 | Distinct value count | Character columns | — | — (INFO) |
+| QC-09 | Allowed values | Configured columns | Any value outside `allowed_values` | — |
+| QC-10 | Numeric bounds | Configured columns | Any value outside `min_value`/`max_value` | — |
+| QC-11 | Non-numeric values | Numeric columns | `non_numeric_rate > max_non_numeric_rate` | Any non-numeric values present |
+| QC-12 | Key uniqueness | Configured `key_columns` | Any duplicate value in key column | — |
+| QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
+| QC-14 | Minimum row count | Table | `row_count < min_row_count` (if \> 0) | — |
+
+**Schema contract checks (SC series)** — only when `expected_columns` is
+configured
+
+| ID | Name | FAIL condition |
+|----|----|----|
+| SC-01 | Unexpected column | Column in file but not in `expected_columns` |
+| SC-02 | Missing expected column | Column in `expected_columns` but absent from file |
+
+**Version comparison checks (CP series)** — skipped in single-file mode
+
+| ID | Name | Flag condition | Severity |
+|----|----|----|----|
+| CP-01 | Row count change | `abs(pct_change) > max_row_count_change_pct` | WARN |
+| CP-02 | Schema diff | Columns added, dropped, or type-changed | WARN |
+| CP-03 | Missing rate change | Increase \> `max_missing_rate_change_pp` pp per column | WARN |
+| CP-04 | Numeric mean shift | Shift \> `max_numeric_mean_shift_pct` per column | WARN |
+| CP-05 | New distinct values | Values in current not in previous (categorical columns) | INFO |
+| CP-06 | Dropped distinct values | Values in previous not in current (categorical columns) | INFO |
+| CP-07 | Non-numeric rate change | Increase \> `max_non_numeric_rate_change_pp` pp per column | WARN |
+| CP-08 | Column order change | Column order differs from previous | WARN (CSV) / FAIL (FWF) |
+
+> CP-02 is the single source of truth for schema differences. The
+> `new_cols_vs_previous` and `missing_cols_vs_previous` columns in the
+> `snapshots` table are derived directly from the CP-02 result — they
+> are not computed separately.
+
+### C.7 Custom checks
+
+- `custom_checks_file` in dataset config points to an `.R` file.
+- Sourced into an isolated environment (not the global env).
+- Must define `custom_checks(df)` returning a list of `dq_result`
+  objects.
+- Receives the trimmed data frame.
+- Errors (missing file, missing function, runtime error) stop the run.
+- Results appear in the “Custom Checks” report section and are written
+  to `column_snapshots` (see C.8).
+
+### C.8 SQLite schema
+
+Database and tables created automatically on first run via
+[`init_snapshot_db()`](https://mickmioduszewski.github.io/dqcheckr/reference/init_snapshot_db.md).
+
+**Table: `snapshots`**
+
+| Column | Type | Notes |
+|----|----|----|
+| `id` | INTEGER PK | Auto-increment |
+| `dataset_name` | TEXT |  |
+| `run_timestamp` | TEXT | `YYYY-MM-DD HH:MM:SS` |
+| `file_name` | TEXT | Basename of current file |
+| `row_count` | INTEGER |  |
+| `col_count` | INTEGER |  |
+| `check_pass_count` | INTEGER |  |
+| `check_warn_count` | INTEGER |  |
+| `check_fail_count` | INTEGER |  |
+| `check_info_count` | INTEGER |  |
+| `overall_status` | TEXT | `FAIL` \> `WARN` \> `PASS` \> `INFO` |
+| `new_cols_vs_previous` | TEXT | Comma-separated; NULL if none or no previous |
+| `missing_cols_vs_previous` | TEXT | Comma-separated; NULL if none or no previous |
+| `new_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
+| `missing_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
+
+**Table: `column_snapshots`**
+
+| Column               | Type       | Notes                                      |
+|----------------------|------------|--------------------------------------------|
+| `id`                 | INTEGER PK | Auto-increment                             |
+| `snapshot_id`        | INTEGER FK | → `snapshots.id`                           |
+| `column_name`        | TEXT       | Column name, or check_id for custom checks |
+| `dq_check`           | TEXT       | Stat name or custom check_id               |
+| `value`              | TEXT       | Always stored as text                      |
+| `threshold`          | TEXT       | NULL if no threshold applies               |
+| `severity_on_breach` | TEXT       | `FAIL`, `WARN`, or NULL if informational   |
+
+Rows written per column type:
+
+| `dq_check` | Written for | `threshold` | `severity_on_breach` |
+|----|----|----|----|
+| `inferred_type` | All columns | NULL | NULL |
+| `missing_count` | All columns | NULL | NULL |
+| `missing_rate` | All columns | `max_missing_rate` | `FAIL` |
+| `distinct_count` | All columns | NULL | NULL |
+| `numeric_mean` | Numeric only | NULL | NULL |
+| `numeric_sd` | Numeric only | NULL | NULL |
+| `numeric_min` | Numeric only | NULL | NULL |
+| `numeric_max` | Numeric only | NULL | NULL |
+| `non_numeric_count` | Numeric only | NULL | NULL |
+| `non_numeric_rate` | Numeric only | `max_non_numeric_rate` | `FAIL` |
+
+Custom check rows: one row per `dq_result` with a non-NA column value.
+`dq_check` = `check_id`, `value` = `observed`, `threshold` =
+`threshold`, `severity_on_breach` = status if WARN/FAIL, else NULL.
+
+### C.9 Main entry point
+
+``` r
+
+run_dq_check(
+  dataset_name,        # matches <dataset_name>.yml in config_dir
+  config_dir = ".",    # contains dqcheckr.yml and <dataset_name>.yml
+  open_report = TRUE   # open in browser when interactive
+)
+# Returns invisibly: list(status, report_path, snapshot_id)
+```
+
+Report filename: `<dataset_name>_<YYYYMMDD_HHMMSS>.html`
+
+Console output:
+
+    [dqcheckr] customer_accounts: FAIL - 0 warning(s), 2 failure(s). Report: reports/customer_accounts_20260410_143022.html
+
+### C.10 Error handling
+
+| Situation | Behaviour |
+|----|----|
+| Folder does not exist | Stop; no output written |
+| No files in folder | Stop; no output written |
+| Explicit file path not found | Stop; no output written |
+| Only one file available | Single-file mode; comparison and vs-previous schema skipped |
+| File cannot be parsed | Stop with filename and parse error |
+| SC-01 / SC-02 violations | FAIL recorded; run continues; report and snapshot written |
+| Custom checks file missing | Stop with message |
+| `custom_checks()` not defined | Stop with message |
+| `custom_checks()` runtime error | Stop with R error detail |
+| SQLite write fails | Warning emitted; HTML report still written |
+| Report render fails | Stop; snapshot already written |
+| `snapshot_db` path missing | Created automatically by [`init_snapshot_db()`](https://mickmioduszewski.github.io/dqcheckr/reference/init_snapshot_db.md) |
+
+### C.11 Dependencies
+
+| Package                 | Role                            |
+|-------------------------|---------------------------------|
+| `readr`                 | CSV / FWF ingestion             |
+| `DBI` + `RSQLite`       | Snapshot store                  |
+| `rmarkdown` + `knitr`   | Report rendering                |
+| `kableExtra`            | Styled HTML tables in report    |
+| `ggplot2` + `gridExtra` | Trend charts in report          |
+| `yaml`                  | Config parsing                  |
+| `dplyr`                 | Data manipulation               |
+| `tidyr`                 | Data reshaping for trend charts |
+| `rlang`                 | Structured error conditions     |
+
+All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used
+— all logic is implemented natively.
+
+------------------------------------------------------------------------
+
+## Part D — Unresolved and Deferred Issues
+
+### D.1 Needs design before implementation
+
+| \# | Issue | Detail |
+|----|----|----|
+| D-01 | **Explicit file naming — partial spec** | The dataset config allows `current_file` and `previous_file` to override folder-scan detection, but the behaviour when one is set and the other is not has not been fully specified. Implemented as: `current_file` set but `previous_file` absent runs in single-file mode. |
+| D-02 | **CP-08 column order — WARN vs FAIL severity** | CP-08 is WARN for CSV and FAIL for FWF. There is currently no way to override the severity per dataset. A `column_order_change_severity` per-dataset override may be needed. |
+| D-03 | **QC-03 duplicate rows — no key scope** | QC-03 checks for fully-identical rows only. Multi-column key uniqueness (two rows with the same `id` but different `amount`) is not yet implemented. |
+
+### D.2 Backlog — agreed
+
+| \# | Feature |
+|----|----|
+| B-01 | **Cross-column consistency rules** — conditional rules between columns (e.g. if `status = CLOSED` then `close_date` must not be null) |
+| B-02 | **Date column recency check** — flag if the most recent value in a date column is older than N days |
+| B-03 | **Multi-column key uniqueness** — QC-12 currently checks single columns only |
+| B-04 | **`post_run_hook` parameter** — user-supplied function for email/Slack/S3 delivery after a run |
+| B-05 | **`batch_run(config_dir)`** — run all configured datasets in sequence |
+| B-06 | **Additional input formats** — Parquet (`arrow`), Excel, database tables via `DBI` |
+| B-07 | **CP-03 severity** — make WARN vs FAIL configurable (currently always WARN) |
+| B-08 | **Report themes** — organisation branding via a `theme` parameter |
+
+### D.3 Known limitations
+
+| \# | Limitation |
+|----|----|
+| L-01 | Type inference uses a fixed 90% threshold; this is not configurable per dataset |
+| L-02 | Date formats tested are hardcoded to five common patterns; exotic formats will be misclassified as character |
+| L-03 | The report appendix reads from in-memory `col_stats`, not from SQLite. If the SQLite write fails but the report succeeds, the appendix and the database can show slightly different values in edge cases |
+| L-04 | Performance target (\< 60 seconds for 1 M rows) has not been benchmarked; very wide files (many columns) may be slower than expected |
