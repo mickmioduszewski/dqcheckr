@@ -1,0 +1,44 @@
+url: https://mickmioduszewski.github.io/dqcheckr/
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [github]
+
+reference:
+  - title: "Run checks"
+    desc: "Main entry point and individual check runners"
+    contents:
+      - run_dq_check
+      - run_qc_checks
+      - run_comparison_checks
+      - run_custom_checks
+  - title: "Configuration & ingestion"
+    desc: "Load config and read dataset files"
+    contents:
+      - load_config
+      - detect_files
+      - read_dataset
+  - title: "Results"
+    desc: "Construct and interpret result objects"
+    contents:
+      - dq_result
+  - title: "Snapshot database"
+    desc: "Query the SQLite snapshot history"
+    contents:
+      - read_recent_snapshots
+  - title: "Internals"
+    desc: "Internal functions (not for direct use)"
+    contents:
+      - starts_with("check_")
+      - starts_with("compare_")
+      - infer_col_type
+      - overall_status
+      - compute_col_stats
+      - init_snapshot_db
+      - write_snapshot
+      - render_report
+      - starts_with("dot-")

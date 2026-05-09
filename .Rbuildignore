@@ -6,3 +6,7 @@
 ^demonstrations$
 ^.*\.sqlite$
 ^README\.md$
+^doc$
+^Meta$
+^_pkgdown\.yml$
+^docs$

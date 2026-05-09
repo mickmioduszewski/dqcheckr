@@ -1,0 +1,507 @@
+# Getting started with dqcheckr
+
+`dqcheckr` automates the verification of recurring external dataset
+deliveries. For each new file arrival it runs a battery of quality
+checks, compares the file to the previous delivery, writes a
+self-contained HTML report, and records summary statistics in a local
+SQLite database so that quality trends can be tracked over time.
+
+## How it works
+
+    Your data file                  Your YAML config
+          │                                │
+          ▼                                ▼
+      read_dataset()            load_config()
+      (all columns as           (global defaults +
+       character, trimmed)       per-dataset rules)
+          │                                │
+          └──────────────┬─────────────────┘
+                         ▼
+              run_qc_checks()        ← single-snapshot checks (QC / SC series)
+              run_comparison_checks()← vs previous delivery   (CP series)
+              run_custom_checks()    ← your own rules
+                         │
+                         ▼
+              write_snapshot()       ← SQLite: one row per run
+              render_report()        ← self-contained HTML
+                         │
+                         ▼
+              run_dq_check()         ← the one function you call
+
+A data officer runs a single command for each arriving dataset:
+
+``` r
+
+run_dq_check("customer_accounts", config_dir = "path/to/configs")
+```
+
+This prints a one-line console summary, writes an HTML report, and
+returns `list(status, report_path, snapshot_id)` invisibly.
+
+------------------------------------------------------------------------
+
+## Installation
+
+`dqcheckr` is a first-party package — install it directly from source:
+
+``` r
+
+devtools::install("path/to/dqr/dqcheckr")
+library(dqcheckr)
+```
+
+All dependencies are on CRAN: `readr`, `DBI`, `RSQLite`, `rmarkdown`,
+`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`.
+
+------------------------------------------------------------------------
+
+## Configuration
+
+Two YAML files control every run.
+
+### Global config — `dqcheckr.yml`
+
+Placed in your config directory. Sets default thresholds used by all
+datasets unless a dataset overrides them.
+
+``` yaml
+snapshot_db:       "data/snapshots.sqlite"
+report_output_dir: "reports/"
+
+default_rules:
+  # FAIL if any column's missing-value rate exceeds this (0–1)
+  max_missing_rate: 0.05
+
+  # FAIL if non-numeric values in a numeric column exceed this rate
+  max_non_numeric_rate: 0.01
+
+  # FAIL if row count drops below this (0 = disabled)
+  min_row_count: 0
+
+  # Version-comparison thresholds (used when a previous file is available)
+  max_row_count_change_pct:       0.10
+  max_numeric_mean_shift_pct:     0.20
+  max_missing_rate_change_pp:     2.0    # percentage points
+  max_non_numeric_rate_change_pp: 1.0
+
+  flag_new_columns:         true
+  flag_dropped_columns:     true
+  flag_type_changes:        true
+  flag_column_order_change: true   # WARN for CSV, FAIL for FWF
+```
+
+### Per-dataset config — `<dataset_name>.yml`
+
+One file per dataset. Only the keys you specify are needed — everything
+else inherits from the global defaults.
+
+``` yaml
+dataset_name: "customer_accounts"
+
+# --- File location ---
+# Option A: folder scan (two most recently modified files are used)
+folder: "data/incoming/customer_accounts/"
+
+# Option B: explicit paths (set current_file only → single-file mode,
+#           no version comparison)
+# current_file:  "data/incoming/customer_accounts/20260410.csv"
+# previous_file: "data/incoming/customer_accounts/20260401.csv"
+
+format:    csv
+encoding:  "UTF-8"
+delimiter: ","
+
+# --- Schema contract (optional) ---
+# SC-01 flags extra columns; SC-02 flags missing columns.
+expected_columns:
+  - id
+  - name
+  - country_code
+  - account_status
+  - account_balance
+  - created_date
+
+# --- Key columns (optional) ---
+# QC-12 checks each for duplicate values.
+key_columns:
+  - id
+
+# --- Rule overrides (optional) ---
+# These replace the matching keys in default_rules for this dataset only.
+rule_overrides:
+  max_missing_rate:        0.02
+  max_row_count_change_pct: 0.05
+  min_row_count:           1000
+
+# --- Per-column rules (optional) ---
+column_rules:
+  country_code:
+    allowed_values: ["GB", "US", "DE", "FR"]   # QC-09
+    pattern: "^[A-Z]{2}$"                       # QC-13
+  account_status:
+    allowed_values: ["ACTIVE", "CLOSED", "SUSPENDED"]
+  account_balance:
+    min_value: 0                                 # QC-10
+    max_value: 1000000
+
+# --- Custom checks (optional) ---
+# custom_checks_file: "custom/customer_accounts_checks.R"
+
+# --- Output paths (optional, override global) ---
+# snapshot_db:       "data/snapshots.sqlite"
+# report_output_dir: "reports/"
+```
+
+### What is required vs optional
+
+The only fields the package requires to run are the file location
+(`folder` or `current_file`) and the `format`. Every other config key is
+optional — the corresponding checks are simply skipped when the key is
+absent.
+
+| Config key | Skipped when absent |
+|----|----|
+| `key_columns` | QC-12 (key uniqueness) |
+| `expected_columns` | SC-01 and SC-02 (schema contract) |
+| `column_rules.allowed_values` | QC-09 (allowed values) |
+| `column_rules.min_value` / `max_value` | QC-10 (numeric bounds) |
+| `column_rules.pattern` | QC-13 (pattern / regex) |
+| `custom_checks_file` | All custom checks |
+| `previous_file` / second file in folder | All CP-01–CP-08 (version comparison) |
+| `min_row_count` set to 0 | QC-14 (minimum row count) |
+
+A minimal dataset config that runs basic checks with no column-level
+rules:
+
+``` yaml
+dataset_name: "my_dataset"
+current_file: "data/incoming/my_dataset.csv"
+format: csv
+```
+
+### Fixed-width files
+
+For fixed-width files, set `format: fwf` and supply column widths and
+names. If the file has a header row, set `fwf_skip: 1` to skip it.
+
+``` yaml
+format: fwf
+fwf_skip: 1
+fwf_widths:    [10, 20, 3, 10, 12, 11]
+fwf_col_names: [id, name, country_code, account_status, account_balance, created_date]
+```
+
+------------------------------------------------------------------------
+
+## The quality checks
+
+Each check returns one or more `dq_result` objects with four key fields:
+`check_id`, `status` (`PASS` / `WARN` / `FAIL` / `INFO`), `observed`,
+and `message`. The overall run status is the worst single status across
+all checks.
+
+### Single-snapshot checks (QC series)
+
+These run on the current file alone.
+
+| ID | Name | Triggers on | Severity |
+|----|----|----|----|
+| QC-01 | Missing rate | Column missing rate \> `max_missing_rate` | FAIL |
+| QC-02 | Empty column | Column is 100% empty | FAIL |
+| QC-03 | Duplicate rows | Any fully-identical rows | WARN |
+| QC-04 | Row count | Always | INFO |
+| QC-05 | Column count | Always | INFO |
+| QC-06 | Inferred type | Always (date / numeric / character / unknown) | INFO |
+| QC-07 | Numeric stats | Numeric columns (min, max, mean, SD) | INFO |
+| QC-08 | Distinct count | Character columns | INFO |
+| QC-09 | Allowed values | Values outside `allowed_values` list | FAIL |
+| QC-10 | Numeric bounds | Values outside `min_value` / `max_value` | FAIL |
+| QC-11 | Non-numeric values | Non-numeric values in a numeric column | WARN / FAIL |
+| QC-12 | Key uniqueness | Duplicate values in a `key_columns` column | FAIL |
+| QC-13 | Pattern / regex | Values not matching `pattern` | FAIL |
+| QC-14 | Minimum row count | Row count below `min_row_count` | FAIL |
+
+### Schema contract checks (SC series)
+
+Only run when `expected_columns` is set.
+
+| ID | Name | Triggers on | Severity |
+|----|----|----|----|
+| SC-01 | Unexpected column | Column in file not in `expected_columns` | FAIL |
+| SC-02 | Missing expected column | Column in `expected_columns` absent from file | FAIL |
+
+### Version comparison checks (CP series)
+
+Only run when a previous file is available. Skipped automatically in
+single-file mode.
+
+| ID | Name | Triggers on | Severity |
+|----|----|----|----|
+| CP-01 | Row count change | Change \> `max_row_count_change_pct` | WARN |
+| CP-02 | Schema diff | Columns added, dropped, or type-changed | WARN |
+| CP-03 | Missing rate change | Increase \> `max_missing_rate_change_pp` pp | WARN |
+| CP-04 | Numeric mean shift | Shift \> `max_numeric_mean_shift_pct` | WARN |
+| CP-05 | New distinct values | Values in current not seen in previous | INFO |
+| CP-06 | Dropped distinct values | Values in previous absent from current | INFO |
+| CP-07 | Non-numeric rate change | Increase \> `max_non_numeric_rate_change_pp` pp | WARN |
+| CP-08 | Column order change | Column order differs from previous | WARN (CSV) / FAIL (FWF) |
+
+------------------------------------------------------------------------
+
+## Type inference
+
+[`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
+classifies each column after whitespace trimming. Rules are applied in
+priority order:
+
+1.  **date** — all non-empty values parse as a known date format
+    (`%Y-%m-%d`, `%d/%m/%Y`, `%m/%d/%Y`, `%Y%m%d`, `%d-%m-%Y`)
+2.  **numeric** — ≥ 90% of non-empty values coerce to numeric
+3.  **character** — everything else
+4.  **unknown** — all values are empty or `NA`
+
+The 90% threshold means a column with up to 10% bad values is still
+classified as numeric, making those bad values visible to QC-11
+(non-numeric contamination).
+
+``` r
+
+infer_col_type(c("2024-01-15", "2024-06-30"))  # "date"
+infer_col_type(c("100", "200", "N/A"))          # "character" (only 67% numeric)
+infer_col_type(c("100", "200", "N/A", rep("50", 17)))  # "numeric" (95% numeric)
+infer_col_type(c(NA, "", NA))                   # "unknown"
+```
+
+------------------------------------------------------------------------
+
+## Running a check
+
+``` r
+
+result <- run_dq_check(
+  dataset_name = "customer_accounts",
+  config_dir   = "path/to/configs",   # contains dqcheckr.yml + customer_accounts.yml
+  open_report  = TRUE                 # open HTML in browser when interactive
+)
+
+# Console output (always printed):
+# [dqcheckr] customer_accounts: FAIL — 1 warning(s), 2 failure(s). Report: reports/...html
+
+result$status       # "PASS", "WARN", or "FAIL"
+result$report_path  # full path to the HTML file
+result$snapshot_id  # integer row ID in snapshots table
+```
+
+The HTML report contains:
+
+1.  **Header** — dataset name, file name, run time, overall status badge
+2.  **File summary** — row count, column count, file size, format,
+    encoding
+3.  **Quality checks table** — every check result, failures first
+4.  **Custom checks table** — if configured
+5.  **Version comparison** — what changed since the previous delivery
+6.  **Historical trend** — row count and check outcomes across the last
+    10 runs (appears once at least two runs have been recorded)
+7.  **Appendix** — full column-level statistics table
+
+------------------------------------------------------------------------
+
+## Calling individual checks
+
+You can call any check function directly, without going through the full
+pipeline. Every check takes `(df, config)` and returns a list of
+`dq_result` objects.
+
+``` r
+
+library(dqcheckr)
+
+# Build a minimal config programmatically
+cfg <- list(
+  rules = list(
+    max_missing_rate     = 0.05,
+    max_non_numeric_rate = 0.01,
+    min_row_count        = 0
+  ),
+  column_rules     = list(
+    status = list(allowed_values = c("ACTIVE", "CLOSED"))
+  ),
+  key_columns      = "id",
+  expected_columns = NULL
+)
+
+df <- read.csv("data/customer_accounts.csv", colClasses = "character")
+df[] <- lapply(df, trimws)
+
+# Run a single check
+results <- check_missing_rate(df, cfg)
+
+# Inspect
+results[[1]]$status    # "PASS" or "FAIL"
+results[[1]]$observed  # e.g. "3.2% missing (4 of 125)"
+
+# Run all single-snapshot checks at once
+all_results <- run_qc_checks(df, cfg)
+
+# Overall status
+overall_status(all_results)  # "FAIL" > "WARN" > "PASS" > "INFO"
+```
+
+------------------------------------------------------------------------
+
+## Custom checks
+
+Create a plain `.R` file that defines `custom_checks(df)`. It receives
+the trimmed data frame and must return a list of `dq_result` objects.
+
+``` r
+
+# File: custom/customer_accounts_checks.R
+
+custom_checks <- function(df) {
+  results <- list()
+
+  # Rule: ACTIVE accounts must not have a zero balance
+  active_zero <- df[df$account_status == "ACTIVE" &
+                    !is.na(df$account_balance) &
+                    df$account_balance == "0", ]
+  n <- nrow(active_zero)
+  results <- c(results, list(dq_result(
+    check_id   = "CUST-01",
+    check_name = "No zero-balance active accounts",
+    status     = if (n > 0) "FAIL" else "PASS",
+    observed   = sprintf("%d ACTIVE account(s) with balance 0", n),
+    message    = if (n > 0)
+      sprintf("%d ACTIVE account(s) have a zero balance.", n)
+    else
+      "No ACTIVE accounts have a zero balance."
+  )))
+
+  results
+}
+```
+
+Point to it in the dataset config:
+
+``` yaml
+custom_checks_file: "custom/customer_accounts_checks.R"
+```
+
+The file is sourced in an isolated environment (not the global session).
+[`dq_result()`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
+is available inside it. Any error — missing file, undefined function,
+runtime failure — stops the run with a clear message.
+
+------------------------------------------------------------------------
+
+## The snapshot database
+
+Every run writes two rows to a shared SQLite database: one row in
+`snapshots` (run-level summary) and one row per column-stat in
+`column_snapshots`.
+
+``` r
+
+library(DBI)
+library(RSQLite)
+
+con <- dbConnect(SQLite(), "data/snapshots.sqlite")
+
+# Recent runs for one dataset
+dbGetQuery(con,
+  "SELECT id, file_name, overall_status, check_fail_count, run_timestamp
+   FROM snapshots
+   WHERE dataset_name = 'customer_accounts'
+   ORDER BY id DESC
+   LIMIT 10")
+
+# Column-level stats for the most recent run
+dbGetQuery(con,
+  "SELECT column_name, dq_check, value, threshold
+   FROM column_snapshots
+   WHERE snapshot_id = (
+     SELECT MAX(id) FROM snapshots WHERE dataset_name = 'customer_accounts'
+   )
+   ORDER BY column_name, dq_check")
+
+dbDisconnect(con)
+```
+
+Because all datasets share one database, you can query across them:
+
+``` r
+
+dbGetQuery(con,
+  "SELECT dataset_name, COUNT(*) AS runs,
+          SUM(check_fail_count) AS total_failures
+   FROM snapshots
+   GROUP BY dataset_name")
+```
+
+The `output/` directory (and database file) are created automatically on
+the first run if they do not exist.
+
+------------------------------------------------------------------------
+
+## Worked example — Star Wars dataset
+
+The following uses
+[`dplyr::starwars`](https://dplyr.tidyverse.org/reference/starwars.html)
+exported to CSV and fixed-width files.
+
+``` r
+
+# Config directory contains:
+#   dqcheckr.yml         — global thresholds
+#   starwars_csv.yml     — CSV dataset config
+#   starwars_fwf.yml     — FWF dataset config
+
+# Run checks on both formats
+result_csv <- run_dq_check("starwars_csv", config_dir = "config", open_report = TRUE)
+result_fwf <- run_dq_check("starwars_fwf", config_dir = "config", open_report = TRUE)
+```
+
+The Star Wars config sets `max_missing_rate: 0.60` because `vehicles`
+(87%) and `starships` (77%) are naturally sparse — most characters have
+none. Both columns FAIL, which is the correct finding: they are
+genuinely incomplete and a consumer should be aware before using them.
+
+Expected console output:
+
+    [dqcheckr] starwars_csv: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
+    [dqcheckr] starwars_fwf: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html
+
+------------------------------------------------------------------------
+
+## Error handling
+
+| Situation | Behaviour |
+|----|----|
+| Config file not found | Stop immediately; no output written |
+| Data file not found | Stop immediately; no output written |
+| Only one file available | Single-file mode; CP checks skipped |
+| File cannot be parsed | Stop with filename and parse error |
+| SC-01 / SC-02 violations | FAIL recorded; run continues; report written |
+| Custom checks file missing | Stop with message |
+| `custom_checks()` not defined | Stop with message |
+| `custom_checks()` runtime error | Stop with R error detail |
+| SQLite write fails | Warning emitted; HTML report still written |
+
+The package never modifies, moves, or deletes source files.
+
+------------------------------------------------------------------------
+
+## Design principles
+
+**Owned and evolvable.** Every check is plain R — readable, modifiable,
+and not hidden behind a third-party API.
+
+**Plain English outputs.** Reports are written for data management
+staff, not engineers. No R code, no package names, no jargon.
+
+**Fail loudly.** Configuration errors, missing files, and custom-check
+failures all stop the run with a clear message. Nothing is silently
+skipped.
+
+**Non-destructive.** The package reads files and writes reports and
+database records. Source files are never touched.
