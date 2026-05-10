@@ -62,7 +62,8 @@ library(dqcheckr)
 ```
 
 All dependencies are on CRAN: `readr`, `DBI`, `RSQLite`, `rmarkdown`,
-`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`.
+`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`, `tidyr`,
+`rlang`.
 
 ---
 
