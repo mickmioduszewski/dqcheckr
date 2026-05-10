@@ -12,8 +12,9 @@
 ## Test environments
 
 * macOS (local), R 4.5.2, aarch64-apple-darwin20
-* R-hub: Windows (to be added before submission)
-* R-hub: Ubuntu Linux (to be added before submission)
+* R-hub: Windows — 0 errors, 0 warnings, 0 notes
+* R-hub: Ubuntu Linux — 0 errors, 0 warnings, 0 notes
+* R-hub: macOS arm64 — 0 errors, 0 warnings, 0 notes
 
 ## Spell check
 
