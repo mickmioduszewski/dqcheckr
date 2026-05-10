@@ -85,7 +85,7 @@ SQLite database so that quality trends can be tracked over time.</p>
           run_custom_checks()    ← your own rules
                      │
                      ▼
-          write_snapshot()       ← SQLite: one row per run
+          write_snapshot()       ← SQLite: run summary + per-column stats
           render_report()        ← self-contained HTML
                      │
                      ▼
@@ -109,7 +109,8 @@ from source:</p>
 <p>All dependencies are on CRAN: <code>readr</code>, <code>DBI</code>,
 <code>RSQLite</code>, <code>rmarkdown</code>, <code>knitr</code>,
 <code>kableExtra</code>, <code>ggplot2</code>, <code>gridExtra</code>,
-<code>yaml</code>, <code>dplyr</code>.</p>
+<code>yaml</code>, <code>dplyr</code>, <code>tidyr</code>,
+<code>rlang</code>.</p>
 <hr>
 </div>
 <div class="section level2">
@@ -219,44 +220,49 @@ corresponding checks are simply skipped when the key is absent.</p>
 </colgroup>
 <thead><tr class="header">
 <th>Config key</th>
-<th>Skipped when absent</th>
+<th>Skipped / default when absent</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code>key_columns</code></td>
-<td>QC-12 (key uniqueness)</td>
+<td>QC-12 (key uniqueness) skipped</td>
 </tr>
 <tr class="even">
 <td><code>expected_columns</code></td>
-<td>SC-01 and SC-02 (schema contract)</td>
+<td>SC-01 and SC-02 (schema contract) skipped</td>
 </tr>
 <tr class="odd">
 <td><code>column_rules.allowed_values</code></td>
-<td>QC-09 (allowed values)</td>
+<td>QC-09 (allowed values) skipped</td>
 </tr>
 <tr class="even">
 <td>
 <code>column_rules.min_value</code> / <code>max_value</code>
 </td>
-<td>QC-10 (numeric bounds)</td>
+<td>QC-10 (numeric bounds) skipped</td>
 </tr>
 <tr class="odd">
 <td><code>column_rules.pattern</code></td>
-<td>QC-13 (pattern / regex)</td>
+<td>QC-13 (pattern / regex) skipped</td>
 </tr>
 <tr class="even">
 <td><code>custom_checks_file</code></td>
-<td>All custom checks</td>
+<td>All custom checks skipped</td>
 </tr>
 <tr class="odd">
 <td>
 <code>previous_file</code> / second file in folder</td>
-<td>All CP-01–CP-08 (version comparison)</td>
+<td>All CP-01–CP-08 (version comparison) skipped</td>
 </tr>
 <tr class="even">
 <td>
 <code>min_row_count</code> set to 0</td>
-<td>QC-14 (minimum row count)</td>
+<td>QC-14 (minimum row count) skipped</td>
+</tr>
+<tr class="odd">
+<td><code>type_inference_threshold</code></td>
+<td>Defaults to 0.90 (affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04,
+CP-05, CP-06, CP-07)</td>
 </tr>
 </tbody>
 </table>
@@ -561,7 +567,7 @@ change.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Console output (always printed):</span></span>
-<span><span class="co"># [dqcheckr] customer_accounts: FAIL — 1 warning(s), 2 failure(s). Report: reports/...html</span></span>
+<span><span class="co"># [dqcheckr] customer_accounts: FAIL - 1 warning(s), 2 failure(s). Report: reports/...html</span></span>
 <span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">status</span>       <span class="co"># "PASS", "WARN", or "FAIL"</span></span>
 <span><span class="va">result</span><span class="op">$</span><span class="va">report_path</span>  <span class="co"># full path to the HTML file</span></span>
@@ -651,6 +657,7 @@ must return a list of <code>dq_result</code> objects.</p>
 <span>  <span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">results</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/dq_result.html">dq_result</a></span><span class="op">(</span></span>
 <span>    check_id   <span class="op">=</span> <span class="st">"CUST-01"</span>,</span>
 <span>    check_name <span class="op">=</span> <span class="st">"No zero-balance active accounts"</span>,</span>
+<span>    column     <span class="op">=</span> <span class="st">"account_balance"</span>,   <span class="co"># enables per-column storage in SQLite</span></span>
 <span>    status     <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="va">n</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="st">"FAIL"</span> <span class="kw">else</span> <span class="st">"PASS"</span>,</span>
 <span>    observed   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%d ACTIVE account(s) with balance 0"</span>, <span class="va">n</span><span class="op">)</span>,</span>
 <span>    message    <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="va">n</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span></span>
@@ -667,6 +674,12 @@ must return a list of <code>dq_result</code> objects.</p>
 session). <code><a href="../reference/dq_result.html">dq_result()</a></code> is available inside it. Any error —
 missing file, undefined function, runtime failure — stops the run with a
 clear message.</p>
+<p><strong>Tip</strong>: always set <code>column =</code> when your
+check is scoped to a specific column. Results with
+<code>column = NA</code> (the default) appear in the HTML report and
+contribute to the overall status, but are not written to the
+<code>column_snapshots</code> SQLite table and therefore do not appear
+in per-column trend queries.</p>
 <hr>
 </div>
 <div class="section level2">
@@ -731,8 +744,8 @@ naturally sparse — most characters have none. Both columns FAIL, which
 is the correct finding: they are genuinely incomplete and a consumer
 should be aware before using them.</p>
 <p>Expected console output:</p>
-<pre><code>[dqcheckr] starwars_csv: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
-[dqcheckr] starwars_fwf: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html</code></pre>
+<pre><code>[dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
+[dqcheckr] starwars_fwf: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html</code></pre>
 <hr>
 </div>
 <div class="section level2">

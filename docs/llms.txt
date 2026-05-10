@@ -29,6 +29,7 @@ report_output_dir: output/reports/
 default_rules:
   max_missing_rate: 0.05
   min_row_count: 0
+  type_inference_threshold: 0.90
 ```
 
 **`config/my_dataset.yml`** — dataset-specific settings:
@@ -45,7 +46,7 @@ Then run:
 library(dqcheckr)
 
 result <- run_dq_check("my_dataset", config_dir = "config")
-result$status      # "PASS", "WARN", or "FAIL"
+result$status      # "PASS", "WARN", "FAIL", or "INFO"
 result$report_path # path to the HTML report
 ```
 
@@ -139,6 +140,12 @@ Construct and interpret result objects
 
 - [`dq_result()`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
   : Construct a data quality result object
+- [`overall_status()`](https://mickmioduszewski.github.io/dqcheckr/reference/overall_status.md)
+  : Compute the worst status across a list of dq_result objects
+- [`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
+  : Infer the logical type of a character column
+- [`check_missing_rate()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_missing_rate.md)
+  : QC-01: Check missing rate per column
 
 ## Snapshot database
 
@@ -151,6 +158,8 @@ Query the SQLite snapshot history
 
 Internal functions (not for direct use)
 
+- [`check_missing_rate()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_missing_rate.md)
+  : QC-01: Check missing rate per column
 - [`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
   : Infer the logical type of a character column
 - [`overall_status()`](https://mickmioduszewski.github.io/dqcheckr/reference/overall_status.md)

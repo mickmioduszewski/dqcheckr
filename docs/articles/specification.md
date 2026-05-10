@@ -1,6 +1,6 @@
 # dqcheckr — Software Specification
 
-**Version**: 0.0.1 **Author**: Mick Mioduszewski **Date**: 10 April 2026
+**Version**: 0.1.1 **Author**: Mick Mioduszewski **Date**: 2026-05-10
 
 ------------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ A data officer runs a single command for each arriving dataset:
 
 ``` r
 
-run_dq_check("customer_accounts")
+run_dq_check("customer_accounts", config_dir = "config")
 ```
 
 The tool finds the two most recent files in the dataset’s folder, checks
@@ -169,17 +169,32 @@ queries without reading the source files again.
     │   ├── checks_custom.R      # source and call custom_checks(df)
     │   ├── compare.R            # CP-01..08
     │   ├── report.R             # rmarkdown::render() wrapper
-    │   └── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+    │   ├── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+    │   └── dqcheckr-package.R   # package-level documentation
     ├── inst/
     │   ├── templates/report.Rmd
-    │   └── config/
-    │       ├── dqcheckr.yml
-    │       └── example_dataset.yml
+    │   ├── config/
+    │   │   ├── dqcheckr.yml
+    │   │   └── example_dataset.yml
+    │   └── demonstrations/
+    │       ├── demo.R           # named-file mode demo (CSV + FWF)
+    │       ├── demo2.R          # folder-scan mode demo with version comparison
+    │       ├── README.md
+    │       ├── config/          # global + starwars_csv + starwars_fwf configs
+    │       ├── config2/         # global + starwars_folder configs
+    │       ├── custom2/         # starwars_custom.R (human-specific checks)
+    │       ├── data/            # starwars.csv, starwars.fwf
+    │       └── data2/           # starwars_v1.csv (original), starwars_v2.csv (perturbed)
     ├── tests/testthat/
     │   ├── test-utils.R
     │   ├── test-checks.R
     │   ├── test-compare.R
-    │   └── test-ingest.R
+    │   ├── test-ingest.R
+    │   ├── test-snapshot.R
+    │   └── test-integration.R
+    ├── vignettes/
+    │   ├── dqcheckr.Rmd         # user guide
+    │   └── specification.Rmd    # this document
     ├── DESCRIPTION
     └── NAMESPACE
 
@@ -220,6 +235,7 @@ encoding: "UTF-8"
 delimiter: ","              # csv only
 fwf_widths: ~               # fwf only
 fwf_col_names: ~            # fwf only
+fwf_skip: 0                 # fwf only — header rows to skip (default 0)
 
 # Optional: explicit file paths override folder-scan version detection
 # current_file: "data/incoming/customer_accounts/20260410.csv"
@@ -326,7 +342,7 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-04 | Row count | Table | — | — (INFO) |
 | QC-05 | Column count | Table | — | — (INFO) |
 | QC-06 | Inferred type | Every column | — | — (INFO) |
-| QC-07 | Numeric range | Numeric columns | — | — (INFO: min/max/mean/SD) |
+| QC-07 | Numeric stats | Numeric columns | — | — (INFO: min/max/mean/SD) |
 | QC-08 | Distinct value count | Character columns | — | — (INFO) |
 | QC-09 | Allowed values | Configured columns | Any value outside `allowed_values` | — |
 | QC-10 | Numeric bounds | Configured columns | Any value outside `min_value`/`max_value` | — |

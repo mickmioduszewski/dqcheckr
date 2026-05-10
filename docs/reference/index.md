@@ -30,6 +30,12 @@ Construct and interpret result objects
 
 - [`dq_result()`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
   : Construct a data quality result object
+- [`overall_status()`](https://mickmioduszewski.github.io/dqcheckr/reference/overall_status.md)
+  : Compute the worst status across a list of dq_result objects
+- [`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
+  : Infer the logical type of a character column
+- [`check_missing_rate()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_missing_rate.md)
+  : QC-01: Check missing rate per column
 
 ## Snapshot database
 
@@ -42,6 +48,8 @@ Query the SQLite snapshot history
 
 Internal functions (not for direct use)
 
+- [`check_missing_rate()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_missing_rate.md)
+  : QC-01: Check missing rate per column
 - [`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
   : Infer the logical type of a character column
 - [`overall_status()`](https://mickmioduszewski.github.io/dqcheckr/reference/overall_status.md)

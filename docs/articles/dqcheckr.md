@@ -22,7 +22,7 @@ SQLite database so that quality trends can be tracked over time.
               run_custom_checks()    ← your own rules
                          │
                          ▼
-              write_snapshot()       ← SQLite: one row per run
+              write_snapshot()       ← SQLite: run summary + per-column stats
               render_report()        ← self-contained HTML
                          │
                          ▼
@@ -51,7 +51,8 @@ library(dqcheckr)
 ```
 
 All dependencies are on CRAN: `readr`, `DBI`, `RSQLite`, `rmarkdown`,
-`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`.
+`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`, `tidyr`,
+`rlang`.
 
 ------------------------------------------------------------------------
 
@@ -159,16 +160,17 @@ The only fields the package requires to run are the file location
 optional — the corresponding checks are simply skipped when the key is
 absent.
 
-| Config key | Skipped when absent |
+| Config key | Skipped / default when absent |
 |----|----|
-| `key_columns` | QC-12 (key uniqueness) |
-| `expected_columns` | SC-01 and SC-02 (schema contract) |
-| `column_rules.allowed_values` | QC-09 (allowed values) |
-| `column_rules.min_value` / `max_value` | QC-10 (numeric bounds) |
-| `column_rules.pattern` | QC-13 (pattern / regex) |
-| `custom_checks_file` | All custom checks |
-| `previous_file` / second file in folder | All CP-01–CP-08 (version comparison) |
-| `min_row_count` set to 0 | QC-14 (minimum row count) |
+| `key_columns` | QC-12 (key uniqueness) skipped |
+| `expected_columns` | SC-01 and SC-02 (schema contract) skipped |
+| `column_rules.allowed_values` | QC-09 (allowed values) skipped |
+| `column_rules.min_value` / `max_value` | QC-10 (numeric bounds) skipped |
+| `column_rules.pattern` | QC-13 (pattern / regex) skipped |
+| `custom_checks_file` | All custom checks skipped |
+| `previous_file` / second file in folder | All CP-01–CP-08 (version comparison) skipped |
+| `min_row_count` set to 0 | QC-14 (minimum row count) skipped |
+| `type_inference_threshold` | Defaults to 0.90 (affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04, CP-05, CP-06, CP-07) |
 
 A minimal dataset config that runs basic checks with no column-level
 rules:
@@ -304,7 +306,7 @@ result <- run_dq_check(
 )
 
 # Console output (always printed):
-# [dqcheckr] customer_accounts: FAIL — 1 warning(s), 2 failure(s). Report: reports/...html
+# [dqcheckr] customer_accounts: FAIL - 1 warning(s), 2 failure(s). Report: reports/...html
 
 result$status       # "PASS", "WARN", or "FAIL"
 result$report_path  # full path to the HTML file
@@ -388,6 +390,7 @@ custom_checks <- function(df) {
   results <- c(results, list(dq_result(
     check_id   = "CUST-01",
     check_name = "No zero-balance active accounts",
+    column     = "account_balance",   # enables per-column storage in SQLite
     status     = if (n > 0) "FAIL" else "PASS",
     observed   = sprintf("%d ACTIVE account(s) with balance 0", n),
     message    = if (n > 0)
@@ -410,6 +413,12 @@ The file is sourced in an isolated environment (not the global session).
 [`dq_result()`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
 is available inside it. Any error — missing file, undefined function,
 runtime failure — stops the run with a clear message.
+
+**Tip**: always set `column =` when your check is scoped to a specific
+column. Results with `column = NA` (the default) appear in the HTML
+report and contribute to the overall status, but are not written to the
+`column_snapshots` SQLite table and therefore do not appear in
+per-column trend queries.
 
 ------------------------------------------------------------------------
 
@@ -487,8 +496,8 @@ genuinely incomplete and a consumer should be aware before using them.
 
 Expected console output:
 
-    [dqcheckr] starwars_csv: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
-    [dqcheckr] starwars_fwf: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html
+    [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
+    [dqcheckr] starwars_fwf: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html
 
 ------------------------------------------------------------------------
 

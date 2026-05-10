@@ -29,6 +29,7 @@ report_output_dir: output/reports/
 default_rules:
   max_missing_rate: 0.05
   min_row_count: 0
+  type_inference_threshold: 0.90
 ```
 
 **`config/my_dataset.yml`** — dataset-specific settings:
@@ -45,7 +46,7 @@ Then run:
 library(dqcheckr)
 
 result <- run_dq_check("my_dataset", config_dir = "config")
-result$status      # "PASS", "WARN", or "FAIL"
+result$status      # "PASS", "WARN", "FAIL", or "INFO"
 result$report_path # path to the HTML report
 ```
 

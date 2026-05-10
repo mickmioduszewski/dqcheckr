@@ -66,8 +66,8 @@ Mioduszewski</h4>
 
     
     
-<p><strong>Version</strong>: 0.0.1 <strong>Author</strong>: Mick
-Mioduszewski <strong>Date</strong>: 10 April 2026</p>
+<p><strong>Version</strong>: 0.1.1 <strong>Author</strong>: Mick
+Mioduszewski <strong>Date</strong>: 2026-05-10</p>
 <hr>
 <div class="section level2">
 <h2 id="part-a-purpose-and-intent">Part A — Purpose and Intent<a class="anchor" aria-label="anchor" href="#part-a-purpose-and-intent"></a>
@@ -133,7 +133,7 @@ source files.</li>
 </h3>
 <p>A data officer runs a single command for each arriving dataset:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"customer_accounts"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"customer_accounts"</span>, config_dir <span class="op">=</span> <span class="st">"config"</span><span class="op">)</span></span></code></pre></div>
 <p>The tool finds the two most recent files in the dataset’s folder,
 checks the newer one, compares it to the older one, writes a timestamped
 HTML report to a reports folder, and prints a one-line summary to the
@@ -262,17 +262,32 @@ long-term trend queries without reading the source files again.</p>
 │   ├── checks_custom.R      # source and call custom_checks(df)
 │   ├── compare.R            # CP-01..08
 │   ├── report.R             # rmarkdown::render() wrapper
-│   └── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+│   ├── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+│   └── dqcheckr-package.R   # package-level documentation
 ├── inst/
 │   ├── templates/report.Rmd
-│   └── config/
-│       ├── dqcheckr.yml
-│       └── example_dataset.yml
+│   ├── config/
+│   │   ├── dqcheckr.yml
+│   │   └── example_dataset.yml
+│   └── demonstrations/
+│       ├── demo.R           # named-file mode demo (CSV + FWF)
+│       ├── demo2.R          # folder-scan mode demo with version comparison
+│       ├── README.md
+│       ├── config/          # global + starwars_csv + starwars_fwf configs
+│       ├── config2/         # global + starwars_folder configs
+│       ├── custom2/         # starwars_custom.R (human-specific checks)
+│       ├── data/            # starwars.csv, starwars.fwf
+│       └── data2/           # starwars_v1.csv (original), starwars_v2.csv (perturbed)
 ├── tests/testthat/
 │   ├── test-utils.R
 │   ├── test-checks.R
 │   ├── test-compare.R
-│   └── test-ingest.R
+│   ├── test-ingest.R
+│   ├── test-snapshot.R
+│   └── test-integration.R
+├── vignettes/
+│   ├── dqcheckr.Rmd         # user guide
+│   └── specification.Rmd    # this document
 ├── DESCRIPTION
 └── NAMESPACE</code></pre>
 </div>
@@ -309,44 +324,45 @@ long-term trend queries without reading the source files again.</p>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="fu">delimiter</span><span class="kw">:</span><span class="at"> </span><span class="st">","</span><span class="co">              # csv only</span></span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">fwf_widths</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">               # fwf only</span></span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">fwf_col_names</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">            # fwf only</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co"># Optional: explicit file paths override folder-scan version detection</span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># current_file: "data/incoming/customer_accounts/20260410.csv"</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co"># Optional: schema contract</span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="co"># Optional: key columns that must be unique</span></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a></span>
-<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co"># Optional rule overrides (merged over global defaults)</span></span>
-<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
-<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span></span>
-<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
-<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.005</span></span>
-<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000</span></span>
-<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a></span>
-<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a><span class="co"># Optional per-column rules</span></span>
-<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
-<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
-<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span></span>
-<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span></span>
-<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
-<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
-<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
-<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
-<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
-<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a></span>
-<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="co"># Optional custom checks</span></span>
-<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">fwf_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                 # fwf only — header rows to skip (default 0)</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># Optional: explicit file paths override folder-scan version detection</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co"># current_file: "data/incoming/customer_accounts/20260410.csv"</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co"># Optional: schema contract</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="co"># Optional: key columns that must be unique</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="co"># Optional rule overrides (merged over global defaults)</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.005</span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000</span></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co"># Optional per-column rules</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span></span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
+<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
+<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
+<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
+<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a></span>
+<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="co"># Optional custom checks</span></span>
+<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="c-3-file-version-detection">C.3 File version detection<a class="anchor" aria-label="anchor" href="#c-3-file-version-detection"></a>
@@ -494,7 +510,7 @@ to QC-11.</p>
 </tr>
 <tr class="odd">
 <td>QC-07</td>
-<td>Numeric range</td>
+<td>Numeric stats</td>
 <td>Numeric columns</td>
 <td>—</td>
 <td>— (INFO: min/max/mean/SD)</td>
