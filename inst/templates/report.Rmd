@@ -131,7 +131,7 @@ if (nrow(qc_df) > 0) {
 
 ```{r custom-section, results='asis'}
 if (length(params$custom_results) > 0) {
-  cat("## 4. Custom checks\n\n")
+  cat("## Custom checks\n\n")
   cc_df <- results_to_df(params$custom_results)
   cc_df <- sort_results_df(cc_df)
   cc_df <- colour_status_col(cc_df)
@@ -143,7 +143,7 @@ if (length(params$custom_results) > 0) {
 
 ```{r comparison-section, results='asis'}
 if (length(params$cp_results) > 0) {
-  cat("## 5. Version comparison\n\n")
+  cat("## Version comparison\n\n")
 
   top_result <- params$cp_results[[which.min(
     sapply(params$cp_results, \(r) status_order[r$status])
@@ -165,7 +165,7 @@ show_trend <- !is.null(hist) && nrow(hist) >= 2
 if (show_trend) {
   hist$run_timestamp <- as.POSIXct(hist$run_timestamp)
   hist <- hist[order(hist$run_timestamp), ]
-  cat("## 6. Historical trend\n\n")
+  cat("## Historical trend\n\n")
 }
 ```
 
@@ -200,7 +200,7 @@ if (show_trend) {
 if (show_trend) cat("\n\n---\n\n")
 ```
 
-## 7. Appendix — Column statistics
+## Appendix — Column statistics
 
 ```{r appendix}
 if (!is.null(params$df) && !is.null(params$config)) {
