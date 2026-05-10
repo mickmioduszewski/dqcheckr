@@ -308,7 +308,7 @@ result <- run_dq_check(
 )
 
 # Console output (always printed):
-# [dqcheckr] customer_accounts: FAIL — 1 warning(s), 2 failure(s). Report: reports/...html
+# [dqcheckr] customer_accounts: FAIL - 1 warning(s), 2 failure(s). Report: reports/...html
 
 result$status       # "PASS", "WARN", or "FAIL"
 result$report_path  # full path to the HTML file
@@ -482,8 +482,8 @@ a consumer should be aware before using them.
 Expected console output:
 
 ```
-[dqcheckr] starwars_csv: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
-[dqcheckr] starwars_fwf: FAIL — 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html
+[dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_csv_....html
+[dqcheckr] starwars_fwf: FAIL - 0 warning(s), 2 failure(s). Report: output/reports/starwars_fwf_....html
 ```
 
 ---
