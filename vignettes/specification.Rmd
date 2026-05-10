@@ -53,7 +53,7 @@ Results are also stored in a local SQLite database so that quality trends can be
 A data officer runs a single command for each arriving dataset:
 
 ```{r}
-run_dq_check("customer_accounts")
+run_dq_check("customer_accounts", config_dir = "config")
 ```
 
 The tool finds the two most recent files in the dataset's folder, checks the newer one, compares it to the older one, writes a timestamped HTML report to a reports folder, and prints a one-line summary to the console. The report opens automatically in the browser.
