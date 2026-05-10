@@ -202,6 +202,11 @@ if (show_trend) cat("\n\n---\n\n")
 
 ## Appendix — Column statistics
 
+Per-column statistics computed for this run. These correspond to the rows
+written to the `column_snapshots` table in the SQLite snapshot database
+(`column_name` → Column, `dq_check` → Stat, `value` → Value,
+`threshold` → Threshold, `severity_on_breach` → Severity).
+
 ```{r appendix}
 if (!is.null(params$df) && !is.null(params$config)) {
   col_stats <- dqcheckr:::compute_col_stats(params$df, params$config,
