@@ -96,8 +96,12 @@ test_that("write_snapshot() inserts column_snapshots rows", {
 })
 
 test_that("write_snapshot() emits warning but does not stop on write error", {
+  fake_dir <- tempfile()
+  file.create(fake_dir)
+  on.exit(unlink(fake_dir))
+  impossible <- file.path(fake_dir, "impossible.sqlite")
   expect_warning(
-    write_snapshot("/dev/null/impossible.sqlite", "ds", "f.csv",
+    write_snapshot(impossible, "ds", "f.csv",
                    make_df(), make_results(), list(), list(),
                    base_config()),
     regexp = "SQLite"
