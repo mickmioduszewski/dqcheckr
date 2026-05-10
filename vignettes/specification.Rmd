@@ -186,10 +186,10 @@ default_rules:
   max_non_numeric_rate_change_pp: 1.0
 
   # Schema flags
-  flag_new_columns: true
-  flag_dropped_columns: true
-  flag_type_changes: true
-  flag_column_order_change: true    # WARN for CSV, FAIL for FWF
+  flag_new_columns: true            # set false to suppress new-column warnings in CP-02
+  flag_dropped_columns: true        # set false to suppress dropped-column warnings in CP-02
+  flag_type_changes: true           # set false to suppress type-change warnings in CP-02
+  flag_column_order_change: true    # set false to skip CP-08 entirely (WARN CSV / FAIL FWF)
 ```
 
 **Per-dataset config — `<dataset_name>.yml`**
@@ -313,13 +313,13 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | ID | Name | Flag condition | Severity |
 |----|------|----------------|----------|
 | CP-01 | Row count change | `abs(pct_change) > max_row_count_change_pct` | WARN |
-| CP-02 | Schema diff | Columns added, dropped, or type-changed | WARN |
+| CP-02 | Schema diff | Columns added, dropped, or type-changed (each independently suppressible via `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes`) | WARN |
 | CP-03 | Missing rate change | Increase > `max_missing_rate_change_pp` pp per column | WARN |
 | CP-04 | Numeric mean shift | Shift > `max_numeric_mean_shift_pct` per column | WARN |
 | CP-05 | New distinct values | Values in current not in previous (categorical columns) | INFO |
 | CP-06 | Dropped distinct values | Values in previous not in current (categorical columns) | INFO |
 | CP-07 | Non-numeric rate change | Increase > `max_non_numeric_rate_change_pp` pp per column | WARN |
-| CP-08 | Column order change | Column order differs from previous | WARN (CSV) / FAIL (FWF) |
+| CP-08 | Column order change | Column order differs from previous (suppressible via `flag_column_order_change: false`) | WARN (CSV) / FAIL (FWF) |
 
 > CP-02 is the single source of truth for schema differences. The `new_cols_vs_previous` and `missing_cols_vs_previous` columns in the `snapshots` table are derived directly from the CP-02 result — they are not computed separately.
 
