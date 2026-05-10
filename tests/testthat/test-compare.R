@@ -45,7 +45,7 @@ make_prev <- function() {
   )
 }
 
-# ── CP-01 Row count change ────────────────────────────────────────────────────
+# -- CP-01 Row count change ----------------------------------------------------
 
 test_that("compare_row_count() returns PASS when change is within threshold", {
   res <- compare_row_count(make_curr(), make_prev(), base_config())
@@ -58,7 +58,7 @@ test_that("compare_row_count() returns WARN when change exceeds threshold", {
   expect_equal(res[[1]]$status, "WARN")
 })
 
-# ── CP-02 Schema diff ─────────────────────────────────────────────────────────
+# -- CP-02 Schema diff ---------------------------------------------------------
 
 test_that("compare_schema() returns PASS when schemas are identical", {
   res <- compare_schema(make_curr(), make_prev(), base_config())
@@ -95,7 +95,7 @@ test_that("compare_schema() attaches new_cols and dropped_cols attributes", {
   expect_false(is.null(attr(res, "dropped_cols")))
 })
 
-# ── CP-03 Missing rate change ─────────────────────────────────────────────────
+# -- CP-03 Missing rate change -------------------------------------------------
 
 test_that("compare_missing_rate() returns PASS when missing rate unchanged", {
   res <- compare_missing_rate(make_curr(), make_prev(), base_config())
@@ -110,7 +110,7 @@ test_that("compare_missing_rate() returns WARN when missing rate increases signi
   expect_equal(name_r[[1]]$status, "WARN")
 })
 
-# ── CP-04 Numeric mean shift ──────────────────────────────────────────────────
+# -- CP-04 Numeric mean shift --------------------------------------------------
 
 test_that("compare_numeric_mean() returns PASS when mean shift is small", {
   res <- compare_numeric_mean(make_curr(), make_prev(), base_config())
@@ -128,7 +128,7 @@ test_that("compare_numeric_mean() returns WARN when mean shift exceeds threshold
   expect_equal(bal[[1]]$status, "WARN")
 })
 
-# ── CP-05 New distinct values ─────────────────────────────────────────────────
+# -- CP-05 New distinct values -------------------------------------------------
 
 test_that("compare_new_values() returns INFO always", {
   res <- compare_new_values(make_curr(), make_prev(), base_config())
@@ -143,14 +143,14 @@ test_that("compare_new_values() reports new values in observed field", {
   expect_match(cc[[1]]$observed, "JP")
 })
 
-# ── CP-06 Dropped distinct values ────────────────────────────────────────────
+# -- CP-06 Dropped distinct values --------------------------------------------
 
 test_that("compare_dropped_values() returns INFO always", {
   res <- compare_dropped_values(make_curr(), make_prev(), base_config())
   expect_true(all(vapply(res, \(r) r$status == "INFO", logical(1))))
 })
 
-# ── CP-07 Non-numeric rate change ─────────────────────────────────────────────
+# -- CP-07 Non-numeric rate change ---------------------------------------------
 
 test_that("compare_non_numeric_rate() returns PASS when rate unchanged", {
   res <- compare_non_numeric_rate(make_curr(), make_prev(), base_config())
@@ -166,7 +166,7 @@ test_that("compare_non_numeric_rate() returns WARN when rate increases significa
   expect_equal(bal[[1]]$status, "WARN")
 })
 
-# ── CP-08 Column order ────────────────────────────────────────────────────────
+# -- CP-08 Column order --------------------------------------------------------
 
 test_that("compare_column_order() returns PASS when column order unchanged", {
   res <- compare_column_order(make_curr(), make_prev(), base_config())
@@ -189,7 +189,7 @@ test_that("compare_column_order() returns FAIL for FWF when order changes", {
   expect_equal(res[[1]]$status, "FAIL")
 })
 
-# ── flag_* config keys ────────────────────────────────────────────────────────
+# -- flag_* config keys --------------------------------------------------------
 
 test_that("compare_schema() suppresses new columns when flag_new_columns=FALSE", {
   curr <- make_curr()

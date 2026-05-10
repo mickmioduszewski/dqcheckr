@@ -32,7 +32,7 @@ make_results <- function() {
   )
 }
 
-# ── init_snapshot_db() ────────────────────────────────────────────────────────
+# -- init_snapshot_db() --------------------------------------------------------
 
 test_that("init_snapshot_db() creates both tables on a new database", {
   db  <- tempfile(fileext = ".sqlite")
@@ -59,7 +59,7 @@ test_that("init_snapshot_db() creates parent directory if missing", {
   unlink(dirname(tmp), recursive = TRUE)
 })
 
-# ── write_snapshot() ──────────────────────────────────────────────────────────
+# -- write_snapshot() ----------------------------------------------------------
 
 test_that("write_snapshot() returns a positive integer snapshot_id", {
   db  <- tempfile(fileext = ".sqlite")
@@ -104,7 +104,7 @@ test_that("write_snapshot() emits warning but does not stop on write error", {
   )
 })
 
-# ── read_recent_snapshots() ───────────────────────────────────────────────────
+# -- read_recent_snapshots() ---------------------------------------------------
 
 test_that("read_recent_snapshots() returns empty data frame when no runs exist", {
   db  <- tempfile(fileext = ".sqlite")

@@ -1,7 +1,7 @@
 library(testthat)
 library(dqcheckr)
 
-# ── dq_result() ───────────────────────────────────────────────────────────────
+# -- dq_result() ---------------------------------------------------------------
 
 test_that("dq_result() returns a named list with all seven fields", {
   r <- dq_result("QC-01", "Missing rate", column = "name",
@@ -40,7 +40,7 @@ test_that("dq_result() accepts all four valid status values", {
   }
 })
 
-# ── overall_status() ──────────────────────────────────────────────────────────
+# -- overall_status() ----------------------------------------------------------
 
 test_that("overall_status() returns FAIL when any result is FAIL", {
   results <- list(
@@ -72,7 +72,7 @@ test_that("overall_status() returns INFO on empty list", {
   expect_equal(overall_status(list()), "INFO")
 })
 
-# ── infer_col_type() ──────────────────────────────────────────────────────────
+# -- infer_col_type() ----------------------------------------------------------
 
 test_that("infer_col_type() returns 'date' for ISO date strings", {
   x <- c("2024-01-01", "2024-06-15", "2023-12-31")
@@ -105,7 +105,7 @@ test_that("infer_col_type() returns 'numeric' for all-NA-except-numeric", {
 })
 
 test_that("infer_col_type() respects a custom threshold", {
-  # 85% numeric — below default 90%, above custom 80%
+  # 85% numeric - below default 90%, above custom 80%
   x <- c(rep("1.0", 17), "abc", "def", "ghi")  # 17/20 = 85%
   expect_equal(infer_col_type(x, threshold = 0.90), "character")
   expect_equal(infer_col_type(x, threshold = 0.80), "numeric")
@@ -122,7 +122,7 @@ test_that("infer_col_type() threshold applies via config in check_inferred_types
   expect_equal(lenient[[1]]$observed, "numeric")
 })
 
-# ── load_config() ─────────────────────────────────────────────────────────────
+# -- load_config() -------------------------------------------------------------
 
 test_that("load_config() merges rule_overrides over defaults", {
   tmp <- tempdir()

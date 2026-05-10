@@ -51,10 +51,10 @@ results_to_df <- function(results) {
     data.frame(
       `Check ID`   = r$check_id,
       `Check Name` = r$check_name,
-      Column       = ifelse(is.na(r$column), "—", r$column),
+      Column       = ifelse(is.na(r$column), "-", r$column),
       Status       = r$status,
       Observed     = r$observed,
-      Threshold    = ifelse(is.na(r$threshold), "—", r$threshold),
+      Threshold    = ifelse(is.na(r$threshold), "-", r$threshold),
       Message      = r$message,
       stringsAsFactors = FALSE,
       check.names = FALSE
@@ -203,12 +203,12 @@ if (show_trend) {
 if (show_trend) cat("\n\n---\n\n")
 ```
 
-## Appendix — Column statistics
+## Appendix - Column statistics
 
 Per-column statistics computed for this run. These correspond to the rows
 written to the `column_snapshots` table in the SQLite snapshot database
-(`column_name` → Column, `dq_check` → Stat, `value` → Value,
-`threshold` → Threshold, `severity_on_breach` → Severity).
+(`column_name` -> Column, `dq_check` -> Stat, `value` -> Value,
+`threshold` -> Threshold, `severity_on_breach` -> Severity).
 
 ```{r appendix}
 if (!is.null(params$col_stats)) {

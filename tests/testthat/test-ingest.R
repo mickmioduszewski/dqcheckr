@@ -3,7 +3,7 @@ library(dqcheckr)
 
 fix <- function(f) testthat::test_path("fixtures", f)
 
-# ── read_dataset() ────────────────────────────────────────────────────────────
+# -- read_dataset() ------------------------------------------------------------
 
 test_that("read_dataset() reads CSV and returns all-character data frame", {
   cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
@@ -66,7 +66,7 @@ test_that("read_dataset() reads FWF file correctly", {
   expect_equal(nrow(df), 10)
 })
 
-# ── detect_files() ────────────────────────────────────────────────────────────
+# -- detect_files() ------------------------------------------------------------
 
 test_that("detect_files() uses current_file when set; previous NULL when absent (D-01)", {
   cfg <- list(current_file = fix("valid_accounts_current.csv"))

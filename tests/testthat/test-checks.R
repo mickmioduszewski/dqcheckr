@@ -33,7 +33,7 @@ make_df <- function() {
   )
 }
 
-# ── QC-01 Missing rate ────────────────────────────────────────────────────────
+# -- QC-01 Missing rate --------------------------------------------------------
 
 test_that("check_missing_rate() returns PASS when missing rate is within threshold", {
   res      <- check_missing_rate(make_df(), base_config())
@@ -49,7 +49,7 @@ test_that("check_missing_rate() returns FAIL when column exceeds threshold", {
   expect_equal(name_res[[1]]$status, "FAIL")
 })
 
-# ── QC-02 Empty column ────────────────────────────────────────────────────────
+# -- QC-02 Empty column --------------------------------------------------------
 
 test_that("check_empty_column() returns PASS when no column is entirely empty", {
   res <- check_empty_column(make_df(), base_config())
@@ -64,7 +64,7 @@ test_that("check_empty_column() returns FAIL for entirely empty column", {
   expect_equal(bal[[1]]$status, "FAIL")
 })
 
-# ── QC-03 Duplicate rows ──────────────────────────────────────────────────────
+# -- QC-03 Duplicate rows ------------------------------------------------------
 
 test_that("check_duplicate_rows() returns PASS when no duplicate rows", {
   res <- check_duplicate_rows(make_df(), base_config())
@@ -77,7 +77,7 @@ test_that("check_duplicate_rows() returns WARN when duplicate rows exist", {
   expect_equal(res[[1]]$status, "WARN")
 })
 
-# ── QC-04 Row count ───────────────────────────────────────────────────────────
+# -- QC-04 Row count -----------------------------------------------------------
 
 test_that("check_row_count() returns INFO with correct count", {
   res <- check_row_count(make_df(), base_config())
@@ -85,7 +85,7 @@ test_that("check_row_count() returns INFO with correct count", {
   expect_equal(res[[1]]$observed, "5")
 })
 
-# ── QC-05 Column count ────────────────────────────────────────────────────────
+# -- QC-05 Column count --------------------------------------------------------
 
 test_that("check_col_count() returns INFO with correct count", {
   df  <- make_df()
@@ -94,7 +94,7 @@ test_that("check_col_count() returns INFO with correct count", {
   expect_equal(res[[1]]$observed, as.character(ncol(df)))
 })
 
-# ── QC-06 Inferred types ──────────────────────────────────────────────────────
+# -- QC-06 Inferred types ------------------------------------------------------
 
 test_that("check_inferred_types() returns INFO for each column", {
   df  <- make_df()
@@ -115,7 +115,7 @@ test_that("check_inferred_types() infers 'date' for created_date", {
   expect_equal(date[[1]]$observed, "date")
 })
 
-# ── QC-07 Numeric stats ───────────────────────────────────────────────────────
+# -- QC-07 Numeric stats -------------------------------------------------------
 
 test_that("check_numeric_stats() returns INFO for numeric columns", {
   res <- check_numeric_stats(make_df(), base_config())
@@ -131,7 +131,7 @@ test_that("check_numeric_stats() observed contains min/max/mean/sd", {
   expect_match(bal[[1]]$observed, "mean=")
 })
 
-# ── QC-08 Distinct counts ─────────────────────────────────────────────────────
+# -- QC-08 Distinct counts -----------------------------------------------------
 
 test_that("check_distinct_counts() returns INFO for character columns", {
   res <- check_distinct_counts(make_df(), base_config())
@@ -139,7 +139,7 @@ test_that("check_distinct_counts() returns INFO for character columns", {
   expect_true(all(vapply(res, \(r) r$status == "INFO", logical(1))))
 })
 
-# ── QC-09 Allowed values ──────────────────────────────────────────────────────
+# -- QC-09 Allowed values ------------------------------------------------------
 
 test_that("check_allowed_values() returns PASS when all values are allowed", {
   cfg <- base_config(list(column_rules = list(
@@ -167,7 +167,7 @@ test_that("check_allowed_values() returns empty list when no column_rules", {
   expect_equal(length(res), 0)
 })
 
-# ── QC-10 Numeric bounds ──────────────────────────────────────────────────────
+# -- QC-10 Numeric bounds ------------------------------------------------------
 
 test_that("check_numeric_bounds() returns PASS when all values within range", {
   cfg <- base_config(list(column_rules = list(
@@ -200,7 +200,7 @@ test_that("check_numeric_bounds() returns FAIL when value above max", {
   expect_equal(bal[[1]]$status, "FAIL")
 })
 
-# ── QC-11 Non-numeric values ──────────────────────────────────────────────────
+# -- QC-11 Non-numeric values --------------------------------------------------
 
 test_that("check_non_numeric() returns PASS when all numeric column values are numeric", {
   res <- check_non_numeric(make_df(), base_config())
@@ -233,7 +233,7 @@ test_that("check_non_numeric() returns WARN when non-numeric present but below t
   expect_equal(bal[[1]]$status, "WARN")
 })
 
-# ── QC-12 Key uniqueness ──────────────────────────────────────────────────────
+# -- QC-12 Key uniqueness ------------------------------------------------------
 
 test_that("check_key_uniqueness() returns PASS for unique key column", {
   cfg <- base_config(list(key_columns = "id"))
@@ -254,7 +254,7 @@ test_that("check_key_uniqueness() returns empty list when no key_columns configu
   expect_equal(length(res), 0)
 })
 
-# ── QC-13 Pattern ─────────────────────────────────────────────────────────────
+# -- QC-13 Pattern -------------------------------------------------------------
 
 test_that("check_pattern() returns PASS when all values match pattern", {
   cfg <- base_config(list(column_rules = list(
@@ -276,7 +276,7 @@ test_that("check_pattern() returns FAIL when values violate pattern", {
   expect_equal(cc[[1]]$status, "FAIL")
 })
 
-# ── QC-14 Minimum row count ───────────────────────────────────────────────────
+# -- QC-14 Minimum row count ---------------------------------------------------
 
 test_that("check_min_row_count() returns PASS when disabled (min_row_count=0)", {
   res <- check_min_row_count(make_df(), base_config())
@@ -294,7 +294,7 @@ test_that("check_min_row_count() returns FAIL when row count below threshold", {
   expect_equal(res[[1]]$status, "FAIL")
 })
 
-# ── SC-01 / SC-02 Schema contract ─────────────────────────────────────────────
+# -- SC-01 / SC-02 Schema contract ---------------------------------------------
 
 test_that("check_schema_contract() returns PASS when columns match exactly", {
   cfg <- base_config(list(
