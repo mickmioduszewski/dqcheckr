@@ -11,9 +11,9 @@ render_report <- function(dataset_name, file_name, file_path, df,
 
   # Normalise to absolute path: rmarkdown changes wd to the template dir,
   # which breaks any relative path supplied as output_file.
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
   file_path  <- normalizePath(file_path,  mustWork = FALSE)
-  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
   ts    <- format(Sys.time(), "%Y%m%d_%H%M%S")
   fname <- sprintf("%s_%s.html", dataset_name, ts)

@@ -1,0 +1,79 @@
+# Per-dataset config for starwars fixed-width file
+dataset_name: "starwars_fwf"
+current_file: "data/starwars.fwf"
+format: fwf
+encoding: "UTF-8"
+
+snapshot_db:       "output/snapshots.sqlite"
+report_output_dir: "output/reports/"
+
+# Skip the header row written by makedata.R
+fwf_skip: 1
+
+# Column widths computed by makedata.R (stored in starwars_fwf_spec.csv)
+fwf_widths:
+  - 21    # name
+  - 6     # height
+  - 4     # mass
+  - 13    # hair_color
+  - 19    # skin_color
+  - 13    # eye_color
+  - 10    # birth_year
+  - 14    # sex
+  - 9     # gender
+  - 14    # homeworld
+  - 14    # species
+  - 131   # films
+  - 35    # vehicles
+  - 100   # starships
+
+fwf_col_names:
+  - name
+  - height
+  - mass
+  - hair_color
+  - skin_color
+  - eye_color
+  - birth_year
+  - sex
+  - gender
+  - homeworld
+  - species
+  - films
+  - vehicles
+  - starships
+
+expected_columns:
+  - name
+  - height
+  - mass
+  - hair_color
+  - skin_color
+  - eye_color
+  - birth_year
+  - sex
+  - gender
+  - homeworld
+  - species
+  - films
+  - vehicles
+  - starships
+
+key_columns:
+  - name
+
+rule_overrides:
+  max_missing_rate: 0.60
+  min_row_count:    80
+
+column_rules:
+  sex:
+    allowed_values: ["male", "female", "none", "hermaphroditic"]
+  gender:
+    allowed_values: ["masculine", "feminine"]
+  height:
+    min_value: 50
+    max_value: 300
+  mass:
+    min_value: 1
+    max_value: 2000
