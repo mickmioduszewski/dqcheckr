@@ -36,8 +36,9 @@
 
 library(dqcheckr)
 
-# Ensure v1 is stamped as older than v2 so folder scan picks v2 as current.
-# This is needed because file copy resets timestamps.
+# Ensure v2 is newer than v1 so folder scan picks v2 as current.
+# Stamping both guarantees correct order regardless of when files were copied.
+Sys.setFileTime("data2/starwars_v2.csv", Sys.time())
 Sys.setFileTime("data2/starwars_v1.csv", Sys.time() - 3600)
 
 result <- run_dq_check("starwars_folder", config_dir = "config2", open_report = TRUE)
