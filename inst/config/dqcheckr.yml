@@ -11,6 +11,7 @@ default_rules:
   # ── Single-snapshot thresholds ──────────────────────────────────────────────
 
   # FAIL if missing rate in any column exceeds this proportion (0–1)
+  type_inference_threshold: 0.90
   max_missing_rate: 0.05
 
   # FAIL if non-numeric value rate in a numeric column exceeds this proportion

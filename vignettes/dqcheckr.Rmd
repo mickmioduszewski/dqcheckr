@@ -263,18 +263,37 @@ are applied in priority order:
 
 1. **date** — all non-empty values parse as a known date format
    (`%Y-%m-%d`, `%d/%m/%Y`, `%m/%d/%Y`, `%Y%m%d`, `%d-%m-%Y`)
-2. **numeric** — ≥ 90% of non-empty values coerce to numeric
+2. **numeric** — ≥ `type_inference_threshold` of non-empty values coerce to numeric
 3. **character** — everything else
 4. **unknown** — all values are empty or `NA`
 
-The 90% threshold means a column with up to 10% bad values is still classified
-as numeric, making those bad values visible to QC-11 (non-numeric contamination).
+The threshold defaults to 90%, meaning a column with up to 10% bad values is
+still classified as numeric, making those bad values visible to QC-11
+(non-numeric contamination). It is configurable per dataset via
+`type_inference_threshold` in `default_rules` or `rule_overrides`:
+
+```yaml
+# raise threshold — stricter, fewer columns classified as numeric
+rule_overrides:
+  type_inference_threshold: 0.95
+
+# lower threshold — more lenient, columns with more noise still classified numeric
+rule_overrides:
+  type_inference_threshold: 0.80
+```
+
+Changing the threshold affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04,
+CP-05, CP-06, and CP-07. Note that changing it between runs may cause CP-02
+to report a spurious type change on columns that sit close to the old and new
+thresholds, even if the underlying data did not change.
 
 ```{r type-inference}
 infer_col_type(c("2024-01-15", "2024-06-30"))  # "date"
 infer_col_type(c("100", "200", "N/A"))          # "character" (only 67% numeric)
 infer_col_type(c("100", "200", "N/A", rep("50", 17)))  # "numeric" (95% numeric)
 infer_col_type(c(NA, "", NA))                   # "unknown"
+# with a custom threshold:
+infer_col_type(c(rep("1", 17), "a", "b", "c"), threshold = 0.80)  # "numeric" (85%)
 ```
 
 ---

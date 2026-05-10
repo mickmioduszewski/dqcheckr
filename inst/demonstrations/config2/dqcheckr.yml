@@ -8,6 +8,7 @@ default_rules:
   # birth_year is 51% missing, mass 32%, homeworld 11% — all expected gaps.
   # Threshold set at 0.60 so those pass.
   # vehicles (87%) and starships (77%) will still FAIL — genuinely sparse.
+  type_inference_threshold: 0.90
   max_missing_rate: 0.60
 
   # All numeric columns are clean integers / doubles — 1% tolerance

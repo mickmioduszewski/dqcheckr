@@ -94,8 +94,11 @@ load_config <- function(dataset_name, config_dir) {
 }
 
 #' Infer the logical type of a character column
+#' @param threshold Numeric. Minimum proportion of non-empty values that must
+#'   parse as numeric for the column to be classified as \code{"numeric"}.
+#'   Defaults to \code{0.90}.
 #' @keywords internal
-infer_col_type <- function(x) {
+infer_col_type <- function(x, threshold = 0.90) {
   non_empty <- x[!is.na(x) & x != ""]
 
   if (length(non_empty) == 0) return("unknown")
@@ -107,7 +110,7 @@ infer_col_type <- function(x) {
   }
 
   numeric_vals <- suppressWarnings(as.numeric(non_empty))
-  if (mean(!is.na(numeric_vals)) >= 0.90) return("numeric")
+  if (mean(!is.na(numeric_vals)) >= threshold) return("numeric")
 
   "character"
 }

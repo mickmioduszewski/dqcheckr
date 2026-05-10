@@ -104,6 +104,24 @@ test_that("infer_col_type() returns 'numeric' for all-NA-except-numeric", {
   expect_equal(infer_col_type(x), "numeric")
 })
 
+test_that("infer_col_type() respects a custom threshold", {
+  # 85% numeric — below default 90%, above custom 80%
+  x <- c(rep("1.0", 17), "abc", "def", "ghi")  # 17/20 = 85%
+  expect_equal(infer_col_type(x, threshold = 0.90), "character")
+  expect_equal(infer_col_type(x, threshold = 0.80), "numeric")
+})
+
+test_that("infer_col_type() threshold applies via config in check_inferred_types()", {
+  df  <- data.frame(score = c(rep("1.0", 17), "bad", "bad", "bad"),
+                    stringsAsFactors = FALSE)
+  cfg_strict <- list(rules = list(type_inference_threshold = 0.90))
+  cfg_lenient <- list(rules = list(type_inference_threshold = 0.80))
+  strict  <- check_inferred_types(df, cfg_strict)
+  lenient <- check_inferred_types(df, cfg_lenient)
+  expect_equal(strict[[1]]$observed,  "character")
+  expect_equal(lenient[[1]]$observed, "numeric")
+})
+
 # ── load_config() ─────────────────────────────────────────────────────────────
 
 test_that("load_config() merges rule_overrides over defaults", {

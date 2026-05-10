@@ -90,8 +90,9 @@ check_col_count <- function(df, config) {
 #' QC-06: Report inferred column types
 #' @keywords internal
 check_inferred_types <- function(df, config) {
+  threshold <- config$rules$type_inference_threshold %||% 0.90
   lapply(names(df), function(col) {
-    typ <- infer_col_type(df[[col]])
+    typ <- infer_col_type(df[[col]], threshold)
     dq_result(
       check_id   = "QC-06",
       check_name = "Inferred type",
@@ -107,9 +108,10 @@ check_inferred_types <- function(df, config) {
 #' @keywords internal
 #' @importFrom stats sd
 check_numeric_stats <- function(df, config) {
+  threshold <- config$rules$type_inference_threshold %||% 0.90
   results <- list()
   for (col in names(df)) {
-    if (infer_col_type(df[[col]]) != "numeric") next
+    if (infer_col_type(df[[col]], threshold) != "numeric") next
     vals <- suppressWarnings(as.numeric(df[[col]]))
     vals <- vals[!is.na(vals)]
     if (length(vals) == 0) next
@@ -130,9 +132,10 @@ check_numeric_stats <- function(df, config) {
 #' QC-08: Report distinct value counts for character columns
 #' @keywords internal
 check_distinct_counts <- function(df, config) {
+  threshold <- config$rules$type_inference_threshold %||% 0.90
   results <- list()
   for (col in names(df)) {
-    if (infer_col_type(df[[col]]) != "character") next
+    if (infer_col_type(df[[col]], threshold) != "character") next
     n_distinct <- length(unique(df[[col]][!.missing_vals(df[[col]])]))
     results <- c(results, list(dq_result(
       check_id   = "QC-08",
@@ -227,10 +230,11 @@ check_numeric_bounds <- function(df, config) {
 #' QC-11: Check non-numeric rate in numeric columns
 #' @keywords internal
 check_non_numeric <- function(df, config) {
-  threshold <- config$rules$max_non_numeric_rate %||% 0.01
+  threshold       <- config$rules$max_non_numeric_rate %||% 0.01
+  type_threshold  <- config$rules$type_inference_threshold %||% 0.90
   results   <- list()
   for (col in names(df)) {
-    if (infer_col_type(df[[col]]) != "numeric") next
+    if (infer_col_type(df[[col]], type_threshold) != "numeric") next
     non_empty <- df[[col]][!.missing_vals(df[[col]])]
     if (length(non_empty) == 0) next
     bad      <- non_empty[is.na(suppressWarnings(as.numeric(non_empty)))]
