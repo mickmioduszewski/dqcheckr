@@ -27,6 +27,7 @@ report_output_dir: output/reports/
 default_rules:
   max_missing_rate: 0.05
   min_row_count: 0
+  type_inference_threshold: 0.90
 ```
 
 **`config/my_dataset.yml`** — dataset-specific settings:
