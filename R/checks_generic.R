@@ -3,7 +3,23 @@
 .missing_vals <- function(x) is.na(x) | x == ""
 
 #' QC-01: Check missing rate per column
-#' @keywords internal
+#'
+#' Returns a \code{\link{dq_result}} per column flagging columns whose
+#' proportion of missing or empty values exceeds \code{max_missing_rate}.
+#'
+#' @param df A data frame with all columns as character vectors.
+#' @param config Named list as returned by \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per column.
+#'
+#' @examples
+#' \dontrun{
+#' cfg <- load_config("my_dataset", "config")
+#' df  <- read_dataset("data/file.csv", cfg)
+#' check_missing_rate(df, cfg)
+#' }
+#'
+#' @export
 check_missing_rate <- function(df, config) {
   threshold <- config$rules$max_missing_rate %||% 0.05
   lapply(names(df), function(col) {

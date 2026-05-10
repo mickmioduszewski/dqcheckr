@@ -26,6 +26,9 @@ reference:
     desc: "Construct and interpret result objects"
     contents:
       - dq_result
+      - overall_status
+      - infer_col_type
+      - check_missing_rate
   - title: "Snapshot database"
     desc: "Query the SQLite snapshot history"
     contents:

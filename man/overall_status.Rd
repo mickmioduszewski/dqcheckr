@@ -6,7 +6,20 @@
 \usage{
 overall_status(results)
 }
-\description{
-Compute the worst status across a list of dq_result objects
+\arguments{
+\item{results}{A list of \code{\link{dq_result}} objects.}
 }
-\keyword{internal}
+\value{
+A single character string: \code{"FAIL"}, \code{"WARN"},
+  \code{"PASS"}, or \code{"INFO"}.
+}
+\description{
+Returns the single worst status in precedence order:
+\code{"FAIL"} > \code{"WARN"} > \code{"PASS"} > \code{"INFO"}.
+}
+\examples{
+r1 <- dq_result("QC-01", "test", status = "PASS", observed = "ok", message = "ok")
+r2 <- dq_result("QC-02", "test", status = "WARN", observed = "ok", message = "ok")
+overall_status(list(r1, r2))  # "WARN"
+
+}

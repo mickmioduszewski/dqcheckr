@@ -6,7 +6,23 @@
 \usage{
 check_missing_rate(df, config)
 }
-\description{
-QC-01: Check missing rate per column
+\arguments{
+\item{df}{A data frame with all columns as character vectors.}
+
+\item{config}{Named list as returned by \code{\link{load_config}}.}
 }
-\keyword{internal}
+\value{
+A list of \code{\link{dq_result}} objects, one per column.
+}
+\description{
+Returns a \code{\link{dq_result}} per column flagging columns whose
+proportion of missing or empty values exceeds \code{max_missing_rate}.
+}
+\examples{
+\dontrun{
+cfg <- load_config("my_dataset", "config")
+df  <- read_dataset("data/file.csv", cfg)
+check_missing_rate(df, cfg)
+}
+
+}

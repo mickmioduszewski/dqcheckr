@@ -94,10 +94,27 @@ load_config <- function(dataset_name, config_dir) {
 }
 
 #' Infer the logical type of a character column
+#'
+#' Classifies a character vector as \code{"date"}, \code{"numeric"},
+#' \code{"character"}, or \code{"unknown"} by applying rules in priority order.
+#'
+#' @param x Character vector to classify (as read from a CSV or FWF file).
 #' @param threshold Numeric. Minimum proportion of non-empty values that must
 #'   parse as numeric for the column to be classified as \code{"numeric"}.
-#'   Defaults to \code{0.90}.
-#' @keywords internal
+#'   Defaults to \code{0.90}. Configurable via \code{type_inference_threshold}
+#'   in \code{rule_overrides}.
+#'
+#' @return A single character string: \code{"date"}, \code{"numeric"},
+#'   \code{"character"}, or \code{"unknown"}.
+#'
+#' @examples
+#' infer_col_type(c("2024-01-01", "2024-06-15"))   # "date"
+#' infer_col_type(c("1.5", "2.0", "3.1"))          # "numeric"
+#' infer_col_type(c("high", "low", "medium"))       # "character"
+#' infer_col_type(c(NA, "", NA))                    # "unknown"
+#' infer_col_type(c(rep("1", 17), "a", "b", "c"), threshold = 0.80)  # "numeric"
+#'
+#' @export
 infer_col_type <- function(x, threshold = 0.90) {
   non_empty <- x[!is.na(x) & x != ""]
 
@@ -116,7 +133,21 @@ infer_col_type <- function(x, threshold = 0.90) {
 }
 
 #' Compute the worst status across a list of dq_result objects
-#' @keywords internal
+#'
+#' Returns the single worst status in precedence order:
+#' \code{"FAIL"} > \code{"WARN"} > \code{"PASS"} > \code{"INFO"}.
+#'
+#' @param results A list of \code{\link{dq_result}} objects.
+#'
+#' @return A single character string: \code{"FAIL"}, \code{"WARN"},
+#'   \code{"PASS"}, or \code{"INFO"}.
+#'
+#' @examples
+#' r1 <- dq_result("QC-01", "test", status = "PASS", observed = "ok", message = "ok")
+#' r2 <- dq_result("QC-02", "test", status = "WARN", observed = "ok", message = "ok")
+#' overall_status(list(r1, r2))  # "WARN"
+#'
+#' @export
 overall_status <- function(results) {
   if (length(results) == 0) return("INFO")
   statuses <- vapply(results, `[[`, character(1), "status")
