@@ -112,7 +112,8 @@ compute_col_stats <- function(df, config, qc_results) {
 #' Write a run snapshot to the SQLite database
 #' @keywords internal
 write_snapshot <- function(db_path, dataset_name, file_name, df,
-                           qc_results, cp_results, custom_results, config) {
+                           qc_results, cp_results, custom_results, config,
+                           col_stats = NULL) {
   tryCatch({
     init_snapshot_db(db_path)
     con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
@@ -171,7 +172,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     snapshot_id <- DBI::dbGetQuery(con,
       "SELECT last_insert_rowid() AS id")$id[[1]]
 
-    col_stats <- compute_col_stats(df, config, qc_results)
+    if (is.null(col_stats)) col_stats <- compute_col_stats(df, config, qc_results)
     col_stats$snapshot_id <- snapshot_id
 
     DBI::dbAppendTable(con, "column_snapshots",

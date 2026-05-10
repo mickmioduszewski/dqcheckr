@@ -46,12 +46,15 @@ run_dq_check <- function(dataset_name,
     list()
   custom_results <- run_custom_checks(df_curr, config)
 
+  col_stats <- compute_col_stats(df_curr, config, qc_results)
+
   db_path     <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
                                mustWork = FALSE)
   snapshot_id <- write_snapshot(
     db_path, dataset_name,
     basename(files$current),
-    df_curr, qc_results, cp_results, custom_results, config
+    df_curr, qc_results, cp_results, custom_results, config,
+    col_stats = col_stats
   )
 
   snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)
@@ -66,6 +69,7 @@ run_dq_check <- function(dataset_name,
     custom_results   = custom_results,
     snapshot_history = snapshot_history,
     config           = config,
+    col_stats        = col_stats,
     output_dir       = config$report_output_dir %||% "reports/",
     open_report      = open_report
   )
