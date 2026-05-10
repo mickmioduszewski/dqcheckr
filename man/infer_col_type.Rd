@@ -4,7 +4,12 @@
 \alias{infer_col_type}
 \title{Infer the logical type of a character column}
 \usage{
-infer_col_type(x)
+infer_col_type(x, threshold = 0.9)
+}
+\arguments{
+\item{threshold}{Numeric. Minimum proportion of non-empty values that must
+parse as numeric for the column to be classified as \code{"numeric"}.
+Defaults to \code{0.90}.}
 }
 \description{
 Infer the logical type of a character column

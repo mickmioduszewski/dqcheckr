@@ -22,8 +22,8 @@ by two YAML files: a global \code{dqcheckr.yml} and a per-dataset
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/mick-mioduszewski/dqcheckr}
-  \item Report bugs at \url{https://github.com/mick-mioduszewski/dqcheckr/issues}
+  \item \url{https://github.com/mickmioduszewski/dqcheckr}
+  \item Report bugs at \url{https://github.com/mickmioduszewski/dqcheckr/issues}
 }
 
 }
