@@ -19,6 +19,8 @@ render_report <- function(dataset_name, file_name, file_path, df,
   fname <- sprintf("%s_%s.html", dataset_name, ts)
   out   <- file.path(output_dir, fname)
 
+  col_stats <- compute_col_stats(df, config, qc_results)
+
   rmarkdown::render(
     input       = template,
     output_file = out,
@@ -33,6 +35,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
       custom_results   = custom_results,
       snapshot_history = snapshot_history,
       config           = config,
+      col_stats        = col_stats,
       overall_status   = overall_status(c(qc_results, cp_results,
                                           custom_results))
     ),

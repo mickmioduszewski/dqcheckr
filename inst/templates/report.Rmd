@@ -17,6 +17,7 @@ params:
   custom_results: NULL
   snapshot_history: NULL
   config: NULL
+  col_stats: NULL
   overall_status: ""
 ---
 
@@ -210,9 +211,8 @@ written to the `column_snapshots` table in the SQLite snapshot database
 `threshold` → Threshold, `severity_on_breach` → Severity).
 
 ```{r appendix}
-if (!is.null(params$df) && !is.null(params$config)) {
-  col_stats <- dqcheckr:::compute_col_stats(params$df, params$config,
-                                             params$qc_results)
+if (!is.null(params$col_stats)) {
+  col_stats <- params$col_stats
   names(col_stats) <- c("Column", "Stat", "Value", "Threshold", "Severity")
   kableExtra::kbl(col_stats) |>
     kableExtra::kable_styling(bootstrap_options = c("striped", "condensed"),
