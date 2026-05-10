@@ -42,7 +42,7 @@ Then run:
 library(dqcheckr)
 
 result <- run_dq_check("my_dataset", config_dir = "config")
-result$status      # "PASS", "WARN", or "FAIL"
+result$status      # "PASS", "WARN", "FAIL", or "INFO"
 result$report_path # path to the HTML report
 ```
 
