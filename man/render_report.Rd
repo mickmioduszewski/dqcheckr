@@ -14,6 +14,7 @@ render_report(
   custom_results,
   snapshot_history,
   config,
+  col_stats = NULL,
   output_dir,
   open_report = TRUE
 )
