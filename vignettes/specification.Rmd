@@ -292,7 +292,7 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-04 | Row count | Table | — | — (INFO) |
 | QC-05 | Column count | Table | — | — (INFO) |
 | QC-06 | Inferred type | Every column | — | — (INFO) |
-| QC-07 | Numeric range | Numeric columns | — | — (INFO: min/max/mean/SD) |
+| QC-07 | Numeric stats | Numeric columns | — | — (INFO: min/max/mean/SD) |
 | QC-08 | Distinct value count | Character columns | — | — (INFO) |
 | QC-09 | Allowed values | Configured columns | Any value outside `allowed_values` | — |
 | QC-10 | Numeric bounds | Configured columns | Any value outside `min_value`/`max_value` | — |
