@@ -1,8 +1,10 @@
 custom_checks <- function(df) {
   results <- list()
 
-  is_human <- "species" %in% names(df) &
+  is_human <- if ("species" %in% names(df))
     !is.na(df$species) & tolower(df$species) == "human"
+  else
+    logical(nrow(df))
 
   # CC-01: Human height error — above 210
   if ("height" %in% names(df) && any(is_human)) {
