@@ -29,6 +29,10 @@ compare_row_count <- function(df_current, df_previous, config) {
 #' @keywords internal
 compare_schema <- function(df_current, df_previous, config) {
   type_threshold <- config$rules$type_inference_threshold %||% 0.90
+  flag_new   <- isTRUE(config$rules$flag_new_columns     %||% TRUE)
+  flag_drop  <- isTRUE(config$rules$flag_dropped_columns %||% TRUE)
+  flag_type  <- isTRUE(config$rules$flag_type_changes    %||% TRUE)
+
   new_cols     <- setdiff(names(df_current), names(df_previous))
   dropped_cols <- setdiff(names(df_previous), names(df_current))
   common_cols  <- intersect(names(df_current), names(df_previous))
@@ -43,17 +47,22 @@ compare_schema <- function(df_current, df_previous, config) {
     }
   }
 
-  has_change <- length(new_cols) > 0 || length(dropped_cols) > 0 ||
-    length(type_changes) > 0
+  # Flags control what is reported; actual changes are always tracked for SQLite
+  reported_new  <- if (flag_new)  new_cols     else character(0)
+  reported_drop <- if (flag_drop) dropped_cols else character(0)
+  reported_type <- if (flag_type) type_changes else character(0)
+
+  has_change <- length(reported_new) > 0 || length(reported_drop) > 0 ||
+    length(reported_type) > 0
   status <- if (has_change) "WARN" else "PASS"
 
   parts <- c(
-    if (length(new_cols) > 0)
-      paste("New columns:", paste(new_cols, collapse = ", ")),
-    if (length(dropped_cols) > 0)
-      paste("Dropped columns:", paste(dropped_cols, collapse = ", ")),
-    if (length(type_changes) > 0)
-      paste("Type changes:", paste(type_changes, collapse = "; "))
+    if (length(reported_new) > 0)
+      paste("New columns:", paste(reported_new, collapse = ", ")),
+    if (length(reported_drop) > 0)
+      paste("Dropped columns:", paste(reported_drop, collapse = ", ")),
+    if (length(reported_type) > 0)
+      paste("Type changes:", paste(reported_type, collapse = "; "))
   )
   observed <- if (length(parts) > 0) paste(parts, collapse = ". ") else "No schema changes."
 
@@ -237,6 +246,7 @@ compare_non_numeric_rate <- function(df_current, df_previous, config) {
 #' CP-08: Check column order consistency between deliveries
 #' @keywords internal
 compare_column_order <- function(df_current, df_previous, config) {
+  if (!isTRUE(config$rules$flag_column_order_change %||% TRUE)) return(list())
   fmt        <- tolower(config$format %||% "csv")
   curr_names <- names(df_current)
   prev_names <- names(df_previous)

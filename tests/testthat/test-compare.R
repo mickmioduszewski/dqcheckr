@@ -188,3 +188,45 @@ test_that("compare_column_order() returns FAIL for FWF when order changes", {
   res <- compare_column_order(curr, make_prev(), cfg)
   expect_equal(res[[1]]$status, "FAIL")
 })
+
+# ── flag_* config keys ────────────────────────────────────────────────────────
+
+test_that("compare_schema() suppresses new columns when flag_new_columns=FALSE", {
+  curr <- make_curr()
+  curr$extra_col <- "x"
+  cfg <- base_config()
+  cfg$rules$flag_new_columns <- FALSE
+  res <- compare_schema(curr, make_prev(), cfg)
+  expect_equal(res[[1]]$status, "PASS")
+  expect_false(grepl("New columns", res[[1]]$observed))
+  expect_equal(attr(res, "new_cols"), "extra_col")  # still tracked for SQLite
+})
+
+test_that("compare_schema() suppresses dropped columns when flag_dropped_columns=FALSE", {
+  prev <- make_prev()
+  prev$ghost_col <- "x"
+  cfg <- base_config()
+  cfg$rules$flag_dropped_columns <- FALSE
+  res <- compare_schema(make_curr(), prev, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+  expect_false(grepl("Dropped", res[[1]]$observed))
+  expect_equal(attr(res, "dropped_cols"), "ghost_col")
+})
+
+test_that("compare_schema() suppresses type changes when flag_type_changes=FALSE", {
+  prev <- make_prev()
+  prev$account_balance <- c("high", "low", "mid", "zero", "neg")
+  cfg <- base_config()
+  cfg$rules$flag_type_changes <- FALSE
+  res <- compare_schema(make_curr(), prev, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+  expect_false(grepl("Type changes", res[[1]]$observed))
+})
+
+test_that("compare_column_order() returns empty list when flag_column_order_change=FALSE", {
+  curr <- make_curr()[, rev(names(make_curr()))]
+  cfg  <- base_config()
+  cfg$rules$flag_column_order_change <- FALSE
+  res  <- compare_column_order(curr, make_prev(), cfg)
+  expect_length(res, 0)
+})

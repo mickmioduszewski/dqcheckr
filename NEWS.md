@@ -1,5 +1,9 @@
 # dqcheckr 0.1.1
 
+* `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes` (in CP-02) and
+  `flag_column_order_change` (CP-08) are now honoured. Setting any flag to `false`
+  suppresses the corresponding check from the report. Schema changes are still
+  tracked in the SQLite snapshot regardless of flags.
 * `type_inference_threshold` is now configurable per dataset via `rule_overrides`
   in the dataset YAML (or `default_rules` in the global config). Previously fixed
   at 90%, it now defaults to 90% if not set. Affects QC-06, QC-07, QC-08, QC-11,
