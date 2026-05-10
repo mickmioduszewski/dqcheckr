@@ -27,6 +27,8 @@ library(kableExtra)
 library(ggplot2)
 library(dplyr)
 
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
 status_colour <- function(s) {
   switch(s,
     FAIL = "red",
