@@ -143,3 +143,35 @@ test_that("read_recent_snapshots() returns at most n rows", {
   expect_equal(nrow(res), 3L)
   unlink(db)
 })
+
+# -- compute_col_stats() column contract ---------------------------------------
+
+test_that("compute_col_stats() returns a data frame with the correct 5 columns in order", {
+  df  <- data.frame(
+    id    = c("1", "2", "3"),
+    score = c("10.5", "20.0", "bad"),
+    stringsAsFactors = FALSE
+  )
+  cfg <- list(rules = list(
+    max_missing_rate    = 0.05,
+    max_non_numeric_rate = 0.01,
+    type_inference_threshold = 0.90
+  ))
+  qc <- run_qc_checks(df, cfg)
+  cs <- compute_col_stats(df, cfg, qc)
+
+  expect_s3_class(cs, "data.frame")
+  expect_equal(names(cs),
+               c("column_name", "dq_check", "value", "threshold", "severity_on_breach"))
+})
+
+test_that("compute_col_stats() column names map correctly to report display names", {
+  df  <- data.frame(x = c("1", "2"), stringsAsFactors = FALSE)
+  cfg <- list(rules = list(max_missing_rate = 0.05,
+                           max_non_numeric_rate = 0.01,
+                           type_inference_threshold = 0.90))
+  qc  <- run_qc_checks(df, cfg)
+  cs  <- compute_col_stats(df, cfg, qc)
+  names(cs) <- c("Column", "Stat", "Value", "Threshold", "Severity")
+  expect_equal(names(cs), c("Column", "Stat", "Value", "Threshold", "Severity"))
+})
