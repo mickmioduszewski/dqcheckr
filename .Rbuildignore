@@ -10,3 +10,5 @@
 ^Meta$
 ^_pkgdown\.yml$
 ^docs$
+^\.claude$
+^cran-comments\.md$
