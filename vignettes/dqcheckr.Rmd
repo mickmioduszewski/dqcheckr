@@ -34,7 +34,7 @@ Your data file                  Your YAML config
           run_custom_checks()    ← your own rules
                      │
                      ▼
-          write_snapshot()       ← SQLite: one row per run
+          write_snapshot()       ← SQLite: run summary + per-column stats
           render_report()        ← self-contained HTML
                      │
                      ▼
