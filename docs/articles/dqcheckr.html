@@ -141,70 +141,72 @@ datasets unless a dataset overrides them.</p>
 <span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate_change_pp</span><span class="kw">:</span><span class="at">     </span><span class="fl">2.0</span><span class="co">    # percentage points</span></span>
 <span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate_change_pp</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span></span>
 <span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_new_columns</span><span class="kw">:</span><span class="at">         </span><span class="ch">true</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_dropped_columns</span><span class="kw">:</span><span class="at">     </span><span class="ch">true</span></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_type_changes</span><span class="kw">:</span><span class="at">        </span><span class="ch">true</span></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_column_order_change</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">   # WARN for CSV, FAIL for FWF</span></span></code></pre></div>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_new_columns</span><span class="kw">:</span><span class="at">         </span><span class="ch">true</span><span class="co">   # set false to suppress new-column warnings in CP-02</span></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_dropped_columns</span><span class="kw">:</span><span class="at">     </span><span class="ch">true</span><span class="co">   # set false to suppress dropped-column warnings in CP-02</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_type_changes</span><span class="kw">:</span><span class="at">        </span><span class="ch">true</span><span class="co">   # set false to suppress type-change warnings in CP-02</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_column_order_change</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">   # set false to skip CP-08 entirely (WARN CSV / FAIL FWF)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="per-dataset-config-dataset_name-yml">Per-dataset config — <code>&lt;dataset_name&gt;.yml</code><a class="anchor" aria-label="anchor" href="#per-dataset-config-dataset_name-yml"></a>
 </h3>
 <p>One file per dataset. Only the keys you specify are needed —
 everything else inherits from the global defaults.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"customer_accounts"</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co"># --- File location ---</span></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># Option A: folder scan (two most recently modified files are used)</span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="fu">folder</span><span class="kw">:</span><span class="at"> </span><span class="st">"data/incoming/customer_accounts/"</span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co"># Option B: explicit paths (set current_file only → single-file mode,</span></span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#           no version comparison)</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co"># current_file:  "data/incoming/customer_accounts/20260410.csv"</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at">    csv</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">encoding</span><span class="kw">:</span><span class="at">  </span><span class="st">"UTF-8"</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="fu">delimiter</span><span class="kw">:</span><span class="at"> </span><span class="st">","</span></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co"># --- Schema contract (optional) ---</span></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co"># SC-01 flags extra columns; SC-02 flags missing columns.</span></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a></span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="co"># --- Key columns (optional) ---</span></span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="co"># QC-12 checks each for duplicate values.</span></span>
-<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a></span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co"># --- Rule overrides (optional) ---</span></span>
-<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="co"># These replace the matching keys in default_rules for this dataset only.</span></span>
-<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
-<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at">        </span><span class="fl">0.02</span></span>
-<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
-<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at">           </span><span class="dv">1000</span></span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a></span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a><span class="co"># --- Per-column rules (optional) ---</span></span>
-<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
-<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
-<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span><span class="co">   # QC-09</span></span>
-<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span><span class="co">                       # QC-13</span></span>
-<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
-<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
-<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
-<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                                 # QC-10</span></span>
-<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
-<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a></span>
-<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a><span class="co"># --- Custom checks (optional) ---</span></span>
-<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a><span class="co"># custom_checks_file: "custom/customer_accounts_checks.R"</span></span>
-<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a></span>
-<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a><span class="co"># --- Output paths (optional, override global) ---</span></span>
-<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a><span class="co"># snapshot_db:       "data/snapshots.sqlite"</span></span>
-<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a><span class="co"># report_output_dir: "reports/"</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"customer_accounts"</span><span class="co">   # for human reference only — the functional</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">                                     # identifier is the YAML filename, which must</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">                                     # match the dataset_name argument to run_dq_check()</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># --- File location ---</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co"># Option A: folder scan (two most recently modified files are used)</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">folder</span><span class="kw">:</span><span class="at"> </span><span class="st">"data/incoming/customer_accounts/"</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co"># Option B: explicit paths (set current_file only → single-file mode,</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#           no version comparison)</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co"># current_file:  "data/incoming/customer_accounts/20260410.csv"</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at">    csv</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="fu">encoding</span><span class="kw">:</span><span class="at">  </span><span class="st">"UTF-8"</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">delimiter</span><span class="kw">:</span><span class="at"> </span><span class="st">","</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co"># --- Schema contract (optional) ---</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co"># SC-01 flags extra columns; SC-02 flags missing columns.</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="co"># --- Key columns (optional) ---</span></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co"># QC-12 checks each for duplicate values.</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a></span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a><span class="co"># --- Rule overrides (optional) ---</span></span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a><span class="co"># These replace the matching keys in default_rules for this dataset only.</span></span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at">        </span><span class="fl">0.02</span></span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at">           </span><span class="dv">1000</span></span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a></span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a><span class="co"># --- Per-column rules (optional) ---</span></span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span><span class="co">   # QC-09</span></span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span><span class="co">                       # QC-13</span></span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
+<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
+<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                                 # QC-10</span></span>
+<span id="cb5-49"><a href="#cb5-49" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
+<span id="cb5-50"><a href="#cb5-50" tabindex="-1"></a></span>
+<span id="cb5-51"><a href="#cb5-51" tabindex="-1"></a><span class="co"># --- Custom checks (optional) ---</span></span>
+<span id="cb5-52"><a href="#cb5-52" tabindex="-1"></a><span class="co"># custom_checks_file: "custom/customer_accounts_checks.R"</span></span>
+<span id="cb5-53"><a href="#cb5-53" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" tabindex="-1"></a><span class="co"># --- Output paths (optional, override global) ---</span></span>
+<span id="cb5-55"><a href="#cb5-55" tabindex="-1"></a><span class="co"># snapshot_db:       "data/snapshots.sqlite"</span></span>
+<span id="cb5-56"><a href="#cb5-56" tabindex="-1"></a><span class="co"># report_output_dir: "reports/"</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="what-is-required-vs-optional">What is required vs optional<a class="anchor" aria-label="anchor" href="#what-is-required-vs-optional"></a>
@@ -264,11 +266,31 @@ corresponding checks are simply skipped when the key is absent.</p>
 <td>Defaults to 0.90 (affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04,
 CP-05, CP-06, CP-07)</td>
 </tr>
+<tr class="even">
+<td><code>flag_new_columns</code></td>
+<td>Defaults to <code>true</code>; set to <code>false</code> to suppress
+new-column warnings in CP-02 (still tracked in SQLite)</td>
+</tr>
+<tr class="odd">
+<td><code>flag_dropped_columns</code></td>
+<td>Defaults to <code>true</code>; set to <code>false</code> to suppress
+dropped-column warnings in CP-02 (still tracked in SQLite)</td>
+</tr>
+<tr class="even">
+<td><code>flag_type_changes</code></td>
+<td>Defaults to <code>true</code>; set to <code>false</code> to suppress
+type-change warnings in CP-02</td>
+</tr>
+<tr class="odd">
+<td><code>flag_column_order_change</code></td>
+<td>Defaults to <code>true</code>; set to <code>false</code> to skip
+CP-08 entirely</td>
+</tr>
 </tbody>
 </table>
 <p>A minimal dataset config that runs basic checks with no column-level
 rules:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"my_dataset"</span></span>
+<div class="sourceCode" id="cb6"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"my_dataset"</span><span class="co">           # for reference; must match the YAML filename</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">current_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"data/incoming/my_dataset.csv"</span></span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at"> csv</span></span></code></pre></div>
 </div>

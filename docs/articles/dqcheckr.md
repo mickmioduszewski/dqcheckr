@@ -85,10 +85,10 @@ default_rules:
   max_missing_rate_change_pp:     2.0    # percentage points
   max_non_numeric_rate_change_pp: 1.0
 
-  flag_new_columns:         true
-  flag_dropped_columns:     true
-  flag_type_changes:        true
-  flag_column_order_change: true   # WARN for CSV, FAIL for FWF
+  flag_new_columns:         true   # set false to suppress new-column warnings in CP-02
+  flag_dropped_columns:     true   # set false to suppress dropped-column warnings in CP-02
+  flag_type_changes:        true   # set false to suppress type-change warnings in CP-02
+  flag_column_order_change: true   # set false to skip CP-08 entirely (WARN CSV / FAIL FWF)
 ```
 
 ### Per-dataset config — `<dataset_name>.yml`
@@ -97,7 +97,9 @@ One file per dataset. Only the keys you specify are needed — everything
 else inherits from the global defaults.
 
 ``` yaml
-dataset_name: "customer_accounts"
+dataset_name: "customer_accounts"   # for human reference only — the functional
+                                     # identifier is the YAML filename, which must
+                                     # match the dataset_name argument to run_dq_check()
 
 # --- File location ---
 # Option A: folder scan (two most recently modified files are used)
@@ -171,12 +173,16 @@ absent.
 | `previous_file` / second file in folder | All CP-01–CP-08 (version comparison) skipped |
 | `min_row_count` set to 0 | QC-14 (minimum row count) skipped |
 | `type_inference_threshold` | Defaults to 0.90 (affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04, CP-05, CP-06, CP-07) |
+| `flag_new_columns` | Defaults to `true`; set to `false` to suppress new-column warnings in CP-02 (still tracked in SQLite) |
+| `flag_dropped_columns` | Defaults to `true`; set to `false` to suppress dropped-column warnings in CP-02 (still tracked in SQLite) |
+| `flag_type_changes` | Defaults to `true`; set to `false` to suppress type-change warnings in CP-02 |
+| `flag_column_order_change` | Defaults to `true`; set to `false` to skip CP-08 entirely |
 
 A minimal dataset config that runs basic checks with no column-level
 rules:
 
 ``` yaml
-dataset_name: "my_dataset"
+dataset_name: "my_dataset"           # for reference; must match the YAML filename
 current_file: "data/incoming/my_dataset.csv"
 format: csv
 ```

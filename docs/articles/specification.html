@@ -311,10 +311,10 @@ long-term trend queries without reading the source files again.</p>
 <span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate_change_pp</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span></span>
 <span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a></span>
 <span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">  # Schema flags</span></span>
-<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_new_columns</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_dropped_columns</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_type_changes</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_column_order_change</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">    # WARN for CSV, FAIL for FWF</span></span></code></pre></div>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_new_columns</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">            # set false to suppress new-column warnings in CP-02</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_dropped_columns</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">        # set false to suppress dropped-column warnings in CP-02</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_type_changes</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">           # set false to suppress type-change warnings in CP-02</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="at">  </span><span class="fu">flag_column_order_change</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">    # set false to skip CP-08 entirely (WARN CSV / FAIL FWF)</span></span></code></pre></div>
 <p><strong>Per-dataset config —
 <code>&lt;dataset_name&gt;.yml</code></strong></p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"customer_accounts"</span></span>
@@ -623,7 +623,9 @@ single-file mode</p>
 <tr class="even">
 <td>CP-02</td>
 <td>Schema diff</td>
-<td>Columns added, dropped, or type-changed</td>
+<td>Columns added, dropped, or type-changed (each independently
+suppressible via <code>flag_new_columns</code>,
+<code>flag_dropped_columns</code>, <code>flag_type_changes</code>)</td>
 <td>WARN</td>
 </tr>
 <tr class="odd">
@@ -661,7 +663,8 @@ column</td>
 <tr class="even">
 <td>CP-08</td>
 <td>Column order change</td>
-<td>Column order differs from previous</td>
+<td>Column order differs from previous (suppressible via
+<code>flag_column_order_change: false</code>)</td>
 <td>WARN (CSV) / FAIL (FWF)</td>
 </tr>
 </tbody>
