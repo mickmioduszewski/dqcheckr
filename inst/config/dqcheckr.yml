@@ -10,8 +10,11 @@ report_output_dir: "reports/"
 default_rules:
   # ── Single-snapshot thresholds ──────────────────────────────────────────────
 
-  # FAIL if missing rate in any column exceeds this proportion (0–1)
+  # Proportion of non-empty values that must parse as numeric for a column to
+  # be classified as numeric (affects QC-06 through QC-11 and CP-02 to CP-07)
   type_inference_threshold: 0.90
+
+  # FAIL if missing rate in any column exceeds this proportion (0–1)
   max_missing_rate: 0.05
 
   # FAIL if non-numeric value rate in a numeric column exceeds this proportion
