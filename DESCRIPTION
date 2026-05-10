@@ -17,6 +17,7 @@ License: MIT + file LICENSE
 URL: https://github.com/mickmioduszewski/dqcheckr
 BugReports: https://github.com/mickmioduszewski/dqcheckr/issues
 Encoding: UTF-8
+Language: en-GB
 Depends:
     R (>= 4.2)
 Imports:
