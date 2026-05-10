@@ -70,7 +70,11 @@ snapshot_db:       "data/snapshots.sqlite"
 report_output_dir: "reports/"
 
 default_rules:
-  # FAIL if any column's missing-value rate exceeds this (0–1)
+  # Proportion of non-empty values that must parse as numeric for a column to
+  # be classified as numeric (affects type inference across many checks)
+  type_inference_threshold: 0.90
+
+  # FAIL if any column's missing-value rate exceeds this (0-1)
   max_missing_rate: 0.05
 
   # FAIL if non-numeric values in a numeric column exceed this rate

@@ -13,6 +13,7 @@ write_snapshot(
   qc_results,
   cp_results,
   custom_results,
-  config
+  config,
+  col_stats = NULL
 )
 ```
