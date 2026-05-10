@@ -230,3 +230,19 @@ test_that("compare_column_order() returns empty list when flag_column_order_chan
   res  <- compare_column_order(curr, make_prev(), cfg)
   expect_length(res, 0)
 })
+
+test_that("run_comparison_checks() preserves new_cols and dropped_cols attributes", {
+  curr <- make_curr()
+  curr$extra_col <- "x"
+  prev <- make_prev()
+  prev$ghost_col <- "y"
+  res <- run_comparison_checks(curr, prev, base_config())
+  expect_equal(attr(res, "new_cols"),     "extra_col")
+  expect_equal(attr(res, "dropped_cols"), "ghost_col")
+})
+
+test_that("run_comparison_checks() attributes are NULL when no schema changes", {
+  res <- run_comparison_checks(make_curr(), make_prev(), base_config())
+  expect_length(attr(res, "new_cols"),     0)
+  expect_length(attr(res, "dropped_cols"), 0)
+})

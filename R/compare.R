@@ -299,9 +299,13 @@ compare_column_order <- function(df_current, df_previous, config) {
 #'
 #' @export
 run_comparison_checks <- function(df_current, df_previous, config) {
-  c(
+  schema_res <- compare_schema(df_current, df_previous, config)
+  new_cols     <- attr(schema_res, "new_cols")
+  dropped_cols <- attr(schema_res, "dropped_cols")
+
+  results <- c(
     compare_row_count(df_current, df_previous, config),
-    compare_schema(df_current, df_previous, config),
+    schema_res,
     compare_missing_rate(df_current, df_previous, config),
     compare_numeric_mean(df_current, df_previous, config),
     compare_new_values(df_current, df_previous, config),
@@ -309,4 +313,8 @@ run_comparison_checks <- function(df_current, df_previous, config) {
     compare_non_numeric_rate(df_current, df_previous, config),
     compare_column_order(df_current, df_previous, config)
   )
+
+  attr(results, "new_cols")     <- new_cols
+  attr(results, "dropped_cols") <- dropped_cols
+  results
 }
