@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -1171,8 +1171,11 @@ configured datasets in sequence</td>
 <tbody>
 <tr class="odd">
 <td>L-01</td>
-<td>Type inference uses a fixed 90% threshold; this is not configurable
-per dataset</td>
+<td>
+<del>Type inference uses a fixed 90% threshold</del> — resolved in
+v0.1.1; configurable via <code>type_inference_threshold</code> in
+<code>rule_overrides</code>
+</td>
 </tr>
 <tr class="even">
 <td>L-02</td>

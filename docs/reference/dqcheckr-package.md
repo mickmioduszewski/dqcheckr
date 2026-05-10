@@ -19,9 +19,9 @@ per-dataset `<dataset_name>.yml`.
 
 Useful links:
 
-- <https://github.com/mick-mioduszewski/dqcheckr>
+- <https://github.com/mickmioduszewski/dqcheckr>
 
-- Report bugs at <https://github.com/mick-mioduszewski/dqcheckr/issues>
+- Report bugs at <https://github.com/mickmioduszewski/dqcheckr/issues>
 
 ## Author
 

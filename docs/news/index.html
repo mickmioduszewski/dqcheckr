@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,11 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.1" id="dqcheckr-011">dqcheckr 0.1.1<a class="anchor" aria-label="anchor" href="#dqcheckr-011"></a></h2>
+<ul><li>
+<code>type_inference_threshold</code> is now configurable per dataset via <code>rule_overrides</code> in the dataset YAML (or <code>default_rules</code> in the global config). Previously fixed at 90%, it now defaults to 90% if not set. Affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04, CP-05, CP-06, and CP-07.</li>
+</ul></div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="dqcheckr-010">dqcheckr 0.1.0<a class="anchor" aria-label="anchor" href="#dqcheckr-010"></a></h2>
 <p>Initial release.</p>
 <ul><li>Single-snapshot quality checks: QC-01 to QC-14 (missing rate, empty columns, duplicate rows, row/column counts, inferred types, numeric stats, distinct counts, allowed values, numeric bounds, non-numeric rate, key uniqueness, regex pattern, minimum row count) and SC-01/SC-02 (schema contract).</li>
@@ -46,7 +51,8 @@
 <li>Supports CSV and fixed-width (FWF) file formats.</li>
 <li>Configuration via global <code>dqcheckr.yml</code> and per-dataset YAML files.</li>
 </ul></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

@@ -509,7 +509,7 @@ All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used
 
 | \# | Limitation |
 |----|----|
-| L-01 | Type inference uses a fixed 90% threshold; this is not configurable per dataset |
+| L-01 | ~~Type inference uses a fixed 90% threshold~~ — resolved in v0.1.1; configurable via `type_inference_threshold` in `rule_overrides` |
 | L-02 | Date formats tested are hardcoded to five common patterns; exotic formats will be misclassified as character |
 | L-03 | The report appendix reads from in-memory `col_stats`, not from SQLite. If the SQLite write fails but the report succeeds, the appendix and the database can show slightly different values in edge cases |
 | L-04 | Performance target (\< 60 seconds for 1 M rows) has not been benchmarked; very wide files (many columns) may be slower than expected |

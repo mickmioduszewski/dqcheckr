@@ -1,5 +1,13 @@
 # Changelog
 
+## dqcheckr 0.1.1
+
+- `type_inference_threshold` is now configurable per dataset via
+  `rule_overrides` in the dataset YAML (or `default_rules` in the global
+  config). Previously fixed at 90%, it now defaults to 90% if not set.
+  Affects QC-06, QC-07, QC-08, QC-11, CP-02, CP-04, CP-05, CP-06, and
+  CP-07.
+
 ## dqcheckr 0.1.0
 
 Initial release.
