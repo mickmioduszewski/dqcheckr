@@ -202,6 +202,7 @@ encoding: "UTF-8"
 delimiter: ","              # csv only
 fwf_widths: ~               # fwf only
 fwf_col_names: ~            # fwf only
+fwf_skip: 0                 # fwf only — header rows to skip (default 0)
 
 # Optional: explicit file paths override folder-scan version detection
 # current_file: "data/incoming/customer_accounts/20260410.csv"
