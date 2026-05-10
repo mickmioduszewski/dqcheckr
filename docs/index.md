@@ -13,8 +13,8 @@ supplied as plain R files.
 
 ``` r
 
-# Install from a local source directory
-devtools::install("path/to/dqcheckr")
+# Install from GitHub
+devtools::install_github("mickmioduszewski/dqcheckr")
 ```
 
 ## Quick start
@@ -79,6 +79,25 @@ Point to it in your dataset YAML:
 ``` yaml
 custom_checks_file: config/my_checks.R
 ```
+
+## Demonstrations
+
+The package includes two runnable demonstrations using the Star Wars
+dataset. Copy them to a local directory and run them directly in
+RStudio:
+
+``` r
+
+# Copy to ~/dqcheckr_demo
+dest <- file.path(path.expand("~"), "dqcheckr_demo")
+file.copy(system.file("demonstrations", package = "dqcheckr"),
+          dirname(dest), recursive = TRUE)
+file.rename(file.path(dirname(dest), "demonstrations"), dest)
+```
+
+Then open `demo.R` (named-file mode, CSV + FWF) or `demo2.R`
+(folder-scan mode, version comparison, custom checks) in RStudio, set
+the working directory to the copied folder, and source the script.
 
 ## Learn more
 
