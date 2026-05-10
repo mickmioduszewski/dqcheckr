@@ -390,6 +390,7 @@ custom_checks <- function(df) {
   results <- c(results, list(dq_result(
     check_id   = "CUST-01",
     check_name = "No zero-balance active accounts",
+    column     = "account_balance",   # enables per-column storage in SQLite
     status     = if (n > 0) "FAIL" else "PASS",
     observed   = sprintf("%d ACTIVE account(s) with balance 0", n),
     message    = if (n > 0)
@@ -411,6 +412,11 @@ custom_checks_file: "custom/customer_accounts_checks.R"
 The file is sourced in an isolated environment (not the global session).
 `dq_result()` is available inside it. Any error — missing file, undefined
 function, runtime failure — stops the run with a clear message.
+
+**Tip**: always set `column =` when your check is scoped to a specific column.
+Results with `column = NA` (the default) appear in the HTML report and
+contribute to the overall status, but are not written to the `column_snapshots`
+SQLite table and therefore do not appear in per-column trend queries.
 
 ---
 
