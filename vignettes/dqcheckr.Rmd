@@ -108,7 +108,9 @@ One file per dataset. Only the keys you specify are needed — everything else
 inherits from the global defaults.
 
 ```yaml
-dataset_name: "customer_accounts"
+dataset_name: "customer_accounts"   # for human reference only — the functional
+                                     # identifier is the YAML filename, which must
+                                     # match the dataset_name argument to run_dq_check()
 
 # --- File location ---
 # Option A: folder scan (two most recently modified files are used)
@@ -189,7 +191,7 @@ the corresponding checks are simply skipped when the key is absent.
 A minimal dataset config that runs basic checks with no column-level rules:
 
 ```yaml
-dataset_name: "my_dataset"
+dataset_name: "my_dataset"           # for reference; must match the YAML filename
 current_file: "data/incoming/my_dataset.csv"
 format: csv
 ```
