@@ -1,7 +1,7 @@
 id,name,country_code,account_status,account_balance,created_date
 ID001,Alice Smith,GB,ACTIVE,high,2024-01-15
 ID002,Bob Jones,US,ACTIVE,low,2024-02-20
-ID003,Clara Müller,DE,CLOSED,medium,2023-11-01
+ID003,Clara Muller,DE,CLOSED,medium,2023-11-01
 ID004,David Martin,FR,ACTIVE,high,2024-03-10
 ID005,Emma Wilson,GB,SUSPENDED,low,2024-04-05
 ID006,Frank Brown,US,ACTIVE,medium,2023-12-31
