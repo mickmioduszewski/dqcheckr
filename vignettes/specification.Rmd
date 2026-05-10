@@ -2,6 +2,7 @@
 title: "dqcheckr — Software Specification"
 author: "Mick Mioduszewski"
 date: "2026-05-10"
+version: "0.1.1"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Software Specification}
@@ -13,9 +14,9 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 ```
 
-**Version**: 0.0.1
+**Version**: 0.1.1
 **Author**: Mick Mioduszewski
-**Date**: 10 April 2026
+**Date**: 2026-05-10
 
 ---
 
@@ -134,17 +135,32 @@ dqcheckr/
 │   ├── checks_custom.R      # source and call custom_checks(df)
 │   ├── compare.R            # CP-01..08
 │   ├── report.R             # rmarkdown::render() wrapper
-│   └── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+│   ├── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
+│   └── dqcheckr-package.R   # package-level documentation
 ├── inst/
 │   ├── templates/report.Rmd
-│   └── config/
-│       ├── dqcheckr.yml
-│       └── example_dataset.yml
+│   ├── config/
+│   │   ├── dqcheckr.yml
+│   │   └── example_dataset.yml
+│   └── demonstrations/
+│       ├── demo.R           # named-file mode demo (CSV + FWF)
+│       ├── demo2.R          # folder-scan mode demo with version comparison
+│       ├── README.md
+│       ├── config/          # global + starwars_csv + starwars_fwf configs
+│       ├── config2/         # global + starwars_folder configs
+│       ├── custom2/         # starwars_custom.R (human-specific checks)
+│       ├── data/            # starwars.csv, starwars.fwf
+│       └── data2/           # starwars_v1.csv (original), starwars_v2.csv (perturbed)
 ├── tests/testthat/
 │   ├── test-utils.R
 │   ├── test-checks.R
 │   ├── test-compare.R
-│   └── test-ingest.R
+│   ├── test-ingest.R
+│   ├── test-snapshot.R
+│   └── test-integration.R
+├── vignettes/
+│   ├── dqcheckr.Rmd         # user guide
+│   └── specification.Rmd    # this document
 ├── DESCRIPTION
 └── NAMESPACE
 ```
