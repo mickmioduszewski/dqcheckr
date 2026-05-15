@@ -33,10 +33,10 @@ renders an HTML report.
 }
 \examples{
 \donttest{
-tmp <- tempdir()
+tmp <- gsub("\\\\\\\\", "/", tempdir())
 dat <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 writeLines(c(
-  paste0('snapshot_db: "',       file.path(tmp, "snap.sqlite"), '"'),
+  paste0('snapshot_db: "',       tmp, '/snap.sqlite"'),
   paste0('report_output_dir: "', tmp, '"'),
   'default_rules:',
   '  max_missing_rate: 0.60',
