@@ -19,10 +19,10 @@ Returns a \code{\link{dq_result}} per column flagging columns whose
 proportion of missing or empty values exceeds \code{max_missing_rate}.
 }
 \examples{
-\dontrun{
-cfg <- load_config("my_dataset", "config")
-df  <- read_dataset("data/file.csv", cfg)
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+df   <- read_dataset(path, cfg)
 check_missing_rate(df, cfg)
-}
 
 }

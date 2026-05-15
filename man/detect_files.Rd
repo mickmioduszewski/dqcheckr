@@ -20,10 +20,11 @@ Resolves the current and previous file paths from the configuration. If
 two most recently modified files in \code{folder} are used.
 }
 \examples{
-\dontrun{
-cfg <- load_config("my_dataset", "config")
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg <- load_config("starwars_csv", config_dir = cfg_dir)
+cfg$current_file <- system.file("demonstrations/data/starwars.csv",
+                                 package = "dqcheckr")
 files <- detect_files(cfg)
 files$current
-}
 
 }

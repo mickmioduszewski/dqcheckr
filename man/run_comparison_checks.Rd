@@ -23,11 +23,12 @@ A list of \code{\link{dq_result}} objects. The list carries
 Runs CP-01 to CP-08 comparing a current delivery against the previous one.
 }
 \examples{
-\dontrun{
-cfg  <- load_config("my_dataset", "config")
-curr <- read_dataset("data/current.csv", cfg)
-prev <- read_dataset("data/previous.csv", cfg)
-results <- run_comparison_checks(curr, prev, cfg)
-}
+cfg_dir   <- system.file("demonstrations/config", package = "dqcheckr")
+cfg       <- load_config("starwars_csv", config_dir = cfg_dir)
+curr_path <- system.file("demonstrations/data2/starwars_v2.csv", package = "dqcheckr")
+prev_path <- system.file("demonstrations/data2/starwars_v1.csv", package = "dqcheckr")
+curr      <- read_dataset(curr_path, cfg)
+prev      <- read_dataset(prev_path, cfg)
+results   <- run_comparison_checks(curr, prev, cfg)
 
 }

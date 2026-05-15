@@ -61,10 +61,9 @@ dq_result <- function(check_id, check_name, column = NA_character_,
 #' @return A named list representing the merged configuration.
 #'
 #' @examples
-#' \dontrun{
-#' cfg <- load_config("my_dataset", config_dir = "config")
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg <- load_config("starwars_csv", config_dir = cfg_dir)
 #' cfg$format
-#' }
 #'
 #' @export
 load_config <- function(dataset_name, config_dir) {

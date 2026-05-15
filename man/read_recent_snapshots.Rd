@@ -25,8 +25,6 @@ Retrieves the \code{n} most recent run records for a given dataset from the
 snapshot database, ordered newest-first.
 }
 \examples{
-\dontrun{
-history <- read_recent_snapshots("output/snapshots.sqlite", "my_dataset")
-}
+history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
 
 }

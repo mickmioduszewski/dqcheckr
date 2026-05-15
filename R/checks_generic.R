@@ -13,11 +13,11 @@
 #' @return A list of \code{\link{dq_result}} objects, one per column.
 #'
 #' @examples
-#' \dontrun{
-#' cfg <- load_config("my_dataset", "config")
-#' df  <- read_dataset("data/file.csv", cfg)
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
 #' check_missing_rate(df, cfg)
-#' }
 #'
 #' @export
 check_missing_rate <- function(df, config) {
@@ -431,11 +431,11 @@ check_schema_contract <- function(df, config) {
 #' @return A list of \code{\link{dq_result}} objects.
 #'
 #' @examples
-#' \dontrun{
-#' cfg <- load_config("my_dataset", "config")
-#' df  <- read_dataset("data/my_file.csv", cfg)
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df      <- read_dataset(path, cfg)
 #' results <- run_qc_checks(df, cfg)
-#' }
 #'
 #' @export
 run_qc_checks <- function(df, config) {

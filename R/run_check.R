@@ -21,8 +21,24 @@
 #'   }
 #'
 #' @examples
-#' \dontrun{
-#' result <- run_dq_check("my_dataset", config_dir = "config")
+#' \donttest{
+#' tmp <- tempdir()
+#' dat <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' writeLines(c(
+#'   paste0('snapshot_db: "',       file.path(tmp, "snap.sqlite"), '"'),
+#'   paste0('report_output_dir: "', tmp, '"'),
+#'   'default_rules:',
+#'   '  max_missing_rate: 0.60',
+#'   '  min_row_count: 80'
+#' ), file.path(tmp, "dqcheckr.yml"))
+#' writeLines(c(
+#'   'dataset_name: "starwars_csv"',
+#'   paste0('current_file: "', dat, '"'),
+#'   'format: csv',
+#'   'encoding: "UTF-8"',
+#'   'delimiter: ","'
+#' ), file.path(tmp, "starwars_csv.yml"))
+#' result <- run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
 #' result$status
 #' }
 #'

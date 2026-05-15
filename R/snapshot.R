@@ -215,9 +215,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   not exist or contains no records for the dataset.
 #'
 #' @examples
-#' \dontrun{
-#' history <- read_recent_snapshots("output/snapshots.sqlite", "my_dataset")
-#' }
+#' history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
 #'
 #' @export
 read_recent_snapshots <- function(db_path, dataset_name, n = 10) {

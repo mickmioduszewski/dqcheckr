@@ -22,10 +22,10 @@ define a function \code{custom_checks(df)} returning a list of
 \code{custom_checks_file} is not set in the config.
 }
 \examples{
-\dontrun{
-cfg     <- load_config("my_dataset", "config")
-df      <- read_dataset("data/current.csv", cfg)
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
+path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+df      <- read_dataset(path, cfg)
 results <- run_custom_checks(df, cfg)
-}
 
 }

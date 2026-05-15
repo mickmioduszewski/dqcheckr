@@ -9,9 +9,9 @@ Authors@R: person("Mick", "Mioduszewski",
 Description:
     Automates quality verification of recurring external dataset deliveries.
     For each new file arrival, it runs single-snapshot quality checks, compares
-    the file to the previous delivery, writes a self-contained HTML report, and
-    records summary statistics in a local SQLite database for long-term trend
-    tracking. Supports CSV and fixed-width formats. Custom organisation-specific
+    the file to the previous delivery, writes a self-contained 'HTML' report, and
+    records summary statistics in a local 'SQLite' database for long-term trend
+    tracking. Supports 'CSV' and fixed-width formats. Custom organisation-specific
     checks can be supplied as plain R files.
 License: MIT + file LICENSE
 URL: https://github.com/mickmioduszewski/dqcheckr
@@ -36,5 +36,5 @@ Imports:
 Suggests:
     testthat (>= 3.0.0)
 VignetteBuilder: knitr
-RoxygenNote: 7.3.3
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
