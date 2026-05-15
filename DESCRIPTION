@@ -1,8 +1,8 @@
 Package: dqcheckr
 Type: Package
 Title: Automated Data Quality Checks for Recurring Dataset Deliveries
-Version: 0.1.1
-Date: 2026-05-10
+Version: 0.1.2
+Date: 2026-05-16
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
                   role  = c("aut", "cre"))
