@@ -17,8 +17,10 @@ A list of \code{\link{dq_result}} objects (may be empty).
 }
 \description{
 Sources the R file specified by \code{config$custom_checks_file}, which must
-define a function \code{custom_checks(df)} returning a list of
-\code{\link{dq_result}} objects. Returns an empty list if
+define a function \code{custom_checks(df)} or \code{custom_checks(df, config)}
+returning a list of \code{\link{dq_result}} objects. If the function accepts
+a second argument the merged config is passed, giving access to
+\code{\link{resolve_col_type}} and column rules. Returns an empty list if
 \code{custom_checks_file} is not set in the config.
 }
 \examples{

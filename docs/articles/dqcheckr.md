@@ -140,6 +140,15 @@ rule_overrides:
   max_row_count_change_pct: 0.05
   min_row_count:           1000
 
+# --- Per-column type overrides (optional) ---
+# Force specific columns to a type regardless of what the data looks like.
+# Valid values: character, numeric, date.
+# Eliminates false positives on phone numbers, postcodes, unit numbers, etc.
+column_types:
+  phone:    character   # prevent QC-11 / CP-04 / CP-07 false positives
+  postcode: character   # 4-digit codes are not meaningful as numeric
+  bsb_code: character   # 6-digit bank codes are not meaningful as numeric
+
 # --- Per-column rules (optional) ---
 column_rules:
   country_code:
@@ -150,6 +159,13 @@ column_rules:
   account_balance:
     min_value: 0                                 # QC-10
     max_value: 1000000
+  # Per-column threshold overrides (optional, within column_rules):
+  email:
+    max_missing_rate: 1.00          # email is 99% absent by design — suppress QC-01
+    max_missing_rate_change_pp: 5.0 # looser than global 2.0 — suppress CP-03 noise
+  account_balance:
+    max_missing_rate: 0.00          # balance must always be present
+    max_numeric_mean_shift_pct: 0.05  # stricter than global 0.20
 
 # --- Custom checks (optional) ---
 # custom_checks_file: "custom/customer_accounts_checks.R"
@@ -170,9 +186,15 @@ absent.
 |----|----|
 | `key_columns` | QC-12 (key uniqueness) skipped |
 | `expected_columns` | SC-01 and SC-02 (schema contract) skipped |
+| `column_types` | All columns use automatic type inference |
 | `column_rules.allowed_values` | QC-09 (allowed values) skipped |
 | `column_rules.min_value` / `max_value` | QC-10 (numeric bounds) skipped |
 | `column_rules.pattern` | QC-13 (pattern / regex) skipped |
+| `column_rules.<col>.max_missing_rate` | Falls back to dataset / global `max_missing_rate` |
+| `column_rules.<col>.max_non_numeric_rate` | Falls back to dataset / global `max_non_numeric_rate` |
+| `column_rules.<col>.max_missing_rate_change_pp` | Falls back to dataset / global `max_missing_rate_change_pp` |
+| `column_rules.<col>.max_numeric_mean_shift_pct` | Falls back to dataset / global `max_numeric_mean_shift_pct` |
+| `column_rules.<col>.max_non_numeric_rate_change_pp` | Falls back to dataset / global `max_non_numeric_rate_change_pp` |
 | `custom_checks_file` | All custom checks skipped |
 | `previous_file` / second file in folder | All CP-01–CP-08 (version comparison) skipped |
 | `min_row_count` set to 0 | QC-14 (minimum row count) skipped |
@@ -302,6 +324,105 @@ infer_col_type(c(NA, "", NA))                   # "unknown"
 # with a custom threshold:
 infer_col_type(c(rep("1", 17), "a", "b", "c"), threshold = 0.80)  # "numeric" (85%)
 ```
+
+### Overriding inferred types
+
+Some columns are formatted as numbers but are semantically character —
+phone numbers, postcodes, unit numbers, BSB codes. Automatic inference
+classifies them as `numeric`, which triggers irrelevant QC-11, CP-04,
+and CP-07 checks and can cause spurious CP-02 type-change warnings when
+the proportion of non-numeric values drifts across the inference
+threshold between deliveries.
+
+Use `column_types` in the dataset YAML to force the type for any column:
+
+``` yaml
+column_types:
+  TenantPhone:    character   # 10-digit numbers — not meaningful as numeric
+  PremisesUnit:   character   # values like "5", "3A", "Ground Floor"
+  PremisesPostCode: character # 4-digit codes validated by pattern, not numeric
+  BSBCode:        character   # 6-digit bank routing codes
+```
+
+Valid values are `character`, `numeric`, and `date`. The override
+affects all downstream logic: the type is stored in SQLite as the
+column’s `inferred_type`, drift comparisons see the stable override, and
+QC/CP checks that would be meaningless for the forced type are skipped
+automatically.
+
+Within custom check scripts, declare `config` as a second argument and
+use
+[`resolve_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/resolve_col_type.md)
+instead of
+[`infer_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.md)
+so that overrides are respected. If the function signature has only one
+argument (`df`), the config is not passed — both signatures work:
+
+``` r
+
+# Two-argument form — config is passed automatically, overrides respected
+custom_checks <- function(df, config) {
+  results <- list()
+  for (col in names(df)) {
+    if (resolve_col_type(col, df[[col]], config) == "numeric") {
+      # numeric-specific check logic here
+    }
+  }
+  results
+}
+
+# One-argument form — still works, type inference only (no override awareness)
+custom_checks <- function(df) {
+  # ...
+}
+```
+
+------------------------------------------------------------------------
+
+## Per-column threshold overrides
+
+Global and dataset-level thresholds apply uniformly to all columns. Some
+columns naturally have higher missing rates or more variability, making
+a single threshold produce constant noise. Per-column threshold keys in
+`column_rules` let you tune specific columns without affecting others.
+
+**Resolution order** for every threshold-based check:
+
+    column_rules.<col>.<threshold>  →  rule_overrides.<threshold>  →  default_rules.<threshold>
+
+### Supported per-column threshold keys
+
+| Key                              | Governs                           | Default |
+|----------------------------------|-----------------------------------|---------|
+| `max_missing_rate`               | QC-01 (missing rate)              | 0.05    |
+| `max_non_numeric_rate`           | QC-11 (non-numeric contamination) | 0.01    |
+| `max_missing_rate_change_pp`     | CP-03 (missing rate change)       | 2.0 pp  |
+| `max_numeric_mean_shift_pct`     | CP-04 (numeric mean shift)        | 0.20    |
+| `max_non_numeric_rate_change_pp` | CP-07 (non-numeric rate change)   | 1.0 pp  |
+
+### Example
+
+``` yaml
+column_rules:
+  # Email is almost always absent by design — don't alert on it
+  LandlordEmail:
+    max_missing_rate:          1.00   # effectively disables QC-01 for this column
+    max_missing_rate_change_pp: 5.0   # allow larger swings without CP-03 noise
+
+  # Bond amount must always be present and should not shift much
+  BondAmount:
+    max_missing_rate:          0.00   # zero tolerance
+    max_numeric_mean_shift_pct: 0.05  # tighter than global 0.20
+
+  # Phone is forced to character via column_types, so numeric thresholds don't apply,
+  # but you can still tighten missing-rate expectations:
+  TenantPhone:
+    max_missing_rate: 0.10
+```
+
+The `threshold` field in the HTML report and `dq_result` objects
+reflects the effective per-column threshold, not the global default, so
+the report always shows the value that was actually used.
 
 ------------------------------------------------------------------------
 
@@ -478,6 +599,133 @@ dbGetQuery(con,
 
 The `output/` directory (and database file) are created automatically on
 the first run if they do not exist.
+
+------------------------------------------------------------------------
+
+## Historical drift comparison
+
+[`run_dq_check()`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.md)
+compares the current file to the previous file in a single run. For
+longer-range comparisons — “how has this dataset’s quality changed over
+the past two years?” — use
+[`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md),
+which reads two historical snapshots from SQLite without needing the
+original files.
+
+### List available snapshots
+
+``` r
+
+# All datasets
+list_snapshots(config_dir = "config")
+
+# One dataset
+list_snapshots("customer_accounts", config_dir = "config")
+#>   id  dataset_name          file_name        run_timestamp row_count overall_status
+#> 1  1 customer_accounts  delivery_20250130.csv  2025-01-30 09:15:00    150000           PASS
+#> 2  4 customer_accounts  delivery_20260128.csv  2026-01-28 10:22:00    158000           WARN
+#> 3  7 customer_accounts  delivery_20270129.csv  2027-01-29 08:45:00    162000           FAIL
+```
+
+[`list_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/list_snapshots.md)
+returns a data frame invisibly. `config_dir` tells it where
+`dqcheckr.yml` is (to find `snapshot_db`).
+
+### Compare two snapshots
+
+``` r
+
+# Latest vs second-latest (default)
+drift <- compare_snapshots("customer_accounts", config_dir = "config")
+
+# Specific snapshot IDs — first argument is always treated as "previous"
+drift <- compare_snapshots("customer_accounts",
+                           snapshot_id_prev = 1,
+                           snapshot_id_curr = 7,
+                           config_dir = "config")
+
+# Also write a plain-text report alongside the HTML
+drift <- compare_snapshots("customer_accounts",
+                           snapshot_id_prev = 1,
+                           snapshot_id_curr = 7,
+                           config_dir  = "config",
+                           text_report = TRUE)
+```
+
+Console output is a single line:
+
+    [dqcheckr] drift: customer_accounts snapshot #1 vs #7 | reports/drift_customer_accounts_20270130_091500.html
+
+### What the drift report shows
+
+1.  **Header** — dataset name, snapshot IDs, timestamps, file names
+2.  **Table-level drift** — row count change (%), column count, check
+    outcome counts (PASS / WARN / FAIL / INFO), threshold breach
+    highlighted
+3.  **Schema drift** — new columns, dropped columns, type changes
+4.  **Per-column drift** (sorted by magnitude, breaches highlighted):
+    - Missing rate change (percentage points)
+    - Non-numeric rate change (percentage points)
+    - Numeric mean shift (%)
+    - Distinct count change (absolute and %)
+
+### Return value
+
+[`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md)
+returns the full drift data invisibly as a named list, so you can
+inspect or process the results programmatically:
+
+``` r
+
+drift <- compare_snapshots("customer_accounts",
+                           snapshot_id_prev = 1,
+                           snapshot_id_curr = 7,
+                           config_dir = "config",
+                           report = FALSE)   # skip HTML output
+
+# Table-level summary
+drift$table_drift
+
+# Schema changes only
+drift$schema_changes
+
+# Columns with the largest missing-rate shift
+head(drift$missing_rate_changes[, c("Column", "missing_rate_prev",
+                                    "missing_rate_curr",
+                                    "missing_rate_change_pp",
+                                    "missing_rate_exceeds")])
+
+# Columns whose numeric mean shifted most
+head(drift$mean_shifts[, c("Column", "numeric_mean_prev",
+                            "numeric_mean_curr",
+                            "numeric_mean_shift_pct",
+                            "numeric_mean_exceeds")])
+```
+
+### Typical workflow
+
+``` r
+
+# 1. Regular delivery run (writes a new snapshot each time)
+run_dq_check("customer_accounts", config_dir = "config")
+
+# 2. Two years later, a new delivery arrives
+run_dq_check("customer_accounts", config_dir = "config")
+
+# 3. Discover what snapshots are available
+list_snapshots("customer_accounts", config_dir = "config")
+
+# 4. Compare any two
+compare_snapshots("customer_accounts",
+                  snapshot_id_prev = 1,
+                  snapshot_id_curr = 4,
+                  config_dir = "config")
+```
+
+**Note:** When explicit IDs are passed, the function treats the first as
+“previous” and the second as “current” regardless of their numeric
+order. This matters when baseline snapshots are backfilled from archived
+files — their IDs may be higher than earlier production runs.
 
 ------------------------------------------------------------------------
 

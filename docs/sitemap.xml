@@ -7,6 +7,7 @@
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/authors.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/index.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/news/index.html</loc></url>
+<url><loc>https://mickmioduszewski.github.io/dqcheckr/plan.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_allowed_values.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_col_count.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_distinct_counts.html</loc></url>
@@ -22,6 +23,7 @@
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_pattern.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_row_count.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/check_schema_contract.html</loc></url>
+<url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/col_threshold.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_column_order.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_dropped_values.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_missing_rate.html</loc></url>
@@ -30,6 +32,7 @@
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_numeric_mean.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_row_count.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_schema.html</loc></url>
+<url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/compute_col_stats.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/detect_files.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/dot-missing_rate_vec.html</loc></url>
@@ -39,11 +42,13 @@
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/index.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/infer_col_type.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/init_snapshot_db.html</loc></url>
+<url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/list_snapshots.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/load_config.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/overall_status.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/read_dataset.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/read_recent_snapshots.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/render_report.html</loc></url>
+<url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/resolve_col_type.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/run_comparison_checks.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/run_custom_checks.html</loc></url>
 <url><loc>https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.html</loc></url>

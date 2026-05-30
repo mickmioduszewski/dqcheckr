@@ -30,9 +30,9 @@ objects.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-cfg <- load_config("my_dataset", "config")
-df  <- read_dataset("data/my_file.csv", cfg)
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
+path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+df      <- read_dataset(path, cfg)
 results <- run_qc_checks(df, cfg)
-} # }
 ```

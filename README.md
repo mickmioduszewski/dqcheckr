@@ -51,14 +51,60 @@ The HTML report opens automatically in your browser (in interactive sessions).
 Historical run data accumulates in the SQLite snapshot database and is shown as
 a trend chart in subsequent reports.
 
+## Per-column type overrides
+
+Some columns are numerically formatted but semantically character — phone
+numbers, postcodes, unit numbers. Add `column_types` to the dataset YAML to
+prevent false positives in type-sensitive checks (QC-11, CP-02, CP-04, CP-07):
+
+```yaml
+column_types:
+  TenantPhone:     character
+  PremisesPostCode: character
+  BSBCode:         character
+```
+
+## Per-column threshold overrides
+
+Some columns have known characteristics that make global thresholds
+meaningless. Add threshold keys directly inside `column_rules`:
+
+```yaml
+column_rules:
+  LandlordEmail:
+    max_missing_rate: 1.00          # almost always absent by design
+  BondAmount:
+    max_missing_rate: 0.00          # must always be present
+    max_numeric_mean_shift_pct: 0.05
+```
+
+Resolution order: `column_rules.<col>.<threshold>` → `rule_overrides` → `default_rules`.
+
+## Historical drift comparison
+
+After running checks across multiple deliveries, compare any two historical
+snapshots directly from the SQLite database — no original files required:
+
+```r
+# See what snapshots are available
+list_snapshots("my_dataset", config_dir = "config")
+
+# Compare snapshot #1 to snapshot #7, produce an HTML drift report
+compare_snapshots("my_dataset",
+                  snapshot_id_prev = 1,
+                  snapshot_id_curr = 7,
+                  config_dir = "config")
+```
+
 ## Custom checks
 
 Supply a plain R file that defines a `custom_checks(df)` function returning a
-list of `dq_result()` objects:
+list of `dq_result()` objects. Declare a second argument `config` to access
+type overrides via `resolve_col_type()`:
 
 ```r
 # config/my_checks.R
-custom_checks <- function(df) {
+custom_checks <- function(df, config) {
   list(
     dq_result("CC-01", "Revenue positive",
               column  = "revenue",
@@ -95,5 +141,6 @@ directory to the copied folder, and source the script.
 ## Learn more
 
 See `vignette("dqcheckr")` for a full description of all configuration options,
-every check (QC-01 to QC-14, SC-01/02, CP-01 to CP-08), and a worked example
-using the Star Wars dataset.
+every check (QC-01 to QC-14, SC-01/02, CP-01 to CP-08), per-column type
+overrides, per-column threshold overrides, historical drift comparison, and a
+worked example using the Star Wars dataset.

@@ -80,6 +80,12 @@ load_config <- function(dataset_name, config_dir) {
   global_cfg  <- yaml::read_yaml(global_path)
   dataset_cfg <- yaml::read_yaml(dataset_path)
 
+  # Propagate top-level global keys that the dataset config does not override
+  for (key in c("snapshot_db", "report_output_dir")) {
+    if (is.null(dataset_cfg[[key]]) && !is.null(global_cfg[[key]]))
+      dataset_cfg[[key]] <- global_cfg[[key]]
+  }
+
   rules <- global_cfg$default_rules %||% list()
 
   if (!is.null(dataset_cfg$rule_overrides)) {
@@ -89,6 +95,18 @@ load_config <- function(dataset_name, config_dir) {
   }
 
   dataset_cfg$rules <- rules
+
+  ct <- dataset_cfg$column_types %||% list()
+  if (length(ct) > 0) {
+    valid_types <- c("character", "numeric", "date")
+    bad <- setdiff(unlist(ct, use.names = FALSE), valid_types)
+    if (length(bad) > 0)
+      rlang::abort(sprintf(
+        "Invalid column_types value(s): %s. Must be one of: %s",
+        paste(bad, collapse = ", "), paste(valid_types, collapse = ", ")
+      ))
+  }
+
   dataset_cfg
 }
 
@@ -129,6 +147,54 @@ infer_col_type <- function(x, threshold = 0.90) {
   if (mean(!is.na(numeric_vals)) >= threshold) return("numeric")
 
   "character"
+}
+
+#' Resolve the effective type of a column, respecting config overrides
+#'
+#' Returns the type for \code{col} from the \code{column_types} map in
+#' \code{config} if one is set, otherwise falls back to
+#' \code{\link{infer_col_type}}. Use this in custom check scripts instead of
+#' calling \code{infer_col_type()} directly so that type overrides are
+#' respected.
+#'
+#' @param col Character. Column name.
+#' @param x Character vector. The column's values (as read from the file).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A single character string: \code{"date"}, \code{"numeric"},
+#'   \code{"character"}, or \code{"unknown"}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg <- load_config("starwars_csv", config_dir = cfg_dir)
+#' resolve_col_type("name", c("Luke", "Leia", "Han"), cfg)   # "character"
+#'
+#' @export
+resolve_col_type <- function(col, x, config) {
+  override <- (config$column_types %||% list())[[col]]
+  if (!is.null(override)) return(override)
+  infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+}
+
+#' Look up the effective threshold for a check, with per-column fallback
+#'
+#' Resolution order: \code{column_rules.<col>.<key>} >
+#' \code{rules.<key>} > \code{default}.
+#'
+#' @param config Named list. Merged configuration.
+#' @param col Character. Column name.
+#' @param key Character. Threshold key (e.g. \code{"max_missing_rate"}).
+#' @param default Default value if not found at any level.
+#'
+#' @return The resolved threshold value.
+#' @keywords internal
+col_threshold <- function(config, col, key, default = NULL) {
+  col_val <- (config$column_rules %||% list())[[col]][[key]]
+  if (!is.null(col_val)) return(col_val)
+  rule_val <- config$rules[[key]]
+  if (!is.null(rule_val)) return(rule_val)
+  default
 }
 
 #' Compute the worst status across a list of dq_result objects

@@ -44,12 +44,11 @@ init_snapshot_db <- function(db_path) {
 #' @keywords internal
 #' @importFrom stats sd
 compute_col_stats <- function(df, config, qc_results) {
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   rows <- list()
 
   for (col in names(df)) {
     x         <- df[[col]]
-    col_type  <- infer_col_type(x, type_threshold)
+    col_type  <- resolve_col_type(col, x, config)
     non_empty <- x[!is.na(x) & x != ""]
     miss_count <- sum(is.na(x) | x == "")
     miss_rate  <- miss_count / nrow(df)

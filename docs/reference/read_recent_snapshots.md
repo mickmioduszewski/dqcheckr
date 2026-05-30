@@ -34,7 +34,5 @@ for the dataset.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-history <- read_recent_snapshots("output/snapshots.sqlite", "my_dataset")
-} # }
+history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
 ```

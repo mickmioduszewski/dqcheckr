@@ -25,9 +25,11 @@ A named list with elements `current` (character path) and `previous`
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-cfg <- load_config("my_dataset", "config")
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg <- load_config("starwars_csv", config_dir = cfg_dir)
+cfg$current_file <- system.file("demonstrations/data/starwars.csv",
+                                 package = "dqcheckr")
 files <- detect_files(cfg)
 files$current
-} # }
+#> [1] "/private/tmp/claude-501/RtmpHixPMe/temp_libpathe6c239208571/dqcheckr/demonstrations/data/starwars.csv"
 ```

@@ -28,7 +28,6 @@ compare_row_count <- function(df_current, df_previous, config) {
 #' CP-02: Detect schema differences between deliveries
 #' @keywords internal
 compare_schema <- function(df_current, df_previous, config) {
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   flag_new   <- isTRUE(config$rules$flag_new_columns     %||% TRUE)
   flag_drop  <- isTRUE(config$rules$flag_dropped_columns %||% TRUE)
   flag_type  <- isTRUE(config$rules$flag_type_changes    %||% TRUE)
@@ -39,8 +38,8 @@ compare_schema <- function(df_current, df_previous, config) {
 
   type_changes <- character(0)
   for (col in common_cols) {
-    t_curr <- infer_col_type(df_current[[col]], type_threshold)
-    t_prev <- infer_col_type(df_previous[[col]], type_threshold)
+    t_curr <- resolve_col_type(col, df_current[[col]], config)
+    t_prev <- resolve_col_type(col, df_previous[[col]], config)
     if (t_curr != t_prev) {
       type_changes <- c(type_changes,
                         sprintf("%s (%s -> %s)", col, t_prev, t_curr))
@@ -85,9 +84,9 @@ compare_schema <- function(df_current, df_previous, config) {
 #' CP-03: Compare per-column missing rate between deliveries
 #' @keywords internal
 compare_missing_rate <- function(df_current, df_previous, config) {
-  max_change_pp <- config$rules$max_missing_rate_change_pp %||% 2.0
-  common_cols   <- intersect(names(df_current), names(df_previous))
+  common_cols <- intersect(names(df_current), names(df_previous))
   lapply(common_cols, function(col) {
+    max_change_pp <- col_threshold(config, col, "max_missing_rate_change_pp", 2.0)
     rate_curr <- .missing_rate_vec(df_current[[col]])
     rate_prev <- .missing_rate_vec(df_previous[[col]])
     change_pp <- (rate_curr - rate_prev) * 100
@@ -111,13 +110,12 @@ compare_missing_rate <- function(df_current, df_previous, config) {
 #' CP-04: Compare numeric column means between deliveries
 #' @keywords internal
 compare_numeric_mean <- function(df_current, df_previous, config) {
-  threshold      <- config$rules$max_numeric_mean_shift_pct %||% 0.20
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (infer_col_type(df_current[[col]],  type_threshold) != "numeric") next
-    if (infer_col_type(df_previous[[col]], type_threshold) != "numeric") next
+    if (resolve_col_type(col, df_current[[col]],  config) != "numeric") next
+    if (resolve_col_type(col, df_previous[[col]], config) != "numeric") next
+    threshold <- col_threshold(config, col, "max_numeric_mean_shift_pct", 0.20)
     mean_curr <- mean(suppressWarnings(as.numeric(df_current[[col]])),  na.rm = TRUE)
     mean_prev <- mean(suppressWarnings(as.numeric(df_previous[[col]])), na.rm = TRUE)
     if (is.nan(mean_prev) || mean_prev == 0) next
@@ -145,11 +143,10 @@ compare_numeric_mean <- function(df_current, df_previous, config) {
 #' CP-05: Detect new distinct values in character columns
 #' @keywords internal
 compare_new_values <- function(df_current, df_previous, config) {
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (infer_col_type(df_current[[col]], type_threshold) != "character") next
+    if (resolve_col_type(col, df_current[[col]], config) != "character") next
     curr_vals <- unique(df_current[[col]][!is.na(df_current[[col]]) &
                                           df_current[[col]] != ""])
     prev_vals <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
@@ -174,11 +171,10 @@ compare_new_values <- function(df_current, df_previous, config) {
 #' CP-06: Detect dropped distinct values in character columns
 #' @keywords internal
 compare_dropped_values <- function(df_current, df_previous, config) {
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (infer_col_type(df_current[[col]], type_threshold) != "character") next
+    if (resolve_col_type(col, df_current[[col]], config) != "character") next
     curr_vals     <- unique(df_current[[col]][!is.na(df_current[[col]]) &
                                               df_current[[col]] != ""])
     prev_vals     <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
@@ -203,16 +199,16 @@ compare_dropped_values <- function(df_current, df_previous, config) {
 #' CP-07: Compare non-numeric rate in numeric columns between deliveries
 #' @keywords internal
 compare_non_numeric_rate <- function(df_current, df_previous, config) {
-  threshold      <- config$rules$max_non_numeric_rate_change_pp %||% 1.0
-  type_threshold <- config$rules$type_inference_threshold %||% 0.90
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    t_curr <- infer_col_type(df_current[[col]], type_threshold)
-    t_prev <- infer_col_type(df_previous[[col]], type_threshold)
+    t_curr <- resolve_col_type(col, df_current[[col]], config)
+    t_prev <- resolve_col_type(col, df_previous[[col]], config)
     if (!t_curr %in% c("numeric", "character") &&
         !t_prev %in% c("numeric", "character")) next
     if (t_curr == "character" && t_prev == "character") next
+
+    threshold <- col_threshold(config, col, "max_non_numeric_rate_change_pp", 1.0)
 
     .nn_rate <- function(x) {
       ne <- x[!is.na(x) & x != ""]

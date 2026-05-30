@@ -1,8 +1,8 @@
 Package: dqcheckr
 Type: Package
 Title: Automated Data Quality Checks for Recurring Dataset Deliveries
-Version: 0.1.2
-Date: 2026-05-16
+Version: 0.2.0
+Date: 2026-05-30
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
                   role  = c("aut", "cre"))
@@ -14,7 +14,7 @@ Description:
     tracking. Supports 'CSV' and fixed-width formats. Custom organisation-specific
     checks can be supplied as plain R files.
 License: MIT + file LICENSE
-URL: https://github.com/mickmioduszewski/dqcheckr
+URL: https://mickmioduszewski.github.io/dqcheckr/, https://github.com/mickmioduszewski/dqcheckr
 BugReports: https://github.com/mickmioduszewski/dqcheckr/issues
 Encoding: UTF-8
 Language: en-GB

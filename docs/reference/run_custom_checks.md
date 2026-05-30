@@ -1,10 +1,14 @@
 # Run organisation-specific custom checks
 
 Sources the R file specified by `config$custom_checks_file`, which must
-define a function `custom_checks(df)` returning a list of
+define a function `custom_checks(df)` or `custom_checks(df, config)`
+returning a list of
 [`dq_result`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
-objects. Returns an empty list if `custom_checks_file` is not set in the
-config.
+objects. If the function accepts a second argument the merged config is
+passed, giving access to
+[`resolve_col_type`](https://mickmioduszewski.github.io/dqcheckr/reference/resolve_col_type.md)
+and column rules. Returns an empty list if `custom_checks_file` is not
+set in the config.
 
 ## Usage
 
@@ -32,9 +36,9 @@ objects (may be empty).
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-cfg     <- load_config("my_dataset", "config")
-df      <- read_dataset("data/current.csv", cfg)
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
+path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+df      <- read_dataset(path, cfg)
 results <- run_custom_checks(df, cfg)
-} # }
 ```

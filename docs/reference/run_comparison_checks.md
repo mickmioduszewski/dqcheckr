@@ -34,10 +34,11 @@ objects. The list carries attributes `new_cols` and `dropped_cols`
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-cfg  <- load_config("my_dataset", "config")
-curr <- read_dataset("data/current.csv", cfg)
-prev <- read_dataset("data/previous.csv", cfg)
-results <- run_comparison_checks(curr, prev, cfg)
-} # }
+cfg_dir   <- system.file("demonstrations/config", package = "dqcheckr")
+cfg       <- load_config("starwars_csv", config_dir = cfg_dir)
+curr_path <- system.file("demonstrations/data2/starwars_v2.csv", package = "dqcheckr")
+prev_path <- system.file("demonstrations/data2/starwars_v1.csv", package = "dqcheckr")
+curr      <- read_dataset(curr_path, cfg)
+prev      <- read_dataset(prev_path, cfg)
+results   <- run_comparison_checks(curr, prev, cfg)
 ```

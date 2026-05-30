@@ -1,5 +1,39 @@
 # Changelog
 
+## dqcheckr 0.2.0
+
+### New features
+
+- **Per-column type overrides** (`column_types` in dataset YAML). Any
+  column can be forced to `character`, `numeric`, or `date` regardless
+  of what the data looks like. Eliminates false QC-11, CP-02, CP-04, and
+  CP-07 findings on columns that are numerically formatted but
+  semantically character (phone numbers, postcodes, unit numbers, BSB
+  codes). The new
+  [`resolve_col_type()`](https://mickmioduszewski.github.io/dqcheckr/reference/resolve_col_type.md)
+  function is exported so custom check scripts can also respect
+  overrides.
+
+- **Per-column threshold overrides** (new keys in `column_rules`). QC-01
+  (`max_missing_rate`), QC-11 (`max_non_numeric_rate`), CP-03
+  (`max_missing_rate_change_pp`), CP-04 (`max_numeric_mean_shift_pct`),
+  and CP-07 (`max_non_numeric_rate_change_pp`) now accept per-column
+  threshold values in `column_rules`. Resolution order: per-column \>
+  dataset (`rule_overrides`) \> global (`default_rules`). Existing
+  configs without per-column keys are unchanged.
+
+- **[`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md)**
+  compares any two historical snapshots from the ‘SQLite’ database by
+  ID, without needing the original files. Produces table-level drift,
+  schema drift, and per-column statistical drift. Renders a
+  self-contained ‘HTML’ drift report; a plain-text report is available
+  via `text_report = TRUE`. Thresholds and report output directory are
+  read from `dqcheckr.yml`.
+
+- **[`list_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/list_snapshots.md)**
+  lists available snapshots in the database, optionally filtered by
+  dataset name. Returns a data frame invisibly.
+
 ## dqcheckr 0.1.1
 
 - `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes` (in

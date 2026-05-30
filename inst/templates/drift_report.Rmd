@@ -1,0 +1,153 @@
+---
+title: "Drift Report"
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    toc: true
+    toc_float: true
+params:
+  drift: NULL
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(kableExtra)
+drift <- params$drift
+```
+
+## `r drift$dataset_name`
+
+| | Previous | Current |
+|---|---|---|
+| **Snapshot** | #`r drift$snap_prev$id` | #`r drift$snap_curr$id` |
+| **Timestamp** | `r drift$snap_prev$run_timestamp` | `r drift$snap_curr$run_timestamp` |
+| **File** | `r drift$snap_prev$file_name` | `r drift$snap_curr$file_name` |
+
+---
+
+## Table-Level Drift
+
+```{r table-drift}
+td <- drift$table_drift
+td$Exceeds <- ifelse(
+  td$Exceeds == "***",
+  cell_spec("EXCEEDS", color = "red", bold = TRUE),
+  ""
+)
+kbl(td, escape = FALSE) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+## Schema Drift
+
+```{r schema-drift}
+sc <- drift$schema_changes
+if (nrow(sc) == 0) {
+  cat("No schema changes detected.")
+} else {
+  sc$Status <- cell_spec(
+    sc$Status,
+    color = ifelse(sc$Status == "TYPE CHANGED", "orange",
+            ifelse(sc$Status == "NEW COLUMN",   "blue", "red")),
+    bold = TRUE
+  )
+  kbl(sc, escape = FALSE) |>
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+}
+```
+
+---
+
+## Per-Column Drift
+
+### Missing Rate Changes
+
+```{r missing-rate}
+mr <- drift$missing_rate_changes
+if (nrow(mr) > 0) {
+  out <- data.frame(
+    Column    = mr$Column,
+    Previous  = sprintf("%.1f%%", mr$missing_rate_prev * 100),
+    Current   = sprintf("%.1f%%", mr$missing_rate_curr * 100),
+    Change_pp = sprintf("%+.2f", mr$missing_rate_change_pp),
+    Exceeds   = ifelse(mr$missing_rate_exceeds,
+                       cell_spec("YES", color = "red", bold = TRUE), ""),
+    stringsAsFactors = FALSE, check.names = FALSE
+  )
+  kbl(out, escape = FALSE) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE)
+} else {
+  cat("No missing rate changes.")
+}
+```
+
+### Non-Numeric Rate Changes
+
+```{r non-numeric-rate}
+nn <- drift$non_numeric_changes
+if (nrow(nn) > 0) {
+  out <- data.frame(
+    Column    = nn$Column,
+    Previous  = sprintf("%.2f%%", nn$non_numeric_rate_prev * 100),
+    Current   = sprintf("%.2f%%", nn$non_numeric_rate_curr * 100),
+    Change_pp = sprintf("%+.2f", nn$non_numeric_rate_change_pp),
+    Exceeds   = ifelse(nn$non_numeric_rate_exceeds,
+                       cell_spec("YES", color = "red", bold = TRUE), ""),
+    stringsAsFactors = FALSE, check.names = FALSE
+  )
+  kbl(out, escape = FALSE) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE)
+} else {
+  cat("No non-numeric rate changes.")
+}
+```
+
+### Numeric Mean Shifts
+
+```{r numeric-mean}
+ms <- drift$mean_shifts
+if (nrow(ms) > 0) {
+  out <- data.frame(
+    Column    = ms$Column,
+    Previous  = sprintf("%.4g", ms$numeric_mean_prev),
+    Current   = sprintf("%.4g", ms$numeric_mean_curr),
+    Shift_pct = sprintf("%+.1f%%", ms$numeric_mean_shift_pct * 100),
+    Exceeds   = ifelse(ms$numeric_mean_exceeds,
+                       cell_spec("YES", color = "red", bold = TRUE), ""),
+    stringsAsFactors = FALSE, check.names = FALSE
+  )
+  kbl(out, escape = FALSE) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE)
+} else {
+  cat("No numeric columns to compare.")
+}
+```
+
+### Distinct Count Changes
+
+```{r distinct-count}
+dc <- drift$distinct_changes
+if (nrow(dc) > 0) {
+  out <- data.frame(
+    Column     = dc$Column,
+    Previous   = dc$distinct_count_prev,
+    Current    = dc$distinct_count_curr,
+    Change     = sprintf("%+d", dc$distinct_count_change),
+    Change_pct = ifelse(!is.na(dc$distinct_count_change_pct),
+                        sprintf("%+.1f%%", dc$distinct_count_change_pct * 100),
+                        ""),
+    stringsAsFactors = FALSE
+  )
+  kbl(out, escape = FALSE) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE)
+} else {
+  cat("No distinct count changes.")
+}
+```

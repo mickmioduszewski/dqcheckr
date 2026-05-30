@@ -1,6 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^PLAN\.md$
+^[Pp][Ll][Aa][Nn]\.md$
 ^PROGRESS\.md$
 ^makedata\.R$
 ^demonstrations$

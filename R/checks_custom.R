@@ -1,8 +1,10 @@
 #' Run organisation-specific custom checks
 #'
 #' Sources the R file specified by \code{config$custom_checks_file}, which must
-#' define a function \code{custom_checks(df)} returning a list of
-#' \code{\link{dq_result}} objects. Returns an empty list if
+#' define a function \code{custom_checks(df)} or \code{custom_checks(df, config)}
+#' returning a list of \code{\link{dq_result}} objects. If the function accepts
+#' a second argument the merged config is passed, giving access to
+#' \code{\link{resolve_col_type}} and column rules. Returns an empty list if
 #' \code{custom_checks_file} is not set in the config.
 #'
 #' @param df A data frame. The current delivery.
@@ -28,7 +30,9 @@ run_custom_checks <- function(df, config) {
   }
 
   env <- new.env(parent = baseenv())
-  env$dq_result <- dq_result
+  env$dq_result        <- dq_result
+  env$resolve_col_type <- resolve_col_type
+  env$infer_col_type   <- infer_col_type
   tryCatch(
     source(path, local = env),
     error = function(e)
@@ -40,8 +44,11 @@ run_custom_checks <- function(df, config) {
     rlang::abort(paste0("custom_checks() function not defined in: ", path))
   }
 
+  fn          <- env$custom_checks
+  pass_config <- length(formals(fn)) >= 2L
+
   results <- tryCatch(
-    env$custom_checks(df),
+    if (pass_config) fn(df, config) else fn(df),
     error = function(e)
       rlang::abort(paste0("custom_checks() runtime error: ", conditionMessage(e)))
   )

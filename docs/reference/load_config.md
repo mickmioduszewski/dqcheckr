@@ -28,8 +28,8 @@ A named list representing the merged configuration.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-cfg <- load_config("my_dataset", config_dir = "config")
+cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+cfg <- load_config("starwars_csv", config_dir = cfg_dir)
 cfg$format
-} # }
+#> [1] "csv"
 ```

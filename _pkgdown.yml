@@ -28,11 +28,14 @@ reference:
       - dq_result
       - overall_status
       - infer_col_type
+      - resolve_col_type
       - check_missing_rate
-  - title: "Snapshot database"
-    desc: "Query the SQLite snapshot history"
+  - title: "Snapshot database & drift analysis"
+    desc: "Query snapshot history and compare snapshots over time"
     contents:
       - read_recent_snapshots
+      - list_snapshots
+      - compare_snapshots
   - title: "Internals"
     desc: "Internal functions (not for direct use)"
     contents:
