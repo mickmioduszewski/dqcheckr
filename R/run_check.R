@@ -95,8 +95,9 @@ run_dq_check <- function(dataset_name,
   n_warn <- sum(vapply(all_r, \(r) r$status == "WARN", logical(1)))
   n_fail <- sum(vapply(all_r, \(r) r$status == "FAIL", logical(1)))
 
+  report_label <- if (!is.null(report_path)) report_path else "(pandoc not available)"
   message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s",
-                  dataset_name, status, n_warn, n_fail, report_path))
+                  dataset_name, status, n_warn, n_fail, report_label))
 
   invisible(list(
     status      = status,

@@ -6,7 +6,8 @@
 #'
 #' @param dataset_name Character or \code{NULL}. If supplied, only snapshots for
 #'   that dataset are returned. If \code{NULL}, all datasets are returned.
-#' @param db_path Character. Path to the SQLite snapshot database.
+#' @param db_path Character. Path to the SQLite snapshot database. Required;
+#'   there is no default (a relative default would be path-sensitive).
 #'
 #' @return A data frame with columns \code{id}, \code{dataset_name},
 #'   \code{file_name}, \code{run_timestamp}, \code{row_count},
@@ -18,7 +19,9 @@
 #'
 #' @export
 list_snapshots <- function(dataset_name = NULL,
-                           db_path = "data/snapshots.sqlite") {
+                           db_path = NULL) {
+  if (is.null(db_path))
+    rlang::abort('`db_path` must be supplied (e.g. db_path = "data/snapshots.sqlite")')
   empty <- data.frame(
     id = integer(), dataset_name = character(), file_name = character(),
     run_timestamp = character(), row_count = integer(),
@@ -460,12 +463,13 @@ compare_snapshots <- function(dataset_name,
     return(invisible(NULL))
   }
 
-  tmp_out <- file.path(tempdir(), basename(outfile))
+  tmp_out <- tempfile(fileext = ".html")
   rmarkdown::render(
-    input       = template,
-    output_file = tmp_out,
-    params      = list(drift = drift),
-    quiet       = TRUE
+    input             = template,
+    output_file       = tmp_out,
+    intermediates_dir = tempdir(),
+    params            = list(drift = drift),
+    quiet             = TRUE
   )
 
   dir.create(dirname(normalizePath(outfile, mustWork = FALSE)),

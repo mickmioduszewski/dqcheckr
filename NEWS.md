@@ -1,5 +1,27 @@
 # dqcheckr 0.2.0
 
+## Bug fixes
+
+* `render_report()` and `.write_drift_html_report()` now pass
+  `intermediates_dir = tempdir()` to `rmarkdown::render()`. Previously knitr
+  wrote intermediate files (`.knit.md`) to the template directory inside the
+  installed package, causing `R CMD check` failures on CRAN Debian builders
+  where the user library is remounted read-only during testing.
+
+* `render_report()` now checks `rmarkdown::pandoc_available()` before rendering
+  and returns `NULL` invisibly when pandoc is absent, consistent with the
+  existing behaviour of the drift report renderer. `run_dq_check()` handles a
+  `NULL` report path gracefully and still returns its full result list with
+  `report_path = NULL`.
+
+* `list_snapshots()` no longer has a relative-path default for `db_path`. The
+  argument is now required; omitting it throws an informative error. The previous
+  default `"data/snapshots.sqlite"` could resolve inside the user library
+  depending on the working directory at call time.
+
+* Removed runtime output artefacts (`inst/demonstrations/output2/`) that were
+  accidentally committed to the package source.
+
 ## New features
 
 * **Per-column type overrides** (`column_types` in dataset YAML). Any column can

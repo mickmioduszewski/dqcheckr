@@ -9,6 +9,11 @@ render_report <- function(dataset_name, file_name, file_path, df,
     rlang::abort("Report template not found in package installation.")
   }
 
+  if (!rmarkdown::pandoc_available()) {
+    warning("Pandoc not found. HTML report skipped.", call. = FALSE)
+    return(invisible(NULL))
+  }
+
   # Normalise to absolute path: rmarkdown changes wd to the template dir,
   # which breaks any relative path supplied as output_file.
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -22,9 +27,10 @@ render_report <- function(dataset_name, file_name, file_path, df,
   if (is.null(col_stats)) col_stats <- compute_col_stats(df, config, qc_results)
 
   rmarkdown::render(
-    input       = template,
-    output_file = out,
-    params      = list(
+    input             = template,
+    output_file       = out,
+    intermediates_dir = tempdir(),
+    params            = list(
       dataset_name     = dataset_name,
       file_name        = file_name,
       file_path        = file_path,

@@ -4,13 +4,14 @@
 \alias{list_snapshots}
 \title{List snapshots available in the database}
 \usage{
-list_snapshots(dataset_name = NULL, db_path = "data/snapshots.sqlite")
+list_snapshots(dataset_name = NULL, db_path = NULL)
 }
 \arguments{
 \item{dataset_name}{Character or \code{NULL}. If supplied, only snapshots for
 that dataset are returned. If \code{NULL}, all datasets are returned.}
 
-\item{db_path}{Character. Path to the SQLite snapshot database.}
+\item{db_path}{Character. Path to the SQLite snapshot database. Required;
+there is no default (a relative default would be path-sensitive).}
 }
 \value{
 A data frame with columns \code{id}, \code{dataset_name},

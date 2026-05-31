@@ -10,8 +10,8 @@ setup_integration_env <- function() {
   dir.create(cfg, showWarnings = FALSE)
 
   writeLines(c(
-    "snapshot_db: 'data/snapshots.sqlite'",
-    "report_output_dir: 'reports/'",
+    sprintf("snapshot_db: '%s'",       file.path(cfg, "snapshots.sqlite")),
+    sprintf("report_output_dir: '%s'", file.path(cfg, "reports")),
     "default_rules:",
     "  max_missing_rate: 0.05",
     "  max_non_numeric_rate: 0.01",
@@ -51,6 +51,7 @@ test_that("run_dq_check() returns a list with status, report_path, snapshot_id",
 })
 
 test_that("run_dq_check() writes an HTML report file to disk", {
+  skip_if_not(rmarkdown::pandoc_available())
   cfg_dir <- setup_integration_env()
   result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
   expect_true(file.exists(result$report_path))
@@ -68,4 +69,35 @@ test_that("run_dq_check() returns PASS status for the clean fixture pair", {
   cfg_dir <- setup_integration_env()
   result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
   expect_equal(result$status, "PASS")
+})
+
+# T-04: all output files are written under tempdir()
+test_that("run_dq_check() writes all output files under tempdir()", {
+  skip_if_not(rmarkdown::pandoc_available())
+  cfg_dir <- setup_integration_env()
+  result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+  if (!is.null(result$report_path))
+    expect_true(startsWith(normalizePath(result$report_path),
+                            normalizePath(tempdir())))
+  db_path <- file.path(cfg_dir, "snapshots.sqlite")
+  expect_true(startsWith(normalizePath(db_path),
+                          normalizePath(tempdir())))
+})
+
+# T-05: run_dq_check() returns valid result with report_path=NULL when pandoc absent
+test_that("run_dq_check() returns valid result with NULL report_path when pandoc unavailable", {
+  cfg_dir <- setup_integration_env()
+  local_mocked_bindings(
+    pandoc_available = function(...) FALSE,
+    .package = "rmarkdown"
+  )
+  expect_warning(
+    result <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE),
+    "Pandoc not found"
+  )
+  expect_type(result, "list")
+  expect_named(result, c("status", "report_path", "snapshot_id"))
+  expect_null(result$report_path)
+  expect_false(is.null(result$snapshot_id))
+  expect_true(result$snapshot_id >= 1L)
 })
