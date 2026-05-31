@@ -4,12 +4,15 @@
 \alias{check_missing_rate}
 \title{QC-01: Check missing rate per column}
 \usage{
-check_missing_rate(df, config)
+check_missing_rate(df, config, con = NULL)
 }
 \arguments{
-\item{df}{A data frame with all columns as character vectors.}
+\item{df}{A data frame with all columns as character vectors, or a character
+table name when \code{con} is provided.}
 
 \item{config}{Named list as returned by \code{\link{load_config}}.}
+
+\item{con}{A DuckDB connection or \code{NULL} (default).}
 }
 \value{
 A list of \code{\link{dq_result}} objects, one per column.

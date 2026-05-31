@@ -44,25 +44,36 @@ detect_files <- function(config) {
     rlang::abort(paste0("No files found in folder: ", folder))
   }
 
-  files <- files[order(file.mtime(files), decreasing = TRUE)]
+  mtimes <- file.mtime(files)
+  files  <- files[order(mtimes, basename(files), decreasing = TRUE)]
   list(
     current  = files[1],
     previous = if (length(files) >= 2) files[2] else NULL
   )
 }
 
-#' Read a dataset file into a data frame
+#' Read a dataset file into a data frame or DuckDB table
 #'
-#' Reads a CSV or fixed-width file, coercing all columns to character and
-#' trimming whitespace. Encoding and delimiter are taken from \code{config}.
+#' Reads a CSV, fixed-width, or Parquet file. When \code{con} is a DuckDB
+#' connection the file is registered as an in-memory DuckDB table named
+#' \code{"current_data"} and the table name is returned as a
+#' \code{character(1)}. When \code{con = NULL} (the default) a \code{data.frame}
+#' is returned as before.
 #'
 #' @param path Character. Path to the file to read.
 #' @param config Named list. Merged configuration as returned by
-#'   \code{\link{load_config}}. Must include \code{format} (\code{"csv"} or
-#'   \code{"fwf"}). For FWF files, \code{fwf_widths} is required and
-#'   \code{fwf_col_names} and \code{fwf_skip} are optional.
+#'   \code{\link{load_config}}. Must include \code{format} (\code{"csv"},
+#'   \code{"fwf"}, or \code{"parquet"}). For FWF files, \code{fwf_widths} is
+#'   required and \code{fwf_col_names} and \code{fwf_skip} are optional.
+#' @param con A DuckDB connection (from \code{DBI::dbConnect(duckdb::duckdb())})
+#'   or \code{NULL} (default). When provided the file is registered in DuckDB
+#'   and the table name is returned.
+#' @param tbl_name Character. Name to use for the DuckDB table when \code{con}
+#'   is provided. Defaults to \code{"current_data"}.
 #'
-#' @return A data frame with all columns as character vectors.
+#' @return When \code{con = NULL}: a \code{data.frame} with all columns as
+#'   character vectors. When \code{con} is provided: the value of \code{tbl_name}
+#'   (a DuckDB table name).
 #'
 #' @examples
 #' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
@@ -71,9 +82,61 @@ detect_files <- function(config) {
 #' df   <- read_dataset(path, cfg)
 #'
 #' @export
-read_dataset <- function(path, config) {
+read_dataset <- function(path, config, con = NULL, tbl_name = "current_data") {
   fmt <- tolower(config$format %||% "csv")
   enc <- config$encoding %||% "UTF-8"
+
+  if (!is.null(con)) {
+    if (fmt == "csv") {
+      delim <- config$delimiter %||% ","
+      col_info <- DBI::dbGetQuery(con, DBI::sqlInterpolate(
+        con,
+        "SELECT column_name FROM (DESCRIBE SELECT * FROM read_csv_auto(?)) LIMIT 0",
+        path))
+      col_names <- DBI::dbGetQuery(
+        con, DBI::sqlInterpolate(con,
+          "SELECT column_name FROM (DESCRIBE SELECT * FROM read_csv_auto(?))",
+          path))$column_name
+      trim_cols <- paste(
+        sprintf("TRIM(CAST(%s AS VARCHAR)) AS %s",
+                DBI::dbQuoteIdentifier(con, col_names),
+                DBI::dbQuoteIdentifier(con, col_names)),
+        collapse = ", ")
+      DBI::dbExecute(con, sprintf(
+        "CREATE OR REPLACE TABLE %s AS SELECT %s FROM read_csv_auto(%s, delim=%s, all_varchar=true)",
+        DBI::dbQuoteIdentifier(con, tbl_name),
+        trim_cols,
+        DBI::dbQuoteLiteral(con, path),
+        DBI::dbQuoteLiteral(con, delim)))
+      return(tbl_name)
+    } else if (fmt == "fwf") {
+      if (is.null(config$fwf_widths))
+        rlang::abort("fwf_widths must be set in config for fixed-width files")
+      df_fwf <- tryCatch(
+        as.data.frame(readr::read_fwf(
+          path,
+          col_positions = readr::fwf_widths(config$fwf_widths,
+                                            col_names = config$fwf_col_names),
+          col_types  = readr::cols(.default = "c"),
+          locale     = readr::locale(encoding = enc),
+          skip       = config$fwf_skip %||% 0L,
+          show_col_types = FALSE
+        ), stringsAsFactors = FALSE),
+        error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)))
+      )
+      for (col in names(df_fwf)) df_fwf[[col]] <- trimws(df_fwf[[col]])
+      DBI::dbWriteTable(con, tbl_name, df_fwf, overwrite = TRUE)
+      return(tbl_name)
+    } else if (fmt == "parquet") {
+      DBI::dbExecute(con, sprintf(
+        "CREATE OR REPLACE TABLE %s AS SELECT * FROM read_parquet(%s)",
+        DBI::dbQuoteIdentifier(con, tbl_name),
+        DBI::dbQuoteLiteral(con, path)))
+      return(tbl_name)
+    } else {
+      rlang::abort(paste0("Unsupported format: '", fmt, "'. Must be 'csv', 'fwf', or 'parquet'."))
+    }
+  }
 
   if (fmt == "csv") {
     delim <- config$delimiter %||% ","
@@ -106,7 +169,7 @@ read_dataset <- function(path, config) {
       error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)))
     )
   } else {
-    rlang::abort(paste0("Unsupported format: '", config$format, "'. Must be 'csv' or 'fwf'."))
+    rlang::abort(paste0("Unsupported format: '", fmt, "'. Must be 'csv', 'fwf', or 'parquet'."))
   }
 
   df <- as.data.frame(df, stringsAsFactors = FALSE)

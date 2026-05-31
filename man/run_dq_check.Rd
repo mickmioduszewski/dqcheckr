@@ -22,13 +22,13 @@ Invisibly, a named list with:
     \item{status}{Overall status string: \code{"PASS"}, \code{"WARN"},
       \code{"FAIL"}, or \code{"INFO"}.}
     \item{report_path}{Absolute path to the rendered HTML report.}
-    \item{snapshot_id}{Integer row ID of the snapshot written to SQLite,
+    \item{snapshot_id}{Integer row ID of the snapshot written to DuckDB,
       or \code{NULL} if the write failed.}
   }
 }
 \description{
 Orchestrates the complete dqcheckr pipeline: loads configuration, detects
-files, runs QC and comparison checks, writes a snapshot to SQLite, and
+files, runs QC and comparison checks, writes a snapshot to DuckDB, and
 renders an HTML report.
 }
 \examples{
@@ -36,7 +36,7 @@ renders an HTML report.
 tmp <- gsub("\\\\\\\\", "/", tempdir())
 dat <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 writeLines(c(
-  paste0('snapshot_db: "',       tmp, '/snap.sqlite"'),
+  paste0('snapshot_db: "',       tmp, '/snap.duckdb"'),
   paste0('report_output_dir: "', tmp, '"'),
   'default_rules:',
   '  max_missing_rate: 0.60',

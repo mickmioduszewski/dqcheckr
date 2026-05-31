@@ -2,24 +2,36 @@
 % Please edit documentation in R/ingest.R
 \name{read_dataset}
 \alias{read_dataset}
-\title{Read a dataset file into a data frame}
+\title{Read a dataset file into a data frame or DuckDB table}
 \usage{
-read_dataset(path, config)
+read_dataset(path, config, con = NULL, tbl_name = "current_data")
 }
 \arguments{
 \item{path}{Character. Path to the file to read.}
 
 \item{config}{Named list. Merged configuration as returned by
-\code{\link{load_config}}. Must include \code{format} (\code{"csv"} or
-\code{"fwf"}). For FWF files, \code{fwf_widths} is required and
-\code{fwf_col_names} and \code{fwf_skip} are optional.}
+\code{\link{load_config}}. Must include \code{format} (\code{"csv"},
+\code{"fwf"}, or \code{"parquet"}). For FWF files, \code{fwf_widths} is
+required and \code{fwf_col_names} and \code{fwf_skip} are optional.}
+
+\item{con}{A DuckDB connection (from \code{DBI::dbConnect(duckdb::duckdb())})
+or \code{NULL} (default). When provided the file is registered in DuckDB
+and the table name is returned.}
+
+\item{tbl_name}{Character. Name to use for the DuckDB table when \code{con}
+is provided. Defaults to \code{"current_data"}.}
 }
 \value{
-A data frame with all columns as character vectors.
+When \code{con = NULL}: a \code{data.frame} with all columns as
+  character vectors. When \code{con} is provided: the value of \code{tbl_name}
+  (a DuckDB table name).
 }
 \description{
-Reads a CSV or fixed-width file, coercing all columns to character and
-trimming whitespace. Encoding and delimiter are taken from \code{config}.
+Reads a CSV, fixed-width, or Parquet file. When \code{con} is a DuckDB
+connection the file is registered as an in-memory DuckDB table named
+\code{"current_data"} and the table name is returned as a
+\code{character(1)}. When \code{con = NULL} (the default) a \code{data.frame}
+is returned as before.
 }
 \examples{
 cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")

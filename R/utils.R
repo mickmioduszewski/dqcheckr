@@ -177,6 +177,36 @@ resolve_col_type <- function(col, x, config) {
   infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
 }
 
+#' Cap a value vector to at most n entries for display
+#'
+#' @param vals Character vector of values to display.
+#' @param n Maximum number of values to show before truncating.
+#' @return A single character string.
+#' @keywords internal
+#' @noRd
+.cap_values <- function(vals, n = 20) {
+  if (length(vals) <= n) return(paste(vals, collapse = ", "))
+  paste0(paste(vals[seq_len(n)], collapse = ", "),
+         " ... and ", length(vals) - n, " more")
+}
+
+#' Look up a table-level threshold from config
+#'
+#' Reads \code{config$rules[[key]]}, falling back to \code{default}.
+#'
+#' @param config Named list. Merged configuration.
+#' @param key Character. Threshold key (e.g. \code{"min_row_count"}).
+#' @param default Default value if not found.
+#'
+#' @return The resolved threshold value.
+#' @keywords internal
+#' @noRd
+table_threshold <- function(config, key, default = NULL) {
+  val <- config$rules[[key]]
+  if (!is.null(val)) return(val)
+  default
+}
+
 #' Look up the effective threshold for a check, with per-column fallback
 #'
 #' Resolution order: \code{column_rules.<col>.<key>} >

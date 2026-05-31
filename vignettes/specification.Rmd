@@ -1,8 +1,8 @@
 ---
 title: "dqcheckr — Software Specification"
 author: "Mick Mioduszewski"
-date: "2026-05-10"
-version: "0.1.1"
+date: "2026-05-31"
+version: "0.3.0"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Software Specification}
@@ -14,9 +14,9 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 ```
 
-**Version**: 0.1.1
+**Version**: 0.3.0
 **Author**: Mick Mioduszewski
-**Date**: 2026-05-10
+**Date**: 2026-05-31
 
 ---
 
@@ -131,9 +131,9 @@ dqcheckr/
 │   ├── run_check.R          # main entry point: run_dq_check()
 │   ├── ingest.R             # read CSV / FWF; trim whitespace
 │   ├── snapshot.R           # SQLite read/write
-│   ├── checks_generic.R     # QC-01..14 and SC-01..02
+│   ├── checks_generic.R     # QC-01..16 and SC-01..02
 │   ├── checks_custom.R      # source and call custom_checks(df)
-│   ├── compare.R            # CP-01..08
+│   ├── compare.R            # CP-01, CP-02a/b/c, CP-03..08
 │   ├── report.R             # rmarkdown::render() wrapper
 │   ├── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
 │   └── dqcheckr-package.R   # package-level documentation
@@ -296,10 +296,13 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-08 | Distinct value count | Character columns | — | — (INFO) |
 | QC-09 | Allowed values | Configured columns | Any value outside `allowed_values` | — |
 | QC-10 | Numeric bounds | Configured columns | Any value outside `min_value`/`max_value` | — |
-| QC-11 | Non-numeric values | Numeric columns | `non_numeric_rate > max_non_numeric_rate` | Any non-numeric values present |
-| QC-12 | Key uniqueness | Configured `key_columns` | Any duplicate value in key column | — |
+| QC-11 | Non-numeric values | Numeric columns | `non_numeric_rate > max_non_numeric_rate` | `non_numeric_rate > warn_non_numeric_rate` (default 0.0) |
+| QC-12 | Key uniqueness | Configured `key_columns` (single or composite list) | Any duplicate in key column(s) | — |
 | QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
 | QC-14 | Minimum row count | Table | `row_count < min_row_count` (if > 0) | — |
+| QC-14b | Maximum row count | Table | `row_count > max_row_count` (if configured) | — |
+| QC-15 | File size | Table | `file_size_mb > max_file_size_mb` (if configured) | — (INFO otherwise) |
+| QC-16 | Outlier detection | Numeric columns (if `max_z_score` configured) | `abs(Z) > max_z_score` per column | — |
 
 **Schema contract checks (SC series)** — only when `expected_columns` is configured
 
@@ -313,15 +316,17 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | ID | Name | Flag condition | Severity |
 |----|------|----------------|----------|
 | CP-01 | Row count change | `abs(pct_change) > max_row_count_change_pct` | WARN |
-| CP-02 | Schema diff | Columns added, dropped, or type-changed (each independently suppressible via `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes`) | WARN |
-| CP-03 | Missing rate change | Increase > `max_missing_rate_change_pp` pp per column | WARN |
+| CP-02a | Schema diff: new columns | New columns detected (`flag_new_columns: false` suppresses) | WARN |
+| CP-02b | Schema diff: dropped columns | Dropped columns detected (`flag_dropped_columns: false` suppresses) | WARN |
+| CP-02c | Schema diff: type changes | Column type changed (`flag_type_changes: false` suppresses) | WARN |
+| CP-03 | Missing rate change | Increase > `max_missing_rate_change_pp` pp per column | WARN (or FAIL via `missing_rate_change_severity`) |
 | CP-04 | Numeric mean shift | Shift > `max_numeric_mean_shift_pct` per column | WARN |
 | CP-05 | New distinct values | Values in current not in previous (categorical columns) | INFO |
 | CP-06 | Dropped distinct values | Values in previous not in current (categorical columns) | INFO |
-| CP-07 | Non-numeric rate change | Increase > `max_non_numeric_rate_change_pp` pp per column | WARN |
-| CP-08 | Column order change | Column order differs from previous (suppressible via `flag_column_order_change: false`) | WARN (CSV) / FAIL (FWF) |
+| CP-07 | Non-numeric rate change | Change > `max_non_numeric_rate_change_pp` pp per column | WARN (PASS when rate does not increase) |
+| CP-08 | Column order change | Column order differs from previous (`flag_column_order_change: false` skips; severity via `column_order_severity`) | WARN (CSV) / FAIL (FWF) by default |
 
-> CP-02 is the single source of truth for schema differences. The `new_cols_vs_previous` and `missing_cols_vs_previous` columns in the `snapshots` table are derived directly from the CP-02 result — they are not computed separately.
+> CP-02 is split into three independent result objects (CP-02a, CP-02b, CP-02c) so each dimension of schema change can be inspected and flag-suppressed separately. The `new_cols_vs_previous`, `missing_cols_vs_previous`, and `type_changed_cols_vs_previous` columns in the `snapshots` table are derived from these results.
 
 ### C.7 Custom checks
 

@@ -34,7 +34,7 @@ test_that("resolve_col_type override works for numeric and date", {
 test_that("load_config aborts on invalid column_types value", {
   tmp <- tempdir()
   writeLines(c(
-    'snapshot_db: "snap.sqlite"',
+    'snapshot_db: "snap.duckdb"',
     'report_output_dir: "reports/"',
     'default_rules:',
     '  max_missing_rate: 0.05'
@@ -127,13 +127,13 @@ test_that("QC-11 skips a column forced to character", {
 
 # --- CP-02: type override stabilises type comparison -------------------------
 
-test_that("CP-02 no WARN when override keeps type stable", {
+test_that("CP-02c no WARN when override keeps type stable", {
   # Without override: col would flip numeric<->character as non-numeric rate changes
   cfg <- cfg_base(column_types = list(unit = "character"))
   # both deliveries forced to character — no type change possible
   curr <- data.frame(unit = c("1", "2", "3A"), stringsAsFactors = FALSE)
   prev <- data.frame(unit = c("1", "2", "3"),  stringsAsFactors = FALSE)
-  res  <- Filter(\(r) r$check_id == "CP-02", compare_schema(curr, prev, cfg))
+  res  <- Filter(\(r) r$check_id == "CP-02c", compare_schema(curr, prev, cfg))
   expect_equal(res[[1]]$status, "PASS")
 })
 
@@ -163,7 +163,7 @@ test_that("CP-07 skips a column forced to character", {
 test_that("compute_col_stats stores overridden type in inferred_type row", {
   cfg <- cfg_base(column_types = list(phone = "character"))
   df  <- data.frame(phone = c("0412345678", "0298765432"), stringsAsFactors = FALSE)
-  cs  <- compute_col_stats(df, cfg, list())
+  cs  <- compute_col_stats(df, cfg)
   row <- cs[cs$column_name == "phone" & cs$dq_check == "inferred_type", ]
   expect_equal(row$value, "character")
 })
@@ -171,7 +171,7 @@ test_that("compute_col_stats stores overridden type in inferred_type row", {
 test_that("compute_col_stats does not add numeric stats for character-forced column", {
   cfg <- cfg_base(column_types = list(phone = "character"))
   df  <- data.frame(phone = c("0412345678", "0298765432"), stringsAsFactors = FALSE)
-  cs  <- compute_col_stats(df, cfg, list())
+  cs  <- compute_col_stats(df, cfg)
   expect_equal(nrow(cs[cs$column_name == "phone" &
-                          cs$dq_check == "numeric_mean", ]), 0L)
+                          cs$dq_check == "numeric_parseable_mean", ]), 0L)
 })

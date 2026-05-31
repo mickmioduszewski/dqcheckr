@@ -1,33 +1,40 @@
-#' Initialise the SQLite snapshot database
+#' Initialise the DuckDB snapshot database
 #' @keywords internal
+#' @noRd
 init_snapshot_db <- function(db_path) {
   dir.create(dirname(db_path), recursive = TRUE, showWarnings = FALSE)
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- DBI::dbConnect(duckdb::duckdb(), db_path)
   on.exit(DBI::dbDisconnect(con))
+
+  DBI::dbExecute(con, "CREATE SEQUENCE IF NOT EXISTS snapshots_id_seq")
+  DBI::dbExecute(con, "CREATE SEQUENCE IF NOT EXISTS column_snapshots_id_seq")
 
   DBI::dbExecute(con, "
     CREATE TABLE IF NOT EXISTS snapshots (
-      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
-      dataset_name             TEXT    NOT NULL,
-      run_timestamp            TEXT    NOT NULL,
-      file_name                TEXT    NOT NULL,
-      row_count                INTEGER NOT NULL,
-      col_count                INTEGER NOT NULL,
-      check_pass_count         INTEGER NOT NULL DEFAULT 0,
-      check_warn_count         INTEGER NOT NULL DEFAULT 0,
-      check_fail_count         INTEGER NOT NULL DEFAULT 0,
-      check_info_count         INTEGER NOT NULL DEFAULT 0,
-      overall_status           TEXT    NOT NULL,
-      new_cols_vs_previous     TEXT,
-      missing_cols_vs_previous TEXT,
-      new_cols_vs_schema       TEXT,
-      missing_cols_vs_schema   TEXT
+      id                            INTEGER PRIMARY KEY DEFAULT nextval('snapshots_id_seq'),
+      dataset_name                  TEXT    NOT NULL,
+      run_timestamp                 TEXT    NOT NULL,
+      file_name                     TEXT    NOT NULL,
+      row_count                     INTEGER NOT NULL,
+      col_count                     INTEGER NOT NULL,
+      check_pass_count              INTEGER NOT NULL DEFAULT 0,
+      check_warn_count              INTEGER NOT NULL DEFAULT 0,
+      check_fail_count              INTEGER NOT NULL DEFAULT 0,
+      check_info_count              INTEGER NOT NULL DEFAULT 0,
+      overall_status                TEXT    NOT NULL,
+      new_cols_vs_previous          TEXT,
+      missing_cols_vs_previous      TEXT,
+      new_cols_vs_schema            TEXT,
+      missing_cols_vs_schema        TEXT,
+      comparison_mode               TEXT    NOT NULL DEFAULT 'comparison',
+      render_status                 TEXT    NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT
     )
   ")
 
   DBI::dbExecute(con, "
     CREATE TABLE IF NOT EXISTS column_snapshots (
-      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      id                 INTEGER PRIMARY KEY DEFAULT nextval('column_snapshots_id_seq'),
       snapshot_id        INTEGER NOT NULL REFERENCES snapshots(id),
       column_name        TEXT    NOT NULL,
       dq_check           TEXT    NOT NULL,
@@ -42,17 +49,30 @@ init_snapshot_db <- function(db_path) {
 
 #' Compute per-column statistics for snapshot storage
 #' @keywords internal
+#' @noRd
 #' @importFrom stats sd
-compute_col_stats <- function(df, config, qc_results) {
+compute_col_stats <- function(df, config, con = NULL) {
   rows <- list()
 
-  for (col in names(df)) {
-    x         <- df[[col]]
+  cols <- if (!is.null(con)) .duck_cols(con, df) else names(df)
+  n    <- if (!is.null(con)) .duck_nrow(con, df)  else nrow(df)
+
+  for (col in cols) {
+    if (!is.null(con)) {
+      x         <- DBI::dbGetQuery(con, sprintf(
+        "SELECT %s AS v FROM %s",
+        DBI::dbQuoteIdentifier(con, col), DBI::dbQuoteIdentifier(con, df)))$v
+    } else {
+      x <- df[[col]]
+    }
+    x         <- as.character(x)
     col_type  <- resolve_col_type(col, x, config)
     non_empty <- x[!is.na(x) & x != ""]
     miss_count <- sum(is.na(x) | x == "")
-    miss_rate  <- miss_count / nrow(df)
+    miss_rate  <- miss_count / n
     dist_count <- length(unique(non_empty))
+
+    miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
 
     rows <- c(rows, list(
       data.frame(column_name = col, dq_check = "inferred_type",
@@ -63,7 +83,7 @@ compute_col_stats <- function(df, config, qc_results) {
                  severity_on_breach = NA_character_, stringsAsFactors = FALSE),
       data.frame(column_name = col, dq_check = "missing_rate",
                  value = as.character(miss_rate),
-                 threshold = as.character(config$rules$max_missing_rate %||% 0.05),
+                 threshold = as.character(miss_threshold),
                  severity_on_breach = "FAIL", stringsAsFactors = FALSE),
       data.frame(column_name = col, dq_check = "distinct_count",
                  value = as.character(dist_count), threshold = NA_character_,
@@ -76,13 +96,14 @@ compute_col_stats <- function(df, config, qc_results) {
       nn_count <- sum(!is.na(non_empty) &
                       is.na(suppressWarnings(as.numeric(non_empty))))
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
+      nn_threshold <- col_threshold(config, col, "max_non_numeric_rate", 0.01)
 
       rows <- c(rows, list(
-        data.frame(column_name = col, dq_check = "numeric_mean",
+        data.frame(column_name = col, dq_check = "numeric_parseable_mean",
                    value = if (length(nn) > 0) as.character(mean(nn)) else NA_character_,
                    threshold = NA_character_, severity_on_breach = NA_character_,
                    stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "numeric_sd",
+        data.frame(column_name = col, dq_check = "numeric_parseable_sd",
                    value = if (length(nn) > 1) as.character(sd(nn)) else NA_character_,
                    threshold = NA_character_, severity_on_breach = NA_character_,
                    stringsAsFactors = FALSE),
@@ -99,7 +120,7 @@ compute_col_stats <- function(df, config, qc_results) {
                    severity_on_breach = NA_character_, stringsAsFactors = FALSE),
         data.frame(column_name = col, dq_check = "non_numeric_rate",
                    value = as.character(nn_rate),
-                   threshold = as.character(config$rules$max_non_numeric_rate %||% 0.01),
+                   threshold = as.character(nn_threshold),
                    severity_on_breach = "FAIL", stringsAsFactors = FALSE)
       ))
     }
@@ -108,14 +129,15 @@ compute_col_stats <- function(df, config, qc_results) {
   do.call(rbind, rows)
 }
 
-#' Write a run snapshot to the SQLite database
+#' Write a run snapshot to the DuckDB database
 #' @keywords internal
+#' @noRd
 write_snapshot <- function(db_path, dataset_name, file_name, df,
                            qc_results, cp_results, custom_results, config,
-                           col_stats = NULL) {
+                           col_stats = NULL, exec_con = NULL) {
   tryCatch({
     init_snapshot_db(db_path)
-    con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
     on.exit(DBI::dbDisconnect(con))
 
     all_results <- c(qc_results, cp_results, custom_results)
@@ -129,10 +151,13 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 
     new_cols_prev  <- attr(cp_results, "new_cols")
     drop_cols_prev <- attr(cp_results, "dropped_cols")
+    type_changed   <- attr(cp_results, "type_changed")
     new_cols_prev_str  <- if (length(new_cols_prev) > 0)
       paste(new_cols_prev, collapse = ",") else NA_character_
     drop_cols_prev_str <- if (length(drop_cols_prev) > 0)
       paste(drop_cols_prev, collapse = ",") else NA_character_
+    type_changed_str   <- if (length(type_changed) > 0)
+      paste(type_changed, collapse = ";") else NA_character_
 
     expected <- config$expected_columns
     if (!is.null(expected)) {
@@ -151,59 +176,90 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
       miss_schema <- NA_character_
     }
 
-    DBI::dbExecute(con,
-      "INSERT INTO snapshots
-       (dataset_name, run_timestamp, file_name, row_count, col_count,
-        check_pass_count, check_warn_count, check_fail_count, check_info_count,
-        overall_status, new_cols_vs_previous, missing_cols_vs_previous,
-        new_cols_vs_schema, missing_cols_vs_schema)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      list(dataset_name,
-           format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-           file_name,
-           nrow(df), ncol(df),
-           pass_count, warn_count, fail_count, info_count,
-           o_status,
-           new_cols_prev_str, drop_cols_prev_str,
-           new_schema, miss_schema)
-    )
+    is_comparison <- length(cp_results) > 0 &&
+      any(vapply(cp_results, \(r) !r$status %in% c("INFO", "PASS"), logical(1))) ||
+      length(attr(cp_results, "new_cols")) > 0
+    comparison_mode <- if (isTRUE(is_comparison)) "comparison" else "single"
 
-    snapshot_id <- DBI::dbGetQuery(con,
-      "SELECT last_insert_rowid() AS id")$id[[1]]
+    if (is.null(col_stats)) col_stats <- compute_col_stats(df, config, exec_con)
 
-    if (is.null(col_stats)) col_stats <- compute_col_stats(df, config, qc_results)
-    col_stats$snapshot_id <- snapshot_id
+    n_row <- if (!is.null(exec_con) && is.character(df)) .duck_nrow(exec_con, df) else nrow(df)
+    n_col <- if (!is.null(exec_con) && is.character(df)) length(.duck_cols(exec_con, df)) else ncol(df)
 
-    DBI::dbAppendTable(con, "column_snapshots",
-      col_stats[, c("snapshot_id", "column_name", "dq_check",
-                    "value", "threshold", "severity_on_breach")])
+    DBI::dbBegin(con)
+    tryCatch({
+      snap_id_row <- DBI::dbGetQuery(con,
+        "INSERT INTO snapshots
+         (dataset_name, run_timestamp, file_name, row_count, col_count,
+          check_pass_count, check_warn_count, check_fail_count, check_info_count,
+          overall_status, new_cols_vs_previous, missing_cols_vs_previous,
+          new_cols_vs_schema, missing_cols_vs_schema,
+          comparison_mode, render_status, type_changed_cols_vs_previous)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING id",
+        list(dataset_name,
+             format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+             file_name,
+             n_row, n_col,
+             pass_count, warn_count, fail_count, info_count,
+             o_status,
+             new_cols_prev_str, drop_cols_prev_str,
+             new_schema, miss_schema,
+             comparison_mode, "success", type_changed_str)
+      )
+      snapshot_id <- snap_id_row$id[[1]]
 
-    for (r in custom_results) {
-      if (!is.na(r$column)) {
-        sev <- if (r$status %in% c("WARN", "FAIL")) r$status else NA_character_
-        DBI::dbExecute(con,
-          "INSERT INTO column_snapshots
-           (snapshot_id, column_name, dq_check, value, threshold, severity_on_breach)
-           VALUES (?, ?, ?, ?, ?, ?)",
-          list(snapshot_id, r$column, r$check_id,
-               r$observed, r$threshold, sev))
+      col_stats$snapshot_id <- snapshot_id
+
+      DBI::dbAppendTable(con, "column_snapshots",
+        col_stats[, c("snapshot_id", "column_name", "dq_check",
+                      "value", "threshold", "severity_on_breach")])
+
+      for (r in custom_results) {
+        if (!is.na(r$column)) {
+          sev <- if (r$status %in% c("WARN", "FAIL")) r$status else NA_character_
+          DBI::dbExecute(con,
+            "INSERT INTO column_snapshots
+             (snapshot_id, column_name, dq_check, value, threshold, severity_on_breach)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            list(snapshot_id, r$column, r$check_id,
+                 r$observed, r$threshold, sev))
+        }
       }
-    }
 
-    snapshot_id
+      DBI::dbCommit(con)
+      snapshot_id
+    }, error = function(e) {
+      DBI::dbRollback(con)
+      stop(e)
+    })
   },
   error = function(e) {
-    warning("SQLite write failed: ", conditionMessage(e))
+    warning("Snapshot write failed: ", conditionMessage(e))
     NULL
   })
 }
 
-#' Read recent snapshot history from the SQLite database
+#' Update render_status for a snapshot after a failed render
+#' @keywords internal
+#' @noRd
+.mark_render_failed <- function(db_path, snapshot_id) {
+  tryCatch({
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
+    on.exit(DBI::dbDisconnect(con))
+    DBI::dbExecute(con,
+      "UPDATE snapshots SET render_status = 'failed' WHERE id = ?",
+      list(snapshot_id))
+  }, error = function(e) invisible(NULL))
+}
+
+#' Read recent snapshot history from the DuckDB database
 #'
 #' Retrieves the \code{n} most recent run records for a given dataset from the
 #' snapshot database, ordered newest-first.
 #'
-#' @param db_path Character. Path to the SQLite database file.
+#' @param db_path Character. Path to the DuckDB database file
+#'   (\code{.duckdb} extension).
 #' @param dataset_name Character. Dataset name to filter on.
 #' @param n Integer. Maximum number of records to return. Defaults to 10.
 #'
@@ -214,7 +270,9 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   not exist or contains no records for the dataset.
 #'
 #' @examples
-#' history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
+#' \dontrun{
+#' history <- read_recent_snapshots(tempfile(fileext = ".duckdb"), "starwars_csv")
+#' }
 #'
 #' @export
 read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
@@ -232,7 +290,7 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
   if (!file.exists(db_path)) return(empty)
 
   tryCatch({
-    con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
     on.exit(DBI::dbDisconnect(con))
     if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
     DBI::dbGetQuery(con,

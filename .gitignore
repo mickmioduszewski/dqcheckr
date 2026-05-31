@@ -25,3 +25,6 @@ src/*.dll
 .DS_Store
 /doc/
 /Meta/
+
+/.quarto/
+**/*.quarto_ipynb

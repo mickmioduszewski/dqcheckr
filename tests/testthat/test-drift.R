@@ -1,7 +1,7 @@
 # --- list_snapshots() ---------------------------------------------------------
 
 test_that("list_snapshots returns empty df for non-existent db", {
-  result <- list_snapshots(db_path = tempfile(fileext = ".sqlite"))
+  result <- list_snapshots(db_path = tempfile(fileext = ".duckdb"))
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 0L)
 })
@@ -38,7 +38,7 @@ test_that("list_snapshots filters by dataset name", {
 test_that("compare_snapshots errors if db does not exist", {
   cfg_dir <- make_drift_config()
   expect_error(
-    compare_snapshots("x", db_path = tempfile(fileext = ".sqlite"),
+    compare_snapshots("x", db_path = tempfile(fileext = ".duckdb"),
                       config_dir = cfg_dir, report = FALSE),
     "not found"
   )
@@ -64,6 +64,16 @@ test_that("compare_snapshots errors if same ID passed twice", {
   )
 })
 
+test_that("compare_snapshots() errors when prev ID is greater than curr ID", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  expect_error(
+    compare_snapshots("test_ds", snapshot_id_prev = 2L, snapshot_id_curr = 1L,
+                      db_path = db, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_error"
+  )
+})
+
 # --- compare_snapshots() default ID selection ---------------------------------
 
 test_that("compare_snapshots defaults to second-latest vs latest", {
@@ -75,14 +85,14 @@ test_that("compare_snapshots defaults to second-latest vs latest", {
   expect_equal(drift$snap_curr$id, 3L)
 })
 
-test_that("compare_snapshots respects explicit ID order even if reversed", {
-  db      <- make_drift_db(2)
+test_that("compare_snapshots respects explicit IDs when in ascending order", {
+  db      <- make_drift_db(3)
   cfg_dir <- make_drift_config()
   drift   <- compare_snapshots("test_ds",
-                               snapshot_id_prev = 2L, snapshot_id_curr = 1L,
+                               snapshot_id_prev = 1L, snapshot_id_curr = 3L,
                                db_path = db, config_dir = cfg_dir, report = FALSE)
-  expect_equal(drift$snap_prev$id, 2L)
-  expect_equal(drift$snap_curr$id, 1L)
+  expect_equal(drift$snap_prev$id, 1L)
+  expect_equal(drift$snap_curr$id, 3L)
 })
 
 # --- drift list structure -----------------------------------------------------
@@ -119,7 +129,7 @@ test_that("table_drift row count change is correct", {
 
 test_that("schema_changes detects new column across snapshots", {
   db  <- make_drift_db(2)
-  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  con <- DBI::dbConnect(duckdb::duckdb(), db)
   # Add a column that appears only in snapshot 2
   DBI::dbExecute(con,
     "INSERT INTO column_snapshots
@@ -139,7 +149,7 @@ test_that("schema_changes detects new column across snapshots", {
 
 test_that("schema_changes detects type change", {
   db  <- make_drift_db(2)
-  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  con <- DBI::dbConnect(duckdb::duckdb(), db)
   # Change 'amount' type in snapshot 2 to character
   DBI::dbExecute(con,
     "UPDATE column_snapshots
@@ -172,6 +182,7 @@ test_that("missing_rate_changes sorted by magnitude descending", {
   drift   <- compare_snapshots("test_ds", db_path = db,
                                config_dir = cfg_dir, report = FALSE)
   mr <- drift$missing_rate_changes
+  expect_true(nrow(mr) >= 1)
   if (nrow(mr) > 1) {
     expect_true(all(diff(abs(mr$missing_rate_change_pp)) <= 0))
   }
@@ -197,4 +208,61 @@ test_that("distinct_changes filtered to changed columns only", {
                                config_dir = cfg_dir, report = FALSE)
   # status has distinct_count = 3 in both snapshots — should not appear
   expect_false("status" %in% drift$distinct_changes$Column)
+})
+
+# --- compare_snapshots() dataset-level threshold override (G-05/G-06) ---------
+
+test_that("compare_snapshots() applies dataset-level threshold overrides", {
+  tmp_cfg <- withr::local_tempdir()
+  db      <- make_drift_db(2)
+
+  writeLines(c(
+    sprintf('snapshot_db: "%s"', db),
+    sprintf('report_output_dir: "%s"', tmp_cfg),
+    'default_rules:',
+    '  max_missing_rate_change_pp: 2.0',
+    '  max_numeric_mean_shift_pct: 0.20',
+    '  max_non_numeric_rate_change_pp: 1.0',
+    '  max_row_count_change_pct: 0.10'
+  ), file.path(tmp_cfg, "dqcheckr.yml"))
+
+  writeLines(c(
+    'dataset_name: "test_ds"',
+    'format: csv',
+    'encoding: "UTF-8"',
+    sprintf('snapshot_db: "%s"', db),
+    sprintf('report_output_dir: "%s"', tmp_cfg),
+    'rule_overrides:',
+    '  max_numeric_mean_shift_pct: 0.01'
+  ), file.path(tmp_cfg, "test_ds.yml"))
+
+  drift <- compare_snapshots("test_ds", db_path = db,
+                             config_dir = tmp_cfg, report = FALSE)
+  # prev mean=100, curr mean=200 => 100% shift; threshold now 1% → must exceed
+  expect_true(drift$mean_shifts[drift$mean_shifts$Column == "amount",
+                                "numeric_mean_exceeds"])
+})
+
+test_that("compare_snapshots() uses global defaults when no dataset override", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("test_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+  # default max_numeric_mean_shift_pct = 0.20; 100% shift still exceeds
+  expect_true(drift$mean_shifts[drift$mean_shifts$Column == "amount",
+                                "numeric_mean_exceeds"])
+})
+
+# --- read_pass_rate_trend() ---------------------------------------------------
+
+test_that("read_pass_rate_trend() returns one row per snapshot", {
+  db <- make_drift_db(3)
+  trend <- read_pass_rate_trend(db, "test_ds", n = 10)
+  expect_equal(nrow(trend), 3L)
+  expect_true(all(c("snapshot_id", "run_timestamp", "pass_rate") %in% names(trend)))
+})
+
+test_that("read_pass_rate_trend() returns empty data frame for missing db", {
+  res <- read_pass_rate_trend(tempfile(fileext = ".duckdb"), "ds")
+  expect_equal(nrow(res), 0L)
 })

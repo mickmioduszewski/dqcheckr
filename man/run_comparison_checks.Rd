@@ -4,15 +4,17 @@
 \alias{run_comparison_checks}
 \title{Run all version comparison checks between two dataset snapshots}
 \usage{
-run_comparison_checks(df_current, df_previous, config)
+run_comparison_checks(df_current, df_previous, config, con = NULL)
 }
 \arguments{
-\item{df_current}{A data frame. The current delivery.}
+\item{df_current}{A data frame or DuckDB table name. The current delivery.}
 
-\item{df_previous}{A data frame. The previous delivery.}
+\item{df_previous}{A data frame or DuckDB table name. The previous delivery.}
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{con}{A DuckDB connection or \code{NULL} (default).}
 }
 \value{
 A list of \code{\link{dq_result}} objects. The list carries

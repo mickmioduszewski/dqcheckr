@@ -1,51 +1,57 @@
 make_drift_db <- function(n_snapshots = 2) {
-  db <- tempfile(fileext = ".sqlite")
-  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  db <- tempfile(fileext = ".duckdb")
+  con <- DBI::dbConnect(duckdb::duckdb(), db)
   on.exit(DBI::dbDisconnect(con))
+
+  DBI::dbExecute(con, "CREATE SEQUENCE IF NOT EXISTS snapshots_id_seq")
+  DBI::dbExecute(con, "CREATE SEQUENCE IF NOT EXISTS column_snapshots_id_seq")
 
   DBI::dbExecute(con, "
     CREATE TABLE snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      dataset_name TEXT, run_timestamp TEXT, file_name TEXT,
-      row_count INTEGER, col_count INTEGER,
+      id               INTEGER PRIMARY KEY DEFAULT nextval('snapshots_id_seq'),
+      dataset_name     TEXT, run_timestamp TEXT, file_name TEXT,
+      row_count        INTEGER, col_count INTEGER,
       check_pass_count INTEGER, check_warn_count INTEGER,
       check_fail_count INTEGER, check_info_count INTEGER,
-      overall_status TEXT,
+      overall_status   TEXT,
       new_cols_vs_previous TEXT, missing_cols_vs_previous TEXT,
-      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT
+      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT,
+      comparison_mode  TEXT NOT NULL DEFAULT 'comparison',
+      render_status    TEXT NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT
     )")
 
   DBI::dbExecute(con, "
     CREATE TABLE column_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          INTEGER PRIMARY KEY DEFAULT nextval('column_snapshots_id_seq'),
       snapshot_id INTEGER, column_name TEXT, dq_check TEXT,
       value TEXT, threshold TEXT, severity_on_breach TEXT
     )")
 
   for (i in seq_len(n_snapshots)) {
-    DBI::dbExecute(con,
+    snap_id_row <- DBI::dbGetQuery(con,
       "INSERT INTO snapshots
        (dataset_name, run_timestamp, file_name,
         row_count, col_count,
         check_pass_count, check_warn_count, check_fail_count, check_info_count,
         overall_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id",
       list("test_ds",
-           sprintf("2025-0%d-01 09:00:00", i),
+           sprintf("2025-0%d-01T09:00:00Z", i),
            sprintf("delivery_0%d.csv", i),
            1000L * i, 3L,
            10L, 0L, 0L, 2L,
            "PASS"))
 
-    snap_id <- DBI::dbGetQuery(con,
-      "SELECT last_insert_rowid() AS id")$id
+    snap_id <- snap_id_row$id[[1]]
 
     stats <- data.frame(
       snapshot_id        = snap_id,
       column_name        = c("amount", "amount", "amount", "amount",
                              "status", "status", "status",
                              "dt",     "dt",     "dt"),
-      dq_check           = c("inferred_type", "missing_rate", "numeric_mean",
+      dq_check           = c("inferred_type", "missing_rate", "numeric_parseable_mean",
                              "distinct_count",
                              "inferred_type", "missing_rate", "distinct_count",
                              "inferred_type", "missing_rate", "distinct_count"),
@@ -71,7 +77,7 @@ make_drift_db <- function(n_snapshots = 2) {
 
 make_drift_config <- function(dir = tempdir()) {
   writeLines(c(
-    'snapshot_db: "data/snapshots.sqlite"',
+    'snapshot_db: "data/snapshots.duckdb"',
     paste0('report_output_dir: "', dir, '"'),
     'default_rules:',
     '  max_missing_rate_change_pp: 2.0',

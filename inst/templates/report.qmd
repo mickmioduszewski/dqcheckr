@@ -1,24 +1,13 @@
 ---
 title: "Data Quality Report"
-output:
-  html_document:
-    self_contained: true
+format:
+  html:
+    embed-resources: true
     theme: flatly
     toc: true
-    toc_float: true
+    toc-location: left
 params:
-  dataset_name: ""
-  file_name: ""
-  file_path: ""
-  run_timestamp: ""
-  df: NULL
-  qc_results: NULL
-  cp_results: NULL
-  custom_results: NULL
-  snapshot_history: NULL
-  config: NULL
-  col_stats: NULL
-  overall_status: ""
+  rds_path: ""
 ---
 
 ```{r setup, include=FALSE}
@@ -27,6 +16,21 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 library(kableExtra)
 library(ggplot2)
 library(dplyr)
+
+# Load all complex R objects from the .rds file passed by render_report()
+.p <- readRDS(params$rds_path)
+dataset_name     <- .p$dataset_name
+file_name        <- .p$file_name
+file_path_param  <- .p$file_path
+run_timestamp    <- .p$run_timestamp
+df               <- .p$df
+qc_results       <- .p$qc_results
+cp_results       <- .p$cp_results
+custom_results   <- .p$custom_results
+snapshot_history <- .p$snapshot_history
+config           <- .p$config
+col_stats        <- .p$col_stats
+overall_status_v <- .p$overall_status
 
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
@@ -81,17 +85,17 @@ colour_status_col <- function(df) {
 
 ## 1. Header
 
-**Dataset**: `r params$dataset_name`
-**File**: `r params$file_name`
-**Run time**: `r params$run_timestamp`
-**Overall status**: `r knitr::raw_html(badge_html(params$overall_status))`
+**Dataset**: `r dataset_name`
+**File**: `r file_name`
+**Run time**: `r run_timestamp`
+**Overall status**: `r knitr::raw_html(badge_html(overall_status_v))`
 
 ---
 
 ## 2. File summary
 
 ```{r file-summary}
-fsize <- tryCatch(file.info(params$file_path)$size, error = function(e) NA)
+fsize <- tryCatch(file.info(file_path_param)$size, error = function(e) NA)
 fsize_str <- if (!is.na(fsize)) {
   sprintf("%.1f KB", fsize / 1024)
 } else {
@@ -101,11 +105,11 @@ fsize_str <- if (!is.na(fsize)) {
 summary_df <- data.frame(
   Item  = c("Row count", "Column count", "File size", "Format", "Encoding"),
   Value = c(
-    as.character(nrow(params$df)),
-    as.character(ncol(params$df)),
+    as.character(nrow(df)),
+    as.character(ncol(df)),
     fsize_str,
-    toupper(params$config$format %||% "CSV"),
-    params$config$encoding %||% "UTF-8"
+    toupper(config$format %||% "CSV"),
+    config$encoding %||% "UTF-8"
   ),
   stringsAsFactors = FALSE
 )
@@ -119,7 +123,7 @@ kableExtra::kbl(summary_df, col.names = c("Item", "Value")) |>
 ## 3. Quality checks
 
 ```{r qc-table}
-qc_df <- results_to_df(params$qc_results)
+qc_df <- results_to_df(qc_results)
 if (nrow(qc_df) > 0) {
   qc_df <- sort_results_df(qc_df)
   qc_df <- colour_status_col(qc_df)
@@ -133,9 +137,9 @@ if (nrow(qc_df) > 0) {
 ---
 
 ```{r custom-section, results='asis'}
-if (length(params$custom_results) > 0) {
+if (length(custom_results) > 0) {
   cat("## Custom checks\n\n")
-  cc_df <- results_to_df(params$custom_results)
+  cc_df <- results_to_df(custom_results)
   cc_df <- sort_results_df(cc_df)
   cc_df <- colour_status_col(cc_df)
   print(kableExtra::kbl(cc_df, escape = FALSE) |>
@@ -145,10 +149,10 @@ if (length(params$custom_results) > 0) {
 ```
 
 ```{r comparison-section, results='asis'}
-if (length(params$cp_results) > 0) {
+if (length(cp_results) > 0) {
   cat("## Version comparison\n\n")
 
-  issues <- Filter(\(r) r$status %in% c("FAIL", "WARN"), params$cp_results)
+  issues <- Filter(\(r) r$status %in% c("FAIL", "WARN"), cp_results)
   issues <- issues[order(sapply(issues, \(r) status_order[r$status]))]
   if (length(issues) > 0) {
     cat("**Summary**:\n\n")
@@ -160,7 +164,7 @@ if (length(params$cp_results) > 0) {
     cat("**Summary**: No issues found.\n\n")
   }
 
-  cp_df <- results_to_df(params$cp_results)
+  cp_df <- results_to_df(cp_results)
   cp_df <- sort_results_df(cp_df)
   cp_df <- colour_status_col(cp_df)
   print(kableExtra::kbl(cp_df, escape = FALSE) |>
@@ -170,7 +174,7 @@ if (length(params$cp_results) > 0) {
 ```
 
 ```{r trend-header, results='asis'}
-hist <- params$snapshot_history
+hist <- snapshot_history
 show_trend <- !is.null(hist) && nrow(hist) >= 2
 if (show_trend) {
   hist$run_timestamp <- as.POSIXct(hist$run_timestamp)
@@ -213,15 +217,15 @@ if (show_trend) cat("\n\n---\n\n")
 ## Appendix - Column statistics
 
 Per-column statistics computed for this run. These correspond to the rows
-written to the `column_snapshots` table in the SQLite snapshot database
+written to the `column_snapshots` table in the snapshot database
 (`column_name` -> Column, `dq_check` -> Stat, `value` -> Value,
 `threshold` -> Threshold, `severity_on_breach` -> Severity).
 
 ```{r appendix}
-if (!is.null(params$col_stats)) {
-  col_stats <- params$col_stats
-  names(col_stats) <- c("Column", "Stat", "Value", "Threshold", "Severity")
-  kableExtra::kbl(col_stats) |>
+if (!is.null(col_stats) && nrow(col_stats) > 0) {
+  cs <- col_stats
+  names(cs) <- c("Column", "Stat", "Value", "Threshold", "Severity")
+  kableExtra::kbl(cs) |>
     kableExtra::kable_styling(bootstrap_options = c("striped", "condensed"),
                               full_width = TRUE)
 }

@@ -4,27 +4,34 @@
 \alias{run_qc_checks}
 \title{Run all generic quality checks on a dataset}
 \usage{
-run_qc_checks(df, config)
+run_qc_checks(df, config, file_path = NULL, con = NULL)
 }
 \arguments{
 \item{df}{A data frame with all columns as character vectors (as returned by
-\code{\link{read_dataset}}).}
+\code{\link{read_dataset}}), or a DuckDB table name when \code{con} is
+provided.}
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{file_path}{Character. Path to the source file; used for the
+\code{max_file_size_mb} check. Pass \code{NULL} to skip the size check.}
+
+\item{con}{A DuckDB connection or \code{NULL} (default). When provided,
+check execution uses DuckDB SQL.}
 }
 \value{
 A list of \code{\link{dq_result}} objects.
 }
 \description{
-Runs the full QC check suite (QC-01 to QC-14, SC-01, SC-02) against a
-single data frame snapshot.
+Runs the full QC check suite (QC-01 to QC-16, SC-01, SC-02) against a
+single dataset snapshot.
 }
 \examples{
 cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
 path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df      <- read_dataset(path, cfg)
-results <- run_qc_checks(df, cfg)
+results <- run_qc_checks(df, cfg, file_path = path)
 
 }

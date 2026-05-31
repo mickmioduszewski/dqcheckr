@@ -70,7 +70,7 @@ test_that("QC-11 uses per-column threshold: zero allowed means FAIL on any non-n
   res <- Filter(\(r) r$check_id == "QC-11" && r$column == "amount",
                 check_non_numeric(df, cfg))
   expect_equal(res[[1]]$status, "FAIL")
-  expect_equal(res[[1]]$threshold, "0.00%")
+  expect_match(res[[1]]$threshold, "FAIL > 0.00%")
 })
 
 # --- CP-03: per-column max_missing_rate_change_pp ----------------------------

@@ -2,7 +2,7 @@
 % Please edit documentation in R/drift.R
 \name{compare_snapshots}
 \alias{compare_snapshots}
-\title{Compare two snapshots from the SQLite database}
+\title{Compare two snapshots from the DuckDB database}
 \usage{
 compare_snapshots(
   dataset_name,
@@ -24,7 +24,7 @@ If \code{NULL}, defaults to the second-most-recent snapshot by ID.}
 \item{snapshot_id_curr}{Integer or \code{NULL}. ID of the later snapshot.
 If \code{NULL}, defaults to the most-recent snapshot by ID.}
 
-\item{db_path}{Character or \code{NULL}. Path to the SQLite snapshot
+\item{db_path}{Character or \code{NULL}. Path to the DuckDB snapshot
 database. If \code{NULL} (the default), the path is read from
 \code{snapshot_db} in \code{dqcheckr.yml}.}
 
@@ -47,14 +47,14 @@ Invisibly, a named list with elements \code{dataset_name},
   \code{non_numeric_changes}, \code{mean_shifts}, \code{distinct_changes}.
 }
 \description{
-Reads two historical snapshot records (by ID) from the SQLite database and
+Reads two historical snapshot records (by ID) from the DuckDB database and
 computes table-level, schema, and per-column statistical drift. Optionally
 renders an HTML drift report and/or a plain-text report.
 }
 \examples{
 \donttest{
 tmp     <- tempdir()
-db_path <- file.path(tmp, "snap.sqlite")
+db_path <- file.path(tmp, "snap.duckdb")
 cfg_yml <- file.path(tmp, "dqcheckr.yml")
 ds_yml  <- file.path(tmp, "starwars_csv.yml")
 dat     <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")

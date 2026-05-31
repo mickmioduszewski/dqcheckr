@@ -116,3 +116,66 @@ test_that("detect_files() returns previous=NULL for single-file folder", {
   expect_null(result$previous)
   unlink(f)
 })
+
+# -- read_dataset() DuckDB path -----------------------------------------------
+
+test_that("read_dataset() registers CSV as DuckDB table when con is provided", {
+  tmp <- tempfile(fileext = ".csv")
+  write.csv(data.frame(a = "1", b = "2"), tmp, row.names = FALSE)
+  on.exit(unlink(tmp))
+  con <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  tbl <- read_dataset(tmp, list(format = "csv", encoding = "UTF-8", delimiter = ","),
+                      con = con)
+  expect_equal(tbl, "current_data")
+  expect_true("current_data" %in% DBI::dbListTables(con))
+})
+
+test_that("read_dataset() still returns data.frame when con = NULL", {
+  cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
+  df  <- read_dataset(fix("valid_accounts_current.csv"), cfg)
+  expect_s3_class(df, "data.frame")
+})
+
+test_that("read_dataset() trims whitespace in DuckDB-registered table", {
+  tmp <- tempfile(fileext = ".csv")
+  writeLines(c("a,b", "  hello  ,  world  "), tmp)
+  on.exit(unlink(tmp))
+  con <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  tbl <- read_dataset(tmp, list(format = "csv", encoding = "UTF-8", delimiter = ","),
+                      con = con)
+  row <- DBI::dbGetQuery(con, "SELECT a, b FROM current_data")
+  expect_equal(row$a[1], "hello")
+  expect_equal(row$b[1], "world")
+})
+
+test_that("read_dataset() reads Parquet into DuckDB when con is provided", {
+  skip_if_not_installed("arrow")
+  tmp_pq <- tempfile(fileext = ".parquet")
+  on.exit(unlink(tmp_pq))
+  arrow::write_parquet(data.frame(x = 1:3, y = c("a","b","c")), tmp_pq)
+  con <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  tbl <- read_dataset(tmp_pq, list(format = "parquet"), con = con)
+  expect_equal(tbl, "current_data")
+  n <- DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM current_data")$n
+  expect_equal(n, 3L)
+})
+
+# -- detect_files() tiebreaker -------------------------------------------------
+
+test_that("detect_files() uses filename as tiebreaker when mtimes are equal", {
+  tmp <- withr::local_tempdir()
+  fa  <- file.path(tmp, "aaa.csv")
+  fb  <- file.path(tmp, "zzz.csv")
+  writeLines("a,b\n1,2", fa)
+  writeLines("a,b\n3,4", fb)
+  t0 <- as.POSIXct("2025-01-01 12:00:00", tz = "UTC")
+  Sys.setFileTime(fa, t0)
+  Sys.setFileTime(fb, t0)
+  cfg    <- list(folder = tmp)
+  result <- detect_files(cfg)
+  expect_equal(basename(result$current),  "zzz.csv")
+  expect_equal(basename(result$previous), "aaa.csv")
+})

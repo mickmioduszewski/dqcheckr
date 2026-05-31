@@ -13,7 +13,7 @@ run_minimal_render <- function() {
     column_rules = list(), key_columns = NULL, expected_columns = NULL
   )
   qc <- run_qc_checks(df, cfg)
-  cs <- compute_col_stats(df, cfg, qc)
+  cs <- compute_col_stats(df, cfg)
   render_report(
     dataset_name     = "tmpds",
     file_name        = "tmp.csv",
@@ -32,7 +32,7 @@ run_minimal_render <- function() {
 
 # T-01: template directory file list is unchanged after a render
 test_that("render_report() leaves no new files in the template directory", {
-  skip_if_not(rmarkdown::pandoc_available())
+  skip_if_not(quarto::quarto_available())
   tmpl_dir <- system.file("templates", package = "dqcheckr")
   before   <- sort(list.files(tmpl_dir, all.files = TRUE))
   run_minimal_render()
@@ -42,7 +42,7 @@ test_that("render_report() leaves no new files in the template directory", {
 
 # T-02: no intermediate files are written into the template directory
 test_that("render_report() writes intermediate files only under tempdir()", {
-  skip_if_not(rmarkdown::pandoc_available())
+  skip_if_not(quarto::quarto_available())
   tmpl_dir   <- system.file("templates", package = "dqcheckr")
   before     <- normalizePath(
     list.files(tmpl_dir, full.names = TRUE, all.files = TRUE))
@@ -55,7 +55,7 @@ test_that("render_report() writes intermediate files only under tempdir()", {
 
 # T-03: compare_snapshots(report = TRUE) leaves template directory unchanged
 test_that("compare_snapshots(report=TRUE) leaves no new files in template directory", {
-  skip_if_not(rmarkdown::pandoc_available())
+  skip_if_not(quarto::quarto_available())
   db       <- make_drift_db(2)
   cfg_dir  <- make_drift_config()
   tmpl_dir <- system.file("templates", package = "dqcheckr")

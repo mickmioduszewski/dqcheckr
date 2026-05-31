@@ -1,7 +1,7 @@
 Package: dqcheckr
 Type: Package
 Title: Automated Data Quality Checks for Recurring Dataset Deliveries
-Version: 0.2.0
+Version: 0.3.0
 Date: 2026-05-30
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
@@ -9,10 +9,10 @@ Authors@R: person("Mick", "Mioduszewski",
 Description:
     Automates quality verification of recurring external dataset deliveries.
     For each new file arrival, it runs single-snapshot quality checks, compares
-    the file to the previous delivery, writes a self-contained 'HTML' report, and
-    records summary statistics in a local 'SQLite' database for long-term trend
-    tracking. Supports 'CSV' and fixed-width formats. Custom organisation-specific
-    checks can be supplied as plain R files.
+    the file to the previous delivery, writes a self-contained 'HTML' report via
+    'Quarto', and records summary statistics in a local 'SQLite' database for
+    long-term trend tracking using 'DuckDB'. Supports 'CSV' and fixed-width
+    formats. Custom organisation-specific checks can be supplied as plain R files.
 License: MIT + file LICENSE
 URL: https://mickmioduszewski.github.io/dqcheckr/, https://github.com/mickmioduszewski/dqcheckr
 BugReports: https://github.com/mickmioduszewski/dqcheckr/issues
@@ -23,8 +23,8 @@ Depends:
 Imports:
     readr,
     DBI,
-    RSQLite,
-    rmarkdown,
+    duckdb (>= 0.10.0),
+    quarto,
     knitr,
     kableExtra,
     ggplot2,
@@ -34,7 +34,11 @@ Imports:
     yaml,
     rlang
 Suggests:
-    testthat (>= 3.1.0)
+    testthat (>= 3.1.0),
+    withr,
+    rmarkdown,
+    RSQLite,
+    arrow
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

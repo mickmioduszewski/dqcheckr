@@ -1,3 +1,73 @@
+# dqcheckr 0.3.0
+
+## Breaking changes
+
+* **DuckDB replaces SQLite** for snapshot storage. Existing `.sqlite` databases
+  must be migrated with `inst/scripts/migrate_sqlite_to_duckdb.R`. Update
+  `snapshot_db` in `dqcheckr.yml` to point to the new `.duckdb` path.
+* **Quarto replaces rmarkdown** for HTML reports. Install Quarto CLI from
+  <https://quarto.org>; the R `quarto` package is now an `Imports` dependency.
+* **CP-02 split into three result objects**: `CP-02a` (new columns), `CP-02b`
+  (dropped columns), `CP-02c` (type changes). Code that filters on
+  `check_id == "CP-02"` must be updated to check `CP-02a`, `CP-02b`, or
+  `CP-02c`.
+* **`run_timestamp`** is now stored in UTC ISO-8601 format
+  (`YYYY-MM-DDTHH:MM:SSZ`). Existing snapshot rows retain the old local-time
+  format; new rows use UTC.
+* **`numeric_mean`** stat key renamed to **`numeric_parseable_mean`** in
+  `column_snapshots`. Existing rows retain the old label; new rows use the new
+  label.
+
+## New features
+
+* **DuckDB check-execution**: CSV and Parquet files are registered in an
+  in-memory DuckDB connection; all QC and CP checks execute as SQL.
+  R-path fallback is preserved for all check functions via `con = NULL`.
+* **Parquet input**: add `format: parquet` to the dataset YAML to read
+  Parquet files directly via DuckDB.
+* **Outlier detection** (`check_outliers()`, check ID `QC-16`): configurable
+  Z-score threshold per column via `column_rules.<col>.max_z_score`. Off by
+  default (`Inf`).
+* **File size check** (`check_file_size()`, check ID `QC-15`): FAIL when
+  file exceeds `max_file_size_mb`; always emits an INFO with the actual size.
+* **Maximum row count** (`max_row_count`): FAIL when file exceeds configured
+  row count (check ID `QC-14b`).
+* **Multi-column composite key uniqueness**: `key_columns` now accepts a list
+  of column names for composite-key uniqueness checks.
+* **PASS rate trend**: `read_pass_rate_trend()` queries the snapshot database
+  for per-snapshot PASS rate history.
+* **`render_status` column** in `snapshots` table: defaults to `'success'`;
+  updated to `'failed'` if the HTML render step fails.
+* **`comparison_mode` column** in `snapshots` table: `'single'` for single-file
+  runs, `'comparison'` for runs with a previous file.
+* **`type_changed_cols_vs_previous` column** in `snapshots` table: stores type
+  changes detected by CP-02c.
+
+## Behaviour changes
+
+* `compare_snapshots()` now loads dataset-level `rule_overrides` when a
+  dataset YAML exists, so drift `***` markers correctly apply per-dataset
+  thresholds.
+* `compare_snapshots()` now rejects inverted snapshot IDs
+  (`snapshot_id_prev > snapshot_id_curr`) with an error.
+* CP-07 now emits a PASS result for columns where the non-numeric rate did not
+  increase (previously skipped).
+* QC-11 now supports a two-level WARN/FAIL threshold via `warn_non_numeric_rate`
+  (default `0.0`, meaning any non-zero non-numeric rate triggers WARN).
+* CP-03 (`compare_missing_rate`) severity is now configurable via
+  `missing_rate_change_severity` (`"warn"` or `"fail"`; default `"warn"`).
+* CP-08 (`compare_column_order`) severity is now configurable via
+  `column_order_severity` (`"warn"` or `"fail"`); still defaults to FAIL for
+  FWF and WARN for CSV.
+* `detect_files()` uses filename alphabetical order as a tiebreaker when
+  modification times are equal.
+* The `observed` field in QC-09, CP-05, and CP-06 is capped at 20 values to
+  avoid oversized output.
+* Comparison summary in the HTML report now lists all WARN/FAIL messages as a
+  bullet list (previously showed only the single worst message).
+* `flag_*` config keys: setting to `false` suppresses the WARN from the report;
+  schema changes are always written to the snapshot database regardless.
+
 # dqcheckr 0.2.0
 
 ## Bug fixes

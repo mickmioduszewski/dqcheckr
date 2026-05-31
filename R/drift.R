@@ -6,7 +6,7 @@
 #'
 #' @param dataset_name Character or \code{NULL}. If supplied, only snapshots for
 #'   that dataset are returned. If \code{NULL}, all datasets are returned.
-#' @param db_path Character. Path to the SQLite snapshot database. Required;
+#' @param db_path Character. Path to the DuckDB snapshot database. Required;
 #'   there is no default (a relative default would be path-sensitive).
 #'
 #' @return A data frame with columns \code{id}, \code{dataset_name},
@@ -15,13 +15,13 @@
 #'   exist or contains no matching records.
 #'
 #' @examples
-#' list_snapshots(db_path = tempfile(fileext = ".sqlite"))
+#' list_snapshots(db_path = tempfile(fileext = ".duckdb"))
 #'
 #' @export
 list_snapshots <- function(dataset_name = NULL,
                            db_path = NULL) {
   if (is.null(db_path))
-    rlang::abort('`db_path` must be supplied (e.g. db_path = "data/snapshots.sqlite")')
+    rlang::abort('`db_path` must be supplied (e.g. db_path = "data/snapshots.duckdb")')
   empty <- data.frame(
     id = integer(), dataset_name = character(), file_name = character(),
     run_timestamp = character(), row_count = integer(),
@@ -30,7 +30,7 @@ list_snapshots <- function(dataset_name = NULL,
   if (!file.exists(db_path)) return(invisible(empty))
 
   tryCatch({
-    con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
     on.exit(DBI::dbDisconnect(con))
     if (!"snapshots" %in% DBI::dbListTables(con)) return(invisible(empty))
 
@@ -54,9 +54,9 @@ list_snapshots <- function(dataset_name = NULL,
   error = function(e) invisible(empty))
 }
 
-#' Compare two snapshots from the SQLite database
+#' Compare two snapshots from the DuckDB database
 #'
-#' Reads two historical snapshot records (by ID) from the SQLite database and
+#' Reads two historical snapshot records (by ID) from the DuckDB database and
 #' computes table-level, schema, and per-column statistical drift. Optionally
 #' renders an HTML drift report and/or a plain-text report.
 #'
@@ -65,7 +65,7 @@ list_snapshots <- function(dataset_name = NULL,
 #'   If \code{NULL}, defaults to the second-most-recent snapshot by ID.
 #' @param snapshot_id_curr Integer or \code{NULL}. ID of the later snapshot.
 #'   If \code{NULL}, defaults to the most-recent snapshot by ID.
-#' @param db_path Character or \code{NULL}. Path to the SQLite snapshot
+#' @param db_path Character or \code{NULL}. Path to the DuckDB snapshot
 #'   database. If \code{NULL} (the default), the path is read from
 #'   \code{snapshot_db} in \code{dqcheckr.yml}.
 #' @param config_dir Character. Path to the directory containing
@@ -85,7 +85,7 @@ list_snapshots <- function(dataset_name = NULL,
 #' @examples
 #' \donttest{
 #' tmp     <- tempdir()
-#' db_path <- file.path(tmp, "snap.sqlite")
+#' db_path <- file.path(tmp, "snap.duckdb")
 #' cfg_yml <- file.path(tmp, "dqcheckr.yml")
 #' ds_yml  <- file.path(tmp, "starwars_csv.yml")
 #' dat     <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
@@ -118,7 +118,20 @@ compare_snapshots <- function(dataset_name,
                               report           = TRUE,
                               text_report      = FALSE,
                               open_report      = interactive()) {
-  thresholds <- .load_drift_thresholds(config_dir)
+  ds_yml <- file.path(config_dir, paste0(dataset_name, ".yml"))
+  thresholds <- if (file.exists(ds_yml)) {
+    cfg <- load_config(dataset_name, config_dir)
+    list(
+      snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.duckdb",
+      report_output_dir              = cfg$report_output_dir %||% "reports/",
+      max_missing_rate_change_pp     = cfg$rules$max_missing_rate_change_pp     %||% 2.0,
+      max_numeric_mean_shift_pct     = cfg$rules$max_numeric_mean_shift_pct     %||% 0.20,
+      max_non_numeric_rate_change_pp = cfg$rules$max_non_numeric_rate_change_pp %||% 1.0,
+      max_row_count_change_pct       = cfg$rules$max_row_count_change_pct       %||% 0.10
+    )
+  } else {
+    .load_drift_thresholds(config_dir)
+  }
   report_dir <- thresholds$report_output_dir
 
   if (is.null(db_path))
@@ -127,7 +140,7 @@ compare_snapshots <- function(dataset_name,
   if (!file.exists(db_path))
     rlang::abort(paste0("Snapshot database not found: ", db_path))
 
-  con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  con <- DBI::dbConnect(duckdb::duckdb(), db_path)
   on.exit(DBI::dbDisconnect(con))
 
   snaps <- DBI::dbGetQuery(con,
@@ -145,6 +158,12 @@ compare_snapshots <- function(dataset_name,
 
   if (id_prev == id_curr)
     rlang::abort("snapshot_id_prev and snapshot_id_curr must differ.")
+
+  if (id_prev > id_curr)
+    rlang::abort(
+      "snapshot_id_prev must be older than snapshot_id_curr (lower ID first).",
+      class = "dqcheckr_error"
+    )
 
   drift <- .compute_drift(con, dataset_name, id_prev, id_curr, thresholds)
 
@@ -177,6 +196,41 @@ compare_snapshots <- function(dataset_name,
   invisible(drift)
 }
 
+#' Read PASS rate trend for a dataset
+#'
+#' Queries the snapshot database for the most recent N snapshots of a dataset
+#' and returns a data frame with the PASS rate per snapshot, ordered by ID.
+#'
+#' @param db_path Character. Path to the DuckDB snapshot database.
+#' @param dataset_name Character. Dataset name to filter on.
+#' @param n Integer. Maximum number of snapshots to include. Defaults to 10.
+#'
+#' @return A data frame with columns \code{snapshot_id}, \code{run_timestamp},
+#'   and \code{pass_rate}. Returns zero rows if no snapshots exist.
+#' @keywords internal
+#' @noRd
+read_pass_rate_trend <- function(db_path, dataset_name, n = 10) {
+  empty <- data.frame(snapshot_id = integer(), run_timestamp = character(),
+                      pass_rate = numeric(), stringsAsFactors = FALSE)
+  if (!file.exists(db_path)) return(empty)
+  tryCatch({
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
+    on.exit(DBI::dbDisconnect(con))
+    if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
+    DBI::dbGetQuery(con,
+      "SELECT s.id AS snapshot_id, s.run_timestamp,
+              SUM(CASE WHEN cs.severity_on_breach IS NULL THEN 1.0 ELSE 0.0 END) /
+              COUNT(*) AS pass_rate
+       FROM snapshots s
+       JOIN column_snapshots cs ON cs.snapshot_id = s.id
+       WHERE s.dataset_name = ?
+       GROUP BY s.id, s.run_timestamp
+       ORDER BY s.id
+       LIMIT ?",
+      list(dataset_name, as.integer(n)))
+  }, error = function(e) empty)
+}
+
 # --- Internal helpers ---------------------------------------------------------
 
 .load_drift_thresholds <- function(config_dir = ".") {
@@ -188,7 +242,7 @@ compare_snapshots <- function(dataset_name,
   dr  <- cfg$default_rules %||% list()
 
   list(
-    snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.sqlite",
+    snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.duckdb",
     report_output_dir              = cfg$report_output_dir %||% "reports/",
     max_missing_rate_change_pp     = dr$max_missing_rate_change_pp     %||% 2.0,
     max_numeric_mean_shift_pct     = dr$max_numeric_mean_shift_pct     %||% 0.20,
@@ -307,9 +361,9 @@ compare_snapshots <- function(dataset_name,
   dd$non_numeric_rate_exceeds   <- !is.na(dd$non_numeric_rate_change_pp) &
     abs(dd$non_numeric_rate_change_pp) > thresholds$max_non_numeric_rate_change_pp
 
-  # Numeric mean
-  dd$numeric_mean_prev      <- .col(col_drift, "numeric_mean_prev")
-  dd$numeric_mean_curr      <- .col(col_drift, "numeric_mean_curr")
+  # Numeric parseable mean
+  dd$numeric_mean_prev      <- .col(col_drift, "numeric_parseable_mean_prev")
+  dd$numeric_mean_curr      <- .col(col_drift, "numeric_parseable_mean_curr")
   dd$numeric_mean_shift_pct <- ifelse(
     !is.na(dd$numeric_mean_prev) & dd$numeric_mean_prev != 0,
     (dd$numeric_mean_curr - dd$numeric_mean_prev) / abs(dd$numeric_mean_prev),
@@ -455,26 +509,39 @@ compare_snapshots <- function(dataset_name,
 }
 
 .write_drift_html_report <- function(drift, outfile) {
-  template <- system.file("templates", "drift_report.Rmd", package = "dqcheckr")
+  template <- system.file("templates", "drift_report.qmd", package = "dqcheckr")
   if (!nzchar(template))
     rlang::abort("Drift report template not found in package installation.")
-  if (!rmarkdown::pandoc_available()) {
-    warning("Pandoc not found. HTML drift report skipped.", call. = FALSE)
+  if (!quarto::quarto_available()) {
+    warning("Quarto CLI not found -- HTML drift report skipped. Install from https://quarto.org",
+            call. = FALSE)
     return(invisible(NULL))
   }
 
-  tmp_out <- tempfile(fileext = ".html")
-  rmarkdown::render(
-    input             = template,
-    output_file       = tmp_out,
-    intermediates_dir = tempdir(),
-    params            = list(drift = drift),
-    quiet             = TRUE
-  )
-
   dir.create(dirname(normalizePath(outfile, mustWork = FALSE)),
              showWarnings = FALSE, recursive = TRUE)
-  file.copy(tmp_out, outfile, overwrite = TRUE)
-  unlink(tmp_out)
+  outfile <- normalizePath(outfile, mustWork = FALSE)
+
+  rds_path <- tempfile(fileext = ".rds")
+  on.exit(unlink(rds_path), add = TRUE)
+  saveRDS(list(drift = drift), rds_path)
+
+  render_dir    <- tempfile()
+  dir.create(render_dir, recursive = TRUE)
+  on.exit(unlink(render_dir, recursive = TRUE), add = TRUE)
+  tmp_template  <- file.path(render_dir, "drift_report.qmd")
+  file.copy(template, tmp_template)
+
+  quarto::quarto_render(
+    input          = tmp_template,
+    output_file    = basename(outfile),
+    execute_params = list(rds_path = rds_path),
+    quiet          = TRUE
+  )
+
+  rendered <- file.path(render_dir, basename(outfile))
+  if (file.exists(rendered)) {
+    file.rename(rendered, outfile)
+  }
   invisible(outfile)
 }

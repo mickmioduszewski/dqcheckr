@@ -10,7 +10,7 @@ list_snapshots(dataset_name = NULL, db_path = NULL)
 \item{dataset_name}{Character or \code{NULL}. If supplied, only snapshots for
 that dataset are returned. If \code{NULL}, all datasets are returned.}
 
-\item{db_path}{Character. Path to the SQLite snapshot database. Required;
+\item{db_path}{Character. Path to the DuckDB snapshot database. Required;
 there is no default (a relative default would be path-sensitive).}
 }
 \value{
@@ -25,6 +25,6 @@ datasets if \code{dataset_name} is \code{NULL}), ordered by dataset name
 and snapshot ID.
 }
 \examples{
-list_snapshots(db_path = tempfile(fileext = ".sqlite"))
+list_snapshots(db_path = tempfile(fileext = ".duckdb"))
 
 }

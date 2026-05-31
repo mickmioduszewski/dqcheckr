@@ -2,12 +2,13 @@
 % Please edit documentation in R/snapshot.R
 \name{read_recent_snapshots}
 \alias{read_recent_snapshots}
-\title{Read recent snapshot history from the SQLite database}
+\title{Read recent snapshot history from the DuckDB database}
 \usage{
 read_recent_snapshots(db_path, dataset_name, n = 10)
 }
 \arguments{
-\item{db_path}{Character. Path to the SQLite database file.}
+\item{db_path}{Character. Path to the DuckDB database file
+(\code{.duckdb} extension).}
 
 \item{dataset_name}{Character. Dataset name to filter on.}
 
@@ -25,6 +26,8 @@ Retrieves the \code{n} most recent run records for a given dataset from the
 snapshot database, ordered newest-first.
 }
 \examples{
-history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
+\dontrun{
+history <- read_recent_snapshots(tempfile(fileext = ".duckdb"), "starwars_csv")
+}
 
 }

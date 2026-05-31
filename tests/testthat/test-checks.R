@@ -167,6 +167,15 @@ test_that("check_allowed_values() returns empty list when no column_rules", {
   expect_equal(length(res), 0)
 })
 
+test_that("check_allowed_values() caps observed string at 20 values", {
+  df <- data.frame(code = paste0("V", 1:30), stringsAsFactors = FALSE)
+  cfg <- base_config(list(column_rules = list(
+    code = list(allowed_values = c("VALID"))
+  )))
+  res <- check_allowed_values(df, cfg)
+  expect_match(res[[1]]$observed, "and 10 more")
+})
+
 # -- QC-10 Numeric bounds ------------------------------------------------------
 
 test_that("check_numeric_bounds() returns PASS when all values within range", {
@@ -233,6 +242,41 @@ test_that("check_non_numeric() returns WARN when non-numeric present but below t
   expect_equal(bal[[1]]$status, "WARN")
 })
 
+test_that("check_non_numeric() returns PASS when rate <= warn_non_numeric_rate", {
+  # 100 rows, 1 bad = 1% rate; warn_threshold = 0.02 → PASS
+  df  <- make_df()[rep(seq_len(5), 20), ]
+  df$account_balance[1] <- "N/A"
+  cfg <- base_config(list(rules = list(
+    max_non_numeric_rate      = 0.05,
+    warn_non_numeric_rate     = 0.02
+  )))
+  res <- check_non_numeric(df, cfg)
+  bal <- Filter(\(r) r$column == "account_balance", res)
+  expect_equal(bal[[1]]$status, "PASS")
+})
+
+test_that("check_non_numeric() returns WARN when warn < rate <= fail threshold", {
+  # 100 rows, 2 bad = 2% rate; warn = 0.01, fail = 0.05 → WARN
+  df  <- make_df()[rep(seq_len(5), 20), ]
+  df$account_balance[1:2] <- "N/A"
+  cfg <- base_config(list(rules = list(
+    max_non_numeric_rate      = 0.05,
+    warn_non_numeric_rate     = 0.01
+  )))
+  res <- check_non_numeric(df, cfg)
+  bal <- Filter(\(r) r$column == "account_balance", res)
+  expect_equal(bal[[1]]$status, "WARN")
+})
+
+test_that("check_non_numeric() WARN/FAIL still correct at zero warn threshold", {
+  # warn_non_numeric_rate default = 0.0: any non-zero → WARN; >fail → FAIL
+  df100 <- make_df()[rep(seq_len(5), 20), ]
+  df100$account_balance[1] <- "N/A"
+  res <- check_non_numeric(df100, base_config())
+  bal <- Filter(\(r) r$column == "account_balance", res)
+  expect_equal(bal[[1]]$status, "WARN")
+})
+
 # -- QC-12 Key uniqueness ------------------------------------------------------
 
 test_that("check_key_uniqueness() returns PASS for unique key column", {
@@ -294,6 +338,30 @@ test_that("check_min_row_count() returns FAIL when row count below threshold", {
   expect_equal(res[[1]]$status, "FAIL")
 })
 
+test_that("check_min_row_count() returns FAIL when row count exceeds max_row_count", {
+  cfg <- base_config(list(rules = list(max_row_count = 3)))
+  res <- check_min_row_count(make_df(), cfg)
+  qc14b <- Filter(\(r) r$check_id == "QC-14b", res)
+  expect_equal(qc14b[[1]]$status, "FAIL")
+})
+
+test_that("check_file_size() returns INFO with actual file size", {
+  tmp <- tempfile(fileext = ".csv")
+  write.csv(make_df(), tmp, row.names = FALSE)
+  on.exit(unlink(tmp))
+  res <- check_file_size(tmp, base_config())
+  expect_equal(res[[1]]$status, "INFO")
+})
+
+test_that("check_file_size() returns FAIL when file exceeds max_file_size_mb", {
+  tmp <- tempfile(fileext = ".csv")
+  write.csv(make_df(), tmp, row.names = FALSE)
+  on.exit(unlink(tmp))
+  cfg <- base_config(list(rules = list(max_file_size_mb = 0.000001)))
+  res <- check_file_size(tmp, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+})
+
 # -- SC-01 / SC-02 Schema contract ---------------------------------------------
 
 test_that("check_schema_contract() returns PASS when columns match exactly", {
@@ -331,4 +399,111 @@ test_that("check_schema_contract() returns FAIL for missing column (SC-02)", {
 test_that("check_schema_contract() returns empty list when expected_columns not set", {
   res <- check_schema_contract(make_df(), base_config())
   expect_equal(length(res), 0)
+})
+
+# -- DuckDB parity tests -------------------------------------------------------
+
+duck_setup <- function() {
+  con <- DBI::dbConnect(duckdb::duckdb())
+  DBI::dbWriteTable(con, "current_data", make_df())
+  list(con = con, tbl = "current_data")
+}
+
+test_that("check_missing_rate() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  r_res  <- check_missing_rate(make_df(), base_config())
+  db_res <- check_missing_rate(s$tbl, base_config(), con = s$con)
+  expect_equal(vapply(r_res,  \(r) r$status, character(1)),
+               vapply(db_res, \(r) r$status, character(1)))
+})
+
+test_that("check_empty_column() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  r_res  <- check_empty_column(make_df(), base_config())
+  db_res <- check_empty_column(s$tbl, base_config(), con = s$con)
+  expect_equal(vapply(r_res,  \(r) r$status, character(1)),
+               vapply(db_res, \(r) r$status, character(1)))
+})
+
+test_that("check_duplicate_rows() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  r_res  <- check_duplicate_rows(make_df(), base_config())
+  db_res <- check_duplicate_rows(s$tbl, base_config(), con = s$con)
+  expect_equal(r_res[[1]]$status, db_res[[1]]$status)
+})
+
+test_that("check_row_count() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  r_res  <- check_row_count(make_df(), base_config())
+  db_res <- check_row_count(s$tbl, base_config(), con = s$con)
+  expect_equal(r_res[[1]]$observed, db_res[[1]]$observed)
+})
+
+test_that("check_non_numeric() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  r_res  <- check_non_numeric(make_df(), base_config())
+  db_res <- check_non_numeric(s$tbl, base_config(), con = s$con)
+  r_bal  <- Filter(\(r) r$column == "account_balance", r_res)
+  db_bal <- Filter(\(r) r$column == "account_balance", db_res)
+  expect_equal(r_bal[[1]]$status, db_bal[[1]]$status)
+})
+
+test_that("check_key_uniqueness() DuckDB path matches R path", {
+  s <- duck_setup()
+  on.exit(DBI::dbDisconnect(s$con))
+  cfg <- base_config(list(key_columns = "id"))
+  r_res  <- check_key_uniqueness(make_df(), cfg)
+  db_res <- check_key_uniqueness(s$tbl, cfg, con = s$con)
+  expect_equal(r_res[[1]]$status, db_res[[1]]$status)
+})
+
+test_that("check_outliers() returns PASS when max_z_score not configured", {
+  res <- check_outliers(make_df(), base_config())
+  expect_equal(length(res), 0)
+})
+
+test_that("check_outliers() returns FAIL for column with obvious outlier", {
+  # 9 values near 1 and one extreme outlier: Z for 1000 >> 2.0
+  df <- data.frame(
+    val = c("1","1","1","1","1","1","1","1","1","1000"),
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(
+    column_rules = list(val = list(max_z_score = 2.0))
+  ))
+  res <- check_outliers(df, cfg)
+  expect_equal(Filter(\(r) r$column == "val", res)[[1]]$status, "FAIL")
+})
+
+test_that("check_key_uniqueness() detects composite key duplicates", {
+  df <- data.frame(
+    cust = c("A", "A", "B"),
+    prod = c("X", "X", "Y"),
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(key_columns = list("cust", "prod")))
+  res <- check_key_uniqueness(df, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+})
+
+test_that("check_key_uniqueness() passes when composite key is unique", {
+  df <- data.frame(
+    cust = c("A", "A", "B"),
+    prod = c("X", "Y", "Y"),
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(key_columns = list("cust", "prod")))
+  res <- check_key_uniqueness(df, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+})
+
+test_that("check_key_uniqueness() backwards compat with single string key_columns", {
+  cfg <- base_config(list(key_columns = "id"))
+  res <- check_key_uniqueness(make_df(), cfg)
+  expect_equal(res[[1]]$status, "PASS")
 })

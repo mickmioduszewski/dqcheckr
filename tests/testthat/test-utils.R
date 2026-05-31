@@ -161,3 +161,33 @@ test_that("load_config() stops when dataset yml is missing", {
              file.path(sub, "dqcheckr.yml"))
   expect_error(load_config("nonexistent_ds", sub))
 })
+
+# -- .cap_values() -------------------------------------------------------------
+
+test_that(".cap_values() returns all values when count <= n", {
+  expect_equal(.cap_values(c("A", "B", "C"), n = 5), "A, B, C")
+})
+
+test_that(".cap_values() truncates and appends count when > n", {
+  vals <- paste0("V", 1:25)
+  result <- .cap_values(vals, n = 20)
+  expect_match(result, "and 5 more")
+  expect_match(result, "^V1,")
+})
+
+# -- table_threshold() ---------------------------------------------------------
+
+test_that("table_threshold() returns config value when present", {
+  cfg <- list(rules = list(min_row_count = 500))
+  expect_equal(table_threshold(cfg, "min_row_count", 0), 500)
+})
+
+test_that("table_threshold() returns default when key absent", {
+  cfg <- list(rules = list(max_missing_rate = 0.05))
+  expect_equal(table_threshold(cfg, "min_row_count", 0), 0)
+})
+
+test_that("table_threshold() returns default when rules list is NULL", {
+  cfg <- list(rules = NULL)
+  expect_equal(table_threshold(cfg, "min_row_count", 0), 0)
+})
