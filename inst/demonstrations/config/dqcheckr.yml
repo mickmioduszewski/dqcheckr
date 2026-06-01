@@ -1,0 +1,29 @@
+# dqcheckr global config for the Star Wars demonstration
+# Thresholds are set for this dataset's natural characteristics.
+
+snapshot_db:       "output/snapshots.sqlite"
+report_output_dir: "output/reports/"
+
+default_rules:
+  # birth_year is 51% missing, mass 32%, homeworld 11% — all expected gaps
+  # in this dataset.  Threshold set at 0.60 so those pass.
+  # vehicles (87%) and starships (77%) will still FAIL — genuinely sparse.
+  type_inference_threshold: 0.90
+  max_missing_rate: 0.60
+
+  # All numeric columns are clean integers / doubles — 1% tolerance
+  max_non_numeric_rate: 0.01
+
+  # Dataset has 87 rows
+  min_row_count: 80
+
+  # Version comparison thresholds (used when a previous file is supplied)
+  max_row_count_change_pct:       0.10
+  max_numeric_mean_shift_pct:     0.20
+  max_missing_rate_change_pp:     5.0
+  max_non_numeric_rate_change_pp: 1.0
+
+  flag_new_columns:        true
+  flag_dropped_columns:    true
+  flag_type_changes:       true
+  flag_column_order_change: true

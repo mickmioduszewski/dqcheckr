@@ -1,0 +1,52 @@
+# dqcheckr global configuration
+# Copy this file to your project config directory and adjust as needed.
+
+# Path to the SQLite snapshot database (relative to working directory)
+snapshot_db: "data/snapshots.sqlite"
+
+# Directory where HTML reports are written
+report_output_dir: "reports/"
+
+default_rules:
+  # -- Single-snapshot thresholds ----------------------------------------------
+
+  # Proportion of non-empty values that must parse as numeric for a column to
+  # be classified as numeric (affects QC-06 through QC-11 and CP-02 to CP-07)
+  type_inference_threshold: 0.90
+
+  # FAIL if missing rate in any column exceeds this proportion (0-1)
+  max_missing_rate: 0.05
+
+  # FAIL if non-numeric value rate in a numeric column exceeds this proportion
+  max_non_numeric_rate: 0.01
+
+  # FAIL if row count is below this value (0 = disabled)
+  min_row_count: 0
+
+  # -- Version comparison thresholds -------------------------------------------
+
+  # WARN if row count changes by more than this proportion between deliveries
+  max_row_count_change_pct: 0.10
+
+  # WARN if numeric column mean shifts by more than this proportion
+  max_numeric_mean_shift_pct: 0.20
+
+  # WARN if missing rate increases by more than this many percentage points
+  max_missing_rate_change_pp: 2.0
+
+  # WARN if non-numeric rate increases by more than this many percentage points
+  max_non_numeric_rate_change_pp: 1.0
+
+  # -- Schema flags -------------------------------------------------------------
+
+  # WARN when new columns appear vs previous delivery
+  flag_new_columns: true
+
+  # WARN when columns are dropped vs previous delivery
+  flag_dropped_columns: true
+
+  # WARN when inferred column type changes vs previous delivery
+  flag_type_changes: true
+
+  # WARN (CSV) or FAIL (FWF) when column order changes vs previous delivery
+  flag_column_order_change: true

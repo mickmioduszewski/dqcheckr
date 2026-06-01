@@ -1,0 +1,21 @@
+# R build artefacts
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
+.Rproj.user/
+
+# R check outputs
+*.Rcheck/
+*.tar.gz
+
+# Data directories that dqcheckr may create at runtime
+data/
+reports/
+
+# macOS
+.DS_Store
+
+# Compiled / installed
+src/*.so
+src/*.dll

@@ -1,0 +1,53 @@
+# Per-dataset config for the folder-scan demonstration.
+# Uses folder: instead of current_file: so dqcheckr detects files automatically.
+# The two most recently modified files in data2/ are used:
+#   current  = starwars_v2.csv (perturbed, newer mtime)
+#   previous = starwars_v1.csv (original, older mtime)
+
+dataset_name: "starwars_folder"
+folder: "data2/"
+format: csv
+encoding: "UTF-8"
+delimiter: ","
+
+snapshot_db:       "output2/snapshots.sqlite"
+report_output_dir: "output2/reports/"
+
+# All 14 columns expected
+expected_columns:
+  - name
+  - height
+  - mass
+  - hair_color
+  - skin_color
+  - eye_color
+  - birth_year
+  - sex
+  - gender
+  - homeworld
+  - species
+  - films
+  - vehicles
+  - starships
+
+# name is the natural key — all 87 values are unique
+key_columns:
+  - name
+
+rule_overrides:
+  max_missing_rate: 0.60
+  min_row_count:    80
+
+custom_checks_file: "custom2/starwars_custom.R"
+
+column_rules:
+  sex:
+    allowed_values: ["male", "female", "none", "hermaphroditic"]
+  gender:
+    allowed_values: ["masculine", "feminine"]
+  height:
+    min_value: 50
+    max_value: 300
+  mass:
+    min_value: 1
+    max_value: 2000
