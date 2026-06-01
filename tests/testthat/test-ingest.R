@@ -116,3 +116,22 @@ test_that("detect_files() returns previous=NULL for single-file folder", {
   expect_null(result$previous)
   unlink(f)
 })
+
+test_that("detect_files() uses filename as tiebreaker when mtimes are equal (RC-01)", {
+  tmp <- withr::local_tempdir()
+  # Create two files with identical timestamps
+  f_b <- file.path(tmp, "b_delivery.csv")
+  f_a <- file.path(tmp, "a_delivery.csv")
+  writeLines("x\n2", f_b)
+  writeLines("x\n1", f_a)
+  # Force both to same mtime
+  t0 <- as.POSIXct("2024-01-01 12:00:00", tz = "UTC")
+  Sys.setFileTime(f_a, t0)
+  Sys.setFileTime(f_b, t0)
+
+  cfg    <- list(folder = tmp)
+  result <- detect_files(cfg)
+  # basename "b_delivery.csv" > "a_delivery.csv" descending → b is current
+  expect_equal(basename(result$current),  "b_delivery.csv")
+  expect_equal(basename(result$previous), "a_delivery.csv")
+})

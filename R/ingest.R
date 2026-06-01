@@ -44,7 +44,7 @@ detect_files <- function(config) {
     rlang::abort(paste0("No files found in folder: ", folder))
   }
 
-  files <- files[order(file.mtime(files), decreasing = TRUE)]
+  files <- files[order(file.mtime(files), basename(files), decreasing = TRUE)]
   list(
     current  = files[1],
     previous = if (length(files) >= 2) files[2] else NULL
