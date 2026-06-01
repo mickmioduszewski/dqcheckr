@@ -9,41 +9,44 @@
 
 ## Previous CRAN submission errors (v0.1.2) — addressed in v0.2.0
 
-The v0.1.2 submission failed with 1 ERROR on CRAN's Debian r-devel server:
+### CRAN policy violation: writes to user library during checks
 
-  Running 'testthat.R' failed.
-  [ FAIL 4 | WARN 4 | SKIP 0 | PASS 146 ]
+CRAN's Debian check servers remount the user library read-only before running
+checks. v0.1.2 violated the CRAN policy on filesystem writes because
+rmarkdown::render() was called with the Rmd template resolved via
+system.file(), which resolves to the installed package directory inside the
+user library. knitr then attempted to write intermediate files (the .knit.md
+scratch file) adjacent to the template, hitting the read-only mount and
+producing:
 
-  Error in `file(con, "w")`: cannot open the connection
-  (test-integration.R, via run_dq_check -> render_report -> rmarkdown::render)
+  Error in file(con, "w"): cannot open the connection
 
-Two root causes, both fixed in v0.2.0:
+This was the direct cause of all 4 test failures in test-integration.R.
 
-1. Report output directory not created before writing.
-   v0.1.2 passed the report_output_dir path to rmarkdown::render() without
-   ensuring the directory existed. On CRAN's server the directory was absent,
-   causing an unhandled "cannot open the connection" error.
+### Fix in v0.2.0
 
-   Fix: render_report() now calls dir.create(output_dir, recursive = TRUE,
-   showWarnings = FALSE) before any write attempt.
+Reports have been migrated from rmarkdown to Quarto. The key change in
+render_report() and the drift equivalent .write_drift_html_report() is that
+the .qmd template is first copied to an isolated tempfile() directory before
+quarto::quarto_render() is called. Quarto and knitr write all intermediate
+and output files to that temp directory. Nothing is written to or near the
+package installation path.
 
-2. No graceful fallback when Quarto CLI is absent.
-   v0.2.0 migrated reports from rmarkdown to Quarto. render_report() now
-   checks quarto::quarto_available() and returns NULL with an informative
-   warning when the CLI is not installed, so the package installs, loads,
-   and runs quality checks cleanly on servers without Quarto.
+Additionally, render_report() now checks quarto::quarto_available() at the
+top of the function and returns NULL with an informative warning when the
+Quarto CLI is not installed. This means the package installs, loads, and runs
+all quality checks cleanly on servers without the Quarto CLI.
 
-   Integration tests that do not exercise the report (status, snapshot_id
-   checks) now wrap run_dq_check() in suppressWarnings() to avoid spurious
-   WARN entries from the expected "Quarto not available" warning on CRAN
-   servers. The test that checks the HTML report file is guarded with
-   skip_if_not(quarto::quarto_available()).
+Integration tests that do not exercise the HTML report path (status and
+snapshot_id assertions) now wrap run_dq_check() in suppressWarnings() to
+avoid spurious WARN entries from the expected "Quarto not available" warning
+emitted on servers without the CLI.
 
 ## Package notes
 
 * The package requires the Quarto CLI for HTML report rendering.
-  render_report() and compare_snapshots() emit an informative warning and
-  return NULL when Quarto is not available, so the package installs and loads
-  without Quarto being present.
-* All examples that invoke Quarto, write files, or require a configured dataset
-  are wrapped in \donttest{}.
+  render_report() and compare_snapshots() return NULL with an informative
+  warning when Quarto is not available, so the package installs and runs
+  without the CLI being present.
+* All examples that invoke Quarto, write files, or require a configured
+  dataset are wrapped in \donttest{}.
