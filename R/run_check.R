@@ -15,7 +15,8 @@
 #'   \describe{
 #'     \item{status}{Overall status string: \code{"PASS"}, \code{"WARN"},
 #'       \code{"FAIL"}, or \code{"INFO"}.}
-#'     \item{report_path}{Absolute path to the rendered HTML report.}
+#'     \item{report_path}{Absolute path to the rendered HTML report, or
+#'       \code{NULL} if rendering was skipped.}
 #'     \item{snapshot_id}{Integer row ID of the snapshot written to SQLite,
 #'       or \code{NULL} if the write failed.}
 #'   }
@@ -62,32 +63,43 @@ run_dq_check <- function(dataset_name,
     list()
   custom_results <- run_custom_checks(df_curr, config)
 
-  col_stats <- compute_col_stats(df_curr, config, qc_results)
+  col_stats <- compute_col_stats(df_curr, config)
 
-  db_path     <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
-                               mustWork = FALSE)
-  snapshot_id <- write_snapshot(
+  db_path         <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
+                                   mustWork = FALSE)
+  comparison_mode <- if (!is.null(df_prev)) "comparison" else "single"
+  snapshot_id     <- write_snapshot(
     db_path, dataset_name,
     basename(files$current),
     df_curr, qc_results, cp_results, custom_results, config,
-    col_stats = col_stats
+    col_stats       = col_stats,
+    comparison_mode = comparison_mode
   )
 
   snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)
 
-  report_path <- render_report(
-    dataset_name     = dataset_name,
-    file_name        = basename(files$current),
-    file_path        = files$current,
-    df               = df_curr,
-    qc_results       = qc_results,
-    cp_results       = cp_results,
-    custom_results   = custom_results,
-    snapshot_history = snapshot_history,
-    config           = config,
-    col_stats        = col_stats,
-    output_dir       = config$report_output_dir %||% "reports/",
-    open_report      = open_report
+  report_path <- tryCatch(
+    render_report(
+      dataset_name     = dataset_name,
+      file_name        = basename(files$current),
+      file_path        = files$current,
+      df               = df_curr,
+      qc_results       = qc_results,
+      cp_results       = cp_results,
+      custom_results   = custom_results,
+      snapshot_history = snapshot_history,
+      config           = config,
+      col_stats        = col_stats,
+      output_dir       = config$report_output_dir %||% "reports/",
+      open_report      = open_report
+    ),
+    error = function(e) {
+      if (!is.null(snapshot_id)) .mark_render_failed(db_path, snapshot_id)
+      warning(paste0("Report rendering failed (snapshot_id = ", snapshot_id,
+                     " marked as failed). Original error: ", conditionMessage(e)),
+              call. = FALSE)
+      invisible(NULL)
+    }
   )
 
   status <- overall_status(c(qc_results, cp_results, custom_results))
@@ -95,8 +107,9 @@ run_dq_check <- function(dataset_name,
   n_warn <- sum(vapply(all_r, \(r) r$status == "WARN", logical(1)))
   n_fail <- sum(vapply(all_r, \(r) r$status == "FAIL", logical(1)))
 
+  report_label <- if (!is.null(report_path)) report_path else "(renderer not available)"
   message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s",
-                  dataset_name, status, n_warn, n_fail, report_path))
+                  dataset_name, status, n_warn, n_fail, report_label))
 
   invisible(list(
     status      = status,

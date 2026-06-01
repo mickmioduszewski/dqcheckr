@@ -51,7 +51,9 @@ dq_result <- function(check_id, check_name, column = NA_character_,
 #'
 #' Reads the global \code{dqcheckr.yml} and the dataset-specific YAML, merging
 #' \code{rule_overrides} from the dataset config on top of \code{default_rules}
-#' from the global config.
+#' from the global config. Top-level keys \code{snapshot_db} and
+#' \code{report_output_dir} are inherited from the global config when absent
+#' from the dataset config.
 #'
 #' @param dataset_name Character. Dataset name; must match
 #'   \code{<dataset_name>.yml} in \code{config_dir}.
@@ -70,25 +72,37 @@ load_config <- function(dataset_name, config_dir) {
   global_path  <- file.path(config_dir, "dqcheckr.yml")
   dataset_path <- file.path(config_dir, paste0(dataset_name, ".yml"))
 
-  if (!file.exists(global_path)) {
+  if (!file.exists(global_path))
     rlang::abort(paste0("Global config not found: ", global_path))
-  }
-  if (!file.exists(dataset_path)) {
+  if (!file.exists(dataset_path))
     rlang::abort(paste0("Dataset config not found: ", dataset_path))
-  }
 
   global_cfg  <- yaml::read_yaml(global_path)
   dataset_cfg <- yaml::read_yaml(dataset_path)
 
-  rules <- global_cfg$default_rules %||% list()
-
-  if (!is.null(dataset_cfg$rule_overrides)) {
-    for (key in names(dataset_cfg$rule_overrides)) {
-      rules[[key]] <- dataset_cfg$rule_overrides[[key]]
-    }
+  for (key in c("snapshot_db", "report_output_dir")) {
+    if (is.null(dataset_cfg[[key]]) && !is.null(global_cfg[[key]]))
+      dataset_cfg[[key]] <- global_cfg[[key]]
   }
 
+  rules <- global_cfg$default_rules %||% list()
+  if (!is.null(dataset_cfg$rule_overrides)) {
+    for (key in names(dataset_cfg$rule_overrides))
+      rules[[key]] <- dataset_cfg$rule_overrides[[key]]
+  }
   dataset_cfg$rules <- rules
+
+  ct <- dataset_cfg$column_types %||% list()
+  if (length(ct) > 0) {
+    valid_types <- c("character", "numeric", "date")
+    bad <- setdiff(unlist(ct, use.names = FALSE), valid_types)
+    if (length(bad) > 0)
+      rlang::abort(sprintf(
+        "Invalid column_types value(s): %s. Must be one of: %s",
+        paste(bad, collapse = ", "), paste(valid_types, collapse = ", ")
+      ))
+  }
+
   dataset_cfg
 }
 
@@ -129,6 +143,83 @@ infer_col_type <- function(x, threshold = 0.90) {
   if (mean(!is.na(numeric_vals)) >= threshold) return("numeric")
 
   "character"
+}
+
+#' Resolve the effective type of a column, respecting config overrides
+#'
+#' Returns the type for \code{col} from the \code{column_types} map in
+#' \code{config} if one is set, otherwise falls back to
+#' \code{\link{infer_col_type}}. Use this in custom check scripts instead of
+#' calling \code{infer_col_type()} directly so that type overrides are
+#' respected.
+#'
+#' @param col Character. Column name.
+#' @param x Character vector. The column's values (as read from the file).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A single character string: \code{"date"}, \code{"numeric"},
+#'   \code{"character"}, or \code{"unknown"}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg <- load_config("starwars_csv", config_dir = cfg_dir)
+#' resolve_col_type("name", c("Luke", "Leia", "Han"), cfg)   # "character"
+#'
+#' @export
+resolve_col_type <- function(col, x, config) {
+  override <- (config$column_types %||% list())[[col]]
+  if (!is.null(override)) return(override)
+  infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+}
+
+#' Look up the effective threshold for a column, with per-column fallback
+#'
+#' Resolution order: \code{column_rules.<col>.<key>} >
+#' \code{rules.<key>} > \code{default}.
+#'
+#' @param config Named list. Merged configuration.
+#' @param col Character. Column name.
+#' @param key Character. Threshold key (e.g. \code{"max_missing_rate"}).
+#' @param default Default value if not found at any level.
+#'
+#' @return The resolved threshold value.
+#' @keywords internal
+#' @noRd
+col_threshold <- function(config, col, key, default = NULL) {
+  col_val <- (config$column_rules %||% list())[[col]][[key]]
+  if (!is.null(col_val)) return(col_val)
+  rule_val <- config$rules[[key]]
+  if (!is.null(rule_val)) return(rule_val)
+  default
+}
+
+#' Look up a table-level threshold from config
+#'
+#' @param config Named list. Merged configuration.
+#' @param key Character. Threshold key (e.g. \code{"min_row_count"}).
+#' @param default Default value if not found.
+#'
+#' @return The resolved threshold value.
+#' @keywords internal
+#' @noRd
+table_threshold <- function(config, key, default = NULL) {
+  val <- config$rules[[key]]
+  if (!is.null(val)) return(val)
+  default
+}
+
+#' Cap a value vector to at most n entries for display
+#'
+#' @param vals Character vector of values to display.
+#' @param n Maximum number of values to show before truncating.
+#' @return A single character string.
+#' @keywords internal
+#' @noRd
+.cap_values <- function(vals, n = 20L) {
+  if (length(vals) <= n) return(paste(vals, collapse = ", "))
+  paste0(paste(vals[seq_len(n)], collapse = ", "),
+         " ... and ", length(vals) - n, " more")
 }
 
 #' Compute the worst status across a list of dq_result objects
