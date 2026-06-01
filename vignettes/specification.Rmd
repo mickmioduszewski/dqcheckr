@@ -1,8 +1,8 @@
 ---
 title: "dqcheckr — Software Specification"
 author: "Mick Mioduszewski"
-date: "2026-05-10"
-version: "0.1.1"
+date: "2026-06-01"
+version: "0.2.0"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Software Specification}
@@ -14,9 +14,9 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 ```
 
-**Version**: 0.1.1
+**Version**: 0.2.0
 **Author**: Mick Mioduszewski
-**Date**: 2026-05-10
+**Date**: 2026-06-01
 
 ---
 
@@ -130,15 +130,18 @@ dqcheckr/
 ├── R/
 │   ├── run_check.R          # main entry point: run_dq_check()
 │   ├── ingest.R             # read CSV / FWF; trim whitespace
-│   ├── snapshot.R           # SQLite read/write
-│   ├── checks_generic.R     # QC-01..14 and SC-01..02
+│   ├── snapshot.R           # SQLite write + read_recent_snapshots()
+│   ├── drift.R              # compare_snapshots(), list_snapshots(), drift helpers
+│   ├── checks_generic.R     # QC-01..15 and SC-01..02
 │   ├── checks_custom.R      # source and call custom_checks(df)
 │   ├── compare.R            # CP-01..08
-│   ├── report.R             # rmarkdown::render() wrapper
+│   ├── report.R             # quarto::quarto_render() wrapper
 │   ├── utils.R              # dq_result(), load_config(), infer_col_type(), helpers
 │   └── dqcheckr-package.R   # package-level documentation
 ├── inst/
-│   ├── templates/report.Rmd
+│   ├── templates/
+│   │   ├── report.qmd       # main HTML report template
+│   │   └── drift_report.qmd # snapshot drift report template
 │   ├── config/
 │   │   ├── dqcheckr.yml
 │   │   └── example_dataset.yml
@@ -157,6 +160,7 @@ dqcheckr/
 │   ├── test-compare.R
 │   ├── test-ingest.R
 │   ├── test-snapshot.R
+│   ├── test-drift.R
 │   └── test-integration.R
 ├── vignettes/
 │   ├── dqcheckr.Rmd         # user guide
@@ -178,18 +182,24 @@ default_rules:
   max_missing_rate: 0.05            # FAIL if column missing rate exceeds this
   max_non_numeric_rate: 0.01        # FAIL if non-numeric rate in numeric column exceeds this
   min_row_count: 0                  # FAIL if row count below this (0 = disabled)
+  # max_row_count: 1000000          # optional FAIL if row count exceeds this
+  # max_file_size_mb: 500           # optional FAIL if file size exceeds this
+  # max_z_score: 3.0                # optional QC-15 outlier detection (Z-score)
+  # iqr_fence_multiplier: 1.5       # optional QC-15 outlier detection (IQR fence)
 
   # Version comparison thresholds
   max_row_count_change_pct: 0.10
   max_numeric_mean_shift_pct: 0.20
   max_missing_rate_change_pp: 2.0   # percentage points
   max_non_numeric_rate_change_pp: 1.0
+  missing_rate_change_severity: warn  # "warn" or "fail" — severity for CP-03 breaches
 
   # Schema flags
   flag_new_columns: true            # set false to suppress new-column warnings in CP-02
   flag_dropped_columns: true        # set false to suppress dropped-column warnings in CP-02
   flag_type_changes: true           # set false to suppress type-change warnings in CP-02
-  flag_column_order_change: true    # set false to skip CP-08 entirely (WARN CSV / FAIL FWF)
+  flag_column_order_change: true    # set false to skip CP-08 entirely
+  column_order_severity: warn       # "warn" or "fail" — overrides format default for CP-08
 ```
 
 **Per-dataset config — `<dataset_name>.yml`**
@@ -296,10 +306,11 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-08 | Distinct value count | Character columns | — | — (INFO) |
 | QC-09 | Allowed values | Configured columns | Any value outside `allowed_values` | — |
 | QC-10 | Numeric bounds | Configured columns | Any value outside `min_value`/`max_value` | — |
-| QC-11 | Non-numeric values | Numeric columns | `non_numeric_rate > max_non_numeric_rate` | Any non-numeric values present |
-| QC-12 | Key uniqueness | Configured `key_columns` | Any duplicate value in key column | — |
+| QC-11 | Non-numeric values | Numeric columns | `non_numeric_rate > max_non_numeric_rate` | `non_numeric_rate > warn_non_numeric_rate` |
+| QC-12 | Key uniqueness | Configured `key_columns` (single or composite) | Any duplicate value in key | — |
 | QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
-| QC-14 | Minimum row count | Table | `row_count < min_row_count` (if > 0) | — |
+| QC-14 | Row count bounds | Table | `row_count < min_row_count` (if > 0); `row_count > max_row_count` (if set); file size > `max_file_size_mb` (if set) | — |
+| QC-15 | Outlier detection | Numeric columns | Value exceeds Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) threshold | — (skipped if neither threshold is configured) |
 
 **Schema contract checks (SC series)** — only when `expected_columns` is configured
 
@@ -312,22 +323,26 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 
 | ID | Name | Flag condition | Severity |
 |----|------|----------------|----------|
-| CP-01 | Row count change | `abs(pct_change) > max_row_count_change_pct` | WARN |
-| CP-02 | Schema diff | Columns added, dropped, or type-changed (each independently suppressible via `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes`) | WARN |
-| CP-03 | Missing rate change | Increase > `max_missing_rate_change_pp` pp per column | WARN |
+| CP-01 | Row count change | `abs(pct_change) > max_row_count_change_pct` (WARN if previous has 0 rows) | WARN |
+| CP-02a | New columns | Columns in current not in previous (suppressible via `flag_new_columns: false`) | WARN |
+| CP-02b | Dropped columns | Columns in previous not in current (suppressible via `flag_dropped_columns: false`) | WARN |
+| CP-02c | Column type changes | Type of a common column changed (suppressible via `flag_type_changes: false`) | WARN |
+| CP-03 | Missing rate change | Increase > `max_missing_rate_change_pp` pp per column; severity controlled by `missing_rate_change_severity` | WARN (default) / FAIL |
 | CP-04 | Numeric mean shift | Shift > `max_numeric_mean_shift_pct` per column | WARN |
 | CP-05 | New distinct values | Values in current not in previous (categorical columns) | INFO |
 | CP-06 | Dropped distinct values | Values in previous not in current (categorical columns) | INFO |
-| CP-07 | Non-numeric rate change | Increase > `max_non_numeric_rate_change_pp` pp per column | WARN |
-| CP-08 | Column order change | Column order differs from previous (suppressible via `flag_column_order_change: false`) | WARN (CSV) / FAIL (FWF) |
+| CP-07 | Non-numeric rate change | Increase > `max_non_numeric_rate_change_pp` pp per column; always emits a result | WARN |
+| CP-08 | Column order change | Column order differs from previous (suppressible via `flag_column_order_change: false`); severity overridable via `column_order_severity` | WARN (CSV) / FAIL (FWF) |
 
-> CP-02 is the single source of truth for schema differences. The `new_cols_vs_previous` and `missing_cols_vs_previous` columns in the `snapshots` table are derived directly from the CP-02 result — they are not computed separately.
+> CP-02 is split into three separate results (CP-02a, CP-02b, CP-02c) so each type of schema change can be independently read in the report and suppressed via config. The `new_cols_vs_previous` and `missing_cols_vs_previous` columns in the `snapshots` table are derived directly from the CP-02a/b results — they are not computed separately.
 
 ### C.7 Custom checks
 
 - `custom_checks_file` in dataset config points to an `.R` file.
-- Sourced into an isolated environment (not the global env).
+- Sourced into an isolated environment whose parent is `baseenv()` (not the global env).
 - Must define `custom_checks(df)` returning a list of `dq_result` objects.
+- `dq_result()` is explicitly injected and available without qualification.
+- All other dqcheckr exports (e.g. `resolve_col_type()`) require the `dqcheckr::` prefix.
 - Receives the trimmed data frame.
 - Errors (missing file, missing function, runtime error) stop the run.
 - Results appear in the "Custom Checks" report section and are written to `column_snapshots` (see C.8).
@@ -355,6 +370,9 @@ Database and tables created automatically on first run via `init_snapshot_db()`.
 | `missing_cols_vs_previous` | TEXT | Comma-separated; NULL if none or no previous |
 | `new_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
 | `missing_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
+| `comparison_mode` | TEXT | `"comparison"` or `"single"` (single-file runs have no previous) |
+| `render_status` | TEXT | `"success"` or `"failed"` (updated if Quarto render fails) |
+| `type_changed_cols_vs_previous` | TEXT | Comma-separated `col (prev->curr)` pairs; NULL if none |
 
 **Table: `column_snapshots`**
 
@@ -376,7 +394,7 @@ Rows written per column type:
 | `missing_count` | All columns | NULL | NULL |
 | `missing_rate` | All columns | `max_missing_rate` | `FAIL` |
 | `distinct_count` | All columns | NULL | NULL |
-| `numeric_mean` | Numeric only | NULL | NULL |
+| `numeric_parseable_mean` | Numeric only | NULL | NULL |
 | `numeric_sd` | Numeric only | NULL | NULL |
 | `numeric_min` | Numeric only | NULL | NULL |
 | `numeric_max` | Numeric only | NULL | NULL |
@@ -385,7 +403,9 @@ Rows written per column type:
 
 Custom check rows: one row per `dq_result` with a non-NA column value. `dq_check` = `check_id`, `value` = `observed`, `threshold` = `threshold`, `severity_on_breach` = status if WARN/FAIL, else NULL.
 
-### C.9 Main entry point
+### C.9 Main entry points
+
+**Standard run:**
 
 ```{r}
 run_dq_check(
@@ -397,6 +417,26 @@ run_dq_check(
 ```
 
 Report filename: `<dataset_name>_<YYYYMMDD_HHMMSS>.html`
+
+**Snapshot drift analysis** (compare any two historical snapshots):
+
+```{r}
+compare_snapshots(
+  dataset_name,
+  snapshot_id_prev = NULL,   # defaults to second-most-recent
+  snapshot_id_curr = NULL,   # defaults to most-recent
+  db_path          = NULL,   # defaults to snapshot_db from dqcheckr.yml
+  config_dir       = ".",
+  report           = TRUE,   # render HTML drift report
+  open_report      = interactive()
+)
+# Returns invisibly: named list with dataset_name, snap_prev, snap_curr,
+#   table_drift, schema_changes, missing_rate_changes, non_numeric_changes,
+#   mean_shifts, distinct_changes
+
+list_snapshots(dataset_name = NULL, db_path)
+# Returns a data frame of snapshot records; dataset_name = NULL returns all datasets
+```
 
 Console output:
 ```
@@ -417,7 +457,7 @@ Console output:
 | `custom_checks()` not defined | Stop with message |
 | `custom_checks()` runtime error | Stop with R error detail |
 | SQLite write fails | Warning emitted; HTML report still written |
-| Report render fails | Stop; snapshot already written |
+| Report render fails | Warning emitted; snapshot marked `render_status = "failed"` |
 | `snapshot_db` path missing | Created automatically by `init_snapshot_db()` |
 
 ### C.11 Dependencies
@@ -426,15 +466,16 @@ Console output:
 |---------|------|
 | `readr` | CSV / FWF ingestion |
 | `DBI` + `RSQLite` | Snapshot store |
-| `rmarkdown` + `knitr` | Report rendering |
-| `kableExtra` | Styled HTML tables in report |
-| `ggplot2` + `gridExtra` | Trend charts in report |
+| `quarto` | Report rendering (Quarto CLI required separately) |
+| `knitr` | Template execution during Quarto render |
+| `kableExtra` | Styled HTML tables in report templates |
+| `ggplot2` + `gridExtra` | Trend charts in report templates |
 | `yaml` | Config parsing |
-| `dplyr` | Data manipulation |
-| `tidyr` | Data reshaping for trend charts |
+| `dplyr` | Pipe operator (`%>%`) used in report templates |
+| `tidyr` | Data reshaping for trend charts in report templates |
 | `rlang` | Structured error conditions |
 
-All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used — all logic is implemented natively.
+All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used — all logic is implemented natively. `rmarkdown` is listed in `Suggests` for vignette compilation only; it is no longer used for report rendering.
 
 ---
 
@@ -445,8 +486,8 @@ All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used — all
 | # | Issue | Detail |
 |---|-------|--------|
 | D-01 | **Explicit file naming — partial spec** | The dataset config allows `current_file` and `previous_file` to override folder-scan detection, but the behaviour when one is set and the other is not has not been fully specified. Implemented as: `current_file` set but `previous_file` absent runs in single-file mode. |
-| D-02 | **CP-08 column order — WARN vs FAIL severity** | CP-08 is WARN for CSV and FAIL for FWF. There is currently no way to override the severity per dataset. A `column_order_change_severity` per-dataset override may be needed. |
-| D-03 | **QC-03 duplicate rows — no key scope** | QC-03 checks for fully-identical rows only. Multi-column key uniqueness (two rows with the same `id` but different `amount`) is not yet implemented. |
+| ~~D-02~~ | ~~**CP-08 column order — WARN vs FAIL severity**~~ | Resolved in v0.2.0: `column_order_severity` config key overrides the format-based default for CP-08. |
+| ~~D-03~~ | ~~**QC-03 duplicate rows — no key scope**~~ | Resolved in v0.2.0: QC-12 now supports composite keys via a `key_columns` list. QC-03 retains full-row duplicate detection. |
 
 ### D.2 Backlog — agreed
 
@@ -454,11 +495,11 @@ All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used — all
 |---|---------|
 | B-01 | **Cross-column consistency rules** — conditional rules between columns (e.g. if `status = CLOSED` then `close_date` must not be null) |
 | B-02 | **Date column recency check** — flag if the most recent value in a date column is older than N days |
-| B-03 | **Multi-column key uniqueness** — QC-12 currently checks single columns only |
+| ~~B-03~~ | ~~**Multi-column key uniqueness**~~ | Resolved in v0.2.0: QC-12 now accepts a `key_columns` list for composite keys. |
 | B-04 | **`post_run_hook` parameter** — user-supplied function for email/Slack/S3 delivery after a run |
 | B-05 | **`batch_run(config_dir)`** — run all configured datasets in sequence |
 | B-06 | **Additional input formats** — Parquet (`arrow`), Excel, database tables via `DBI` |
-| B-07 | **CP-03 severity** — make WARN vs FAIL configurable (currently always WARN) |
+| ~~B-07~~ | ~~**CP-03 severity**~~ | Resolved in v0.2.0: `missing_rate_change_severity` config key controls whether CP-03 breaches are WARN or FAIL. |
 | B-08 | **Report themes** — organisation branding via a `theme` parameter |
 
 ### D.3 Known limitations
@@ -467,5 +508,5 @@ All on CRAN. `pointblank` and `dataCompareR` were evaluated and not used — all
 |---|------------|
 | L-01 | ~~Type inference uses a fixed 90% threshold~~ — resolved in v0.1.1; configurable via `type_inference_threshold` in `rule_overrides` |
 | L-02 | Date formats tested are hardcoded to five common patterns; exotic formats will be misclassified as character |
-| L-03 | The report appendix reads from in-memory `col_stats`, not from SQLite. If the SQLite write fails but the report succeeds, the appendix and the database can show slightly different values in edge cases |
+| L-03 | The report appendix reads from in-memory `col_stats`, not from SQLite. If the SQLite write fails but the report succeeds, the appendix and the database can show slightly different values in edge cases. Report render failures are non-fatal from v0.2.0: the snapshot is preserved and marked `render_status = "failed"`. |
 | L-04 | Performance target (< 60 seconds for 1 M rows) has not been benchmarked; very wide files (many columns) may be slower than expected |

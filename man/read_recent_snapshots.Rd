@@ -15,10 +15,15 @@ read_recent_snapshots(db_path, dataset_name, n = 10)
 }
 \value{
 A data frame with one row per run and columns including
-  \code{id}, \code{run_timestamp}, \code{file_name}, \code{row_count},
-  \code{overall_status}, \code{check_pass_count}, \code{check_warn_count},
-  \code{check_fail_count}. Returns an empty data frame if the database does
-  not exist or contains no records for the dataset.
+  \code{id}, \code{dataset_name}, \code{run_timestamp}, \code{file_name},
+  \code{row_count}, \code{col_count}, \code{overall_status},
+  \code{check_pass_count}, \code{check_warn_count}, \code{check_fail_count},
+  \code{check_info_count}, \code{new_cols_vs_previous},
+  \code{missing_cols_vs_previous}, \code{new_cols_vs_schema},
+  \code{missing_cols_vs_schema}, \code{comparison_mode},
+  \code{render_status}, and \code{type_changed_cols_vs_previous}.
+  Returns an empty data frame if the database does not exist or contains no
+  records for the dataset.
 }
 \description{
 Retrieves the \code{n} most recent run records for a given dataset from the

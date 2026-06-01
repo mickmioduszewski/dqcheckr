@@ -10,6 +10,18 @@ compare_row_count <- function(df_current, df_previous, config) {
   threshold  <- config$rules$max_row_count_change_pct %||% 0.10
   n_curr     <- nrow(df_current)
   n_prev     <- nrow(df_previous)
+
+  if (n_prev == 0) {
+    return(list(dq_result(
+      check_id   = "CP-01",
+      check_name = "Row count change",
+      status     = "WARN",
+      observed   = sprintf("%d rows (previous: 0 rows)", n_curr),
+      threshold  = sprintf("+/-%.0f%%", threshold * 100),
+      message    = "Previous file had 0 rows; row count change cannot be expressed as a percentage."
+    )))
+  }
+
   pct_change <- (n_curr - n_prev) / n_prev
   status     <- if (abs(pct_change) > threshold) "WARN" else "PASS"
   list(dq_result(
@@ -300,8 +312,10 @@ compare_column_order <- function(df_current, df_previous, config) {
       observed   = sprintf("Current: [%s] | Previous: [%s]",
                            paste(curr_names, collapse = ", "),
                            paste(prev_names, collapse = ", ")),
-      message    = if (fmt == "fwf" || status == "FAIL")
+      message    = if (fmt == "fwf")
         "Column order has changed. This is an error for fixed-width files."
+      else if (status == "FAIL")
+        "Column order has changed vs previous delivery (elevated to FAIL by column_order_severity config)."
       else
         "Column order has changed vs previous delivery."
     )))

@@ -47,8 +47,27 @@ check_missing_rate <- function(df, config) {
 }
 
 #' QC-02: Check for entirely empty columns
-#' @keywords internal
-#' @noRd
+#'
+#' Returns a \code{\link{dq_result}} per column. A column is considered empty
+#' when every value is \code{NA} or the empty string \code{""}.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per column.
+#'   Status is \code{"FAIL"} for entirely empty columns; \code{"PASS"}
+#'   otherwise.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_empty_column(df, cfg)
+#'
+#' @export
 check_empty_column <- function(df, config) {
   lapply(names(df), function(col) {
     is_empty <- all(.missing_vals(df[[col]]))
@@ -67,8 +86,27 @@ check_empty_column <- function(df, config) {
 }
 
 #' QC-03: Check for fully-duplicate rows
-#' @keywords internal
-#' @noRd
+#'
+#' Returns a single \code{\link{dq_result}} for the whole table. A row is
+#' considered a duplicate when every column value is identical to another row.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}. Currently unused; present for API consistency.
+#'
+#' @return A list containing one \code{\link{dq_result}}.
+#'   Status is \code{"WARN"} if any duplicate rows exist; \code{"PASS"}
+#'   otherwise.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_duplicate_rows(df, cfg)
+#'
+#' @export
 check_duplicate_rows <- function(df, config) {
   n_dups <- sum(duplicated(df))
   status <- if (n_dups > 0) "WARN" else "PASS"
@@ -85,8 +123,27 @@ check_duplicate_rows <- function(df, config) {
 }
 
 #' QC-04: Report row count
-#' @keywords internal
-#' @noRd
+#'
+#' Returns a single \code{"INFO"} \code{\link{dq_result}} recording the number
+#' of rows in the data frame. Never fails or warns; use
+#' \code{\link{check_min_row_count}} for threshold-based row count checks.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}. Currently unused; present for API consistency.
+#'
+#' @return A list containing one \code{\link{dq_result}} with status
+#'   \code{"INFO"}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_row_count(df, cfg)
+#'
+#' @export
 check_row_count <- function(df, config) {
   list(dq_result(
     check_id   = "QC-04",
@@ -98,8 +155,26 @@ check_row_count <- function(df, config) {
 }
 
 #' QC-05: Report column count
-#' @keywords internal
-#' @noRd
+#'
+#' Returns a single \code{"INFO"} \code{\link{dq_result}} recording the number
+#' of columns in the data frame. Never fails or warns.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}. Currently unused; present for API consistency.
+#'
+#' @return A list containing one \code{\link{dq_result}} with status
+#'   \code{"INFO"}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_col_count(df, cfg)
+#'
+#' @export
 check_col_count <- function(df, config) {
   list(dq_result(
     check_id   = "QC-05",
@@ -111,8 +186,28 @@ check_col_count <- function(df, config) {
 }
 
 #' QC-06: Report inferred column types
-#' @keywords internal
-#' @noRd
+#'
+#' Returns one \code{"INFO"} \code{\link{dq_result}} per column recording the
+#' type resolved by \code{\link{resolve_col_type}} (\code{"date"},
+#' \code{"numeric"}, \code{"character"}, or \code{"unknown"}).
+#' Per-column overrides from \code{config$column_types} are respected.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per column, all with
+#'   status \code{"INFO"}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_inferred_types(df, cfg)
+#'
+#' @export
 check_inferred_types <- function(df, config) {
   lapply(names(df), function(col) {
     typ <- resolve_col_type(col, df[[col]], config)
@@ -128,9 +223,30 @@ check_inferred_types <- function(df, config) {
 }
 
 #' QC-07: Report numeric summary statistics
-#' @keywords internal
-#' @noRd
+#'
+#' For each column whose resolved type is \code{"numeric"}, returns one
+#' \code{"INFO"} \code{\link{dq_result}} containing min, max, mean, and
+#' standard deviation of the parseable values. Columns inferred as non-numeric
+#' are silently skipped.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects (one per numeric column),
+#'   all with status \code{"INFO"}. Returns an empty list if no numeric columns
+#'   are found.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_numeric_stats(df, cfg)
+#'
 #' @importFrom stats sd
+#' @export
 check_numeric_stats <- function(df, config) {
   results <- list()
   for (col in names(df)) {
@@ -153,8 +269,28 @@ check_numeric_stats <- function(df, config) {
 }
 
 #' QC-08: Report distinct value counts for character columns
-#' @keywords internal
-#' @noRd
+#'
+#' For each column whose resolved type is \code{"character"}, returns one
+#' \code{"INFO"} \code{\link{dq_result}} with the count of distinct non-empty
+#' values. Columns inferred as numeric or date are silently skipped.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects (one per character column),
+#'   all with status \code{"INFO"}. Returns an empty list if no character
+#'   columns are found.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_distinct_counts(df, cfg)
+#'
+#' @export
 check_distinct_counts <- function(df, config) {
   results <- list()
   for (col in names(df)) {
@@ -174,8 +310,30 @@ check_distinct_counts <- function(df, config) {
 }
 
 #' QC-09: Check for values outside the allowed set
-#' @keywords internal
-#' @noRd
+#'
+#' For each column that has \code{allowed_values} configured in
+#' \code{config$column_rules}, returns a \code{\link{dq_result}} flagging any
+#' non-empty values not in the allowed list. Returns an empty list when no
+#' \code{allowed_values} rules are configured.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per configured column.
+#'   Status is \code{"FAIL"} when unexpected values are found; \code{"PASS"}
+#'   otherwise. Returns an empty list if no \code{allowed_values} rules are
+#'   configured.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_allowed_values(df, cfg)
+#'
+#' @export
 check_allowed_values <- function(df, config) {
   results   <- list()
   col_rules <- config$column_rules %||% list()
@@ -206,9 +364,30 @@ check_allowed_values <- function(df, config) {
 }
 
 #' QC-10: Check for out-of-range numeric values
-#' @keywords internal
-#' @noRd
+#'
+#' For each column that has \code{min_value} or \code{max_value} configured in
+#' \code{config$column_rules}, returns a \code{\link{dq_result}} flagging any
+#' values that fall outside the specified range. Returns an empty list when no
+#' bound rules are configured.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per configured column.
+#'   Status is \code{"FAIL"} when out-of-range values are found; \code{"PASS"}
+#'   otherwise. Returns an empty list if no bound rules are configured.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_numeric_bounds(df, cfg)
+#'
 #' @importFrom utils head
+#' @export
 check_numeric_bounds <- function(df, config) {
   results   <- list()
   col_rules <- config$column_rules %||% list()
@@ -253,8 +432,30 @@ check_numeric_bounds <- function(df, config) {
 }
 
 #' QC-11: Check non-numeric rate in numeric columns
-#' @keywords internal
-#' @noRd
+#'
+#' For each column whose resolved type is \code{"numeric"}, computes the
+#' proportion of non-empty values that cannot be coerced to numeric. Returns
+#' \code{"FAIL"} when the rate exceeds \code{max_non_numeric_rate} (default
+#' 0.01), \code{"WARN"} when it exceeds \code{warn_non_numeric_rate} (default
+#' 0), and \code{"PASS"} otherwise. Both thresholds support per-column
+#' overrides via \code{config$column_rules}.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per numeric column.
+#'   Returns an empty list if no numeric columns are found.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_non_numeric(df, cfg)
+#'
+#' @export
 check_non_numeric <- function(df, config) {
   results <- list()
   for (col in names(df)) {
@@ -292,13 +493,29 @@ check_non_numeric <- function(df, config) {
 
 #' QC-12: Check uniqueness of key column(s)
 #'
-#' Supports both single-column and composite key uniqueness. When
-#' \code{key_columns} in config is a single string, one result is returned per
-#' key column. When it is a character vector of length > 1, a single result
-#' covering the composite key is returned.
+#' Checks that the column(s) listed in \code{config$key_columns} have no
+#' duplicate values. When \code{key_columns} is a single string, one result is
+#' returned for that column. When it is a character vector of length > 1, a
+#' single result covering the composite key is returned. Returns an empty list
+#' if \code{key_columns} is not configured.
 #'
-#' @keywords internal
-#' @noRd
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects. Status is \code{"FAIL"}
+#'   when duplicates or missing key columns are detected; \code{"PASS"}
+#'   otherwise. Returns an empty list if \code{key_columns} is not configured.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_key_uniqueness(df, cfg)
+#'
+#' @export
 check_key_uniqueness <- function(df, config) {
   keys <- config$key_columns
   if (is.null(keys) || length(keys) == 0) return(list())
@@ -362,8 +579,29 @@ check_key_uniqueness <- function(df, config) {
 }
 
 #' QC-13: Check values against a regex pattern
-#' @keywords internal
-#' @noRd
+#'
+#' For each column that has a \code{pattern} configured in
+#' \code{config$column_rules}, returns a \code{\link{dq_result}} reporting how
+#' many non-empty values do not match the Perl-compatible regular expression.
+#' Returns an empty list when no pattern rules are configured.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per configured column.
+#'   Status is \code{"FAIL"} when any values violate the pattern; \code{"PASS"}
+#'   otherwise. Returns an empty list if no pattern rules are configured.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_pattern(df, cfg)
+#'
+#' @export
 check_pattern <- function(df, config) {
   results   <- list()
   col_rules <- config$column_rules %||% list()
@@ -392,12 +630,37 @@ check_pattern <- function(df, config) {
 
 #' QC-14: Check row count bounds and optional file size
 #'
-#' Checks \code{min_row_count} and (when configured) \code{max_row_count}.
-#' An optional \code{max_file_size_mb} check is performed before reading
-#' when \code{file_path} is supplied.
+#' Runs up to three sub-checks, each returning a separate
+#' \code{\link{dq_result}}:
+#' \enumerate{
+#'   \item \strong{File size} — only when \code{file_path} is supplied and
+#'     \code{max_file_size_mb} is configured in \code{rules}: FAIL if the file
+#'     exceeds the size limit.
+#'   \item \strong{Minimum row count} — FAIL if \code{row_count <
+#'     min_row_count}. Skipped (PASS with a note) when \code{min_row_count}
+#'     is \code{0}.
+#'   \item \strong{Maximum row count} — only when \code{max_row_count} is
+#'     configured in \code{rules}: FAIL if \code{row_count > max_row_count}.
+#' }
 #'
-#' @keywords internal
-#' @noRd
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#' @param file_path Character or \code{NULL}. Absolute path to the file on
+#'   disk, required for the optional file-size sub-check.
+#'
+#' @return A list of \code{\link{dq_result}} objects (one to three entries
+#'   depending on which sub-checks are active).
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_min_row_count(df, cfg, file_path = path)
+#'
+#' @export
 check_min_row_count <- function(df, config, file_path = NULL) {
   results <- list()
 
@@ -466,13 +729,37 @@ check_min_row_count <- function(df, config, file_path = NULL) {
 
 #' QC-15: Detect statistical outliers in numeric columns
 #'
-#' Uses Z-score (\code{max_z_score}) or IQR fence (\code{iqr_fence_multiplier})
-#' thresholds from config. The check is skipped (PASS) when neither key is
-#' present. Only columns whose resolved type is \code{"numeric"} are checked.
+#' For each column whose resolved type is \code{"numeric"}, applies up to two
+#' outlier detection methods (combined with logical OR):
+#' \enumerate{
+#'   \item \strong{Z-score}: values whose absolute Z-score exceeds
+#'     \code{max_z_score} are flagged.
+#'   \item \strong{IQR fence}: values below \code{Q1 - k * IQR} or above
+#'     \code{Q3 + k * IQR} (where \code{k = iqr_fence_multiplier}) are
+#'     flagged.
+#' }
+#' Both thresholds support per-column overrides via \code{config$column_rules}.
+#' A column is skipped (PASS with a note) when neither threshold is configured
+#' or when it has fewer than four parseable values.
 #'
-#' @keywords internal
-#' @noRd
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects, one per numeric column.
+#'   Status is \code{"FAIL"} when outliers are detected; \code{"PASS"}
+#'   otherwise. Returns an empty list if no numeric columns are found.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_outliers(df, cfg)
+#'
 #' @importFrom stats median IQR quantile
+#' @export
 check_outliers <- function(df, config) {
   results <- list()
   for (col in names(df)) {
@@ -551,9 +838,36 @@ check_outliers <- function(df, config) {
   results
 }
 
-#' SC-01/SC-02: Check columns against expected schema contract
-#' @keywords internal
-#' @noRd
+#' SC-01 / SC-02: Check columns against the expected schema contract
+#'
+#' Compares the columns present in \code{df} against
+#' \code{config$expected_columns}:
+#' \itemize{
+#'   \item \strong{SC-01}: one \code{"FAIL"} result per column present in the
+#'     file but not listed in \code{expected_columns}.
+#'   \item \strong{SC-02}: one \code{"FAIL"} result per column listed in
+#'     \code{expected_columns} but absent from the file.
+#' }
+#' Returns an empty list if \code{expected_columns} is not configured.
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}.
+#'
+#' @return A list of \code{\link{dq_result}} objects. Each schema violation
+#'   produces one \code{"FAIL"} result; a \code{"PASS"} result is emitted for
+#'   each sub-check when no violations are found. Returns an empty list if
+#'   \code{expected_columns} is not configured.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_schema_contract(df, cfg)
+#'
+#' @export
 check_schema_contract <- function(df, config) {
   expected <- config$expected_columns
   if (is.null(expected)) return(list())
