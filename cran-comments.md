@@ -1,11 +1,18 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
 
 ## Test environments
 
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local)
-* win-builder: R-devel (2026-05-31 r90090, x86_64-w64-mingw32): results pending
+* win-builder: R-devel (2026-05-31 r90090, x86_64-w64-mingw32): 0 errors | 0 warnings | 1 note
+
+## Notes
+
+* "Package has a VignetteBuilder field but no prebuilt vignette index."
+  The package uses Quarto for vignette rendering. Quarto may not be available
+  on all check servers. The vignettes build correctly in environments where the
+  Quarto CLI is installed.
 
 ## Previous CRAN submission errors (v0.1.2) — addressed in v0.2.0
 
