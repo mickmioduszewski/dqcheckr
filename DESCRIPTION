@@ -1,12 +1,12 @@
 Package: dqcheckr
 Type: Package
 Title: Automated Data Quality Checks for Recurring Dataset Deliveries
-Version: 0.1.2
-Date: 2026-05-16
+Version: 0.2.0.9000
+Date: 2026-06-01
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
                   role  = c("aut", "cre"))
-Description: 
+Description:
     Automates quality verification of recurring external dataset deliveries.
     For each new file arrival, it runs single-snapshot quality checks, compares
     the file to the previous delivery, writes a self-contained 'HTML' report, and
@@ -21,11 +21,8 @@ Language: en-GB
 Depends: R (>= 4.2)
 Imports: readr, DBI, RSQLite, rmarkdown, knitr, kableExtra, ggplot2,
         gridExtra, dplyr, tidyr, yaml, rlang
-Suggests: testthat (>= 3.0.0)
+Suggests: testthat (>= 3.1.0),
+    withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
-NeedsCompilation: no
-Packaged: 2026-05-15 16:51:37 UTC; mick
-Author: Mick Mioduszewski [aut, cre]
-Maintainer: Mick Mioduszewski <mick@mioduszewski.net>

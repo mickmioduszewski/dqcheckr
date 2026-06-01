@@ -1,3 +1,28 @@
+# dqcheckr 0.2.0 (development)
+
+* Snapshot storage upgraded from RSQLite to DuckDB (Change 1 / impact01).
+* Reports migrated from rmarkdown to Quarto (Change 3 / impact01).
+* New `compare_snapshots()` and `list_snapshots()` functions for drift analysis.
+* New `drift_report.qmd` template; `render_drift_report()` added to `R/drift.R`.
+* `detect_files()` now uses filename as a tiebreaker when two files share the
+  same modification time, making folder-mode ordering deterministic (RC-01).
+* `compare_non_numeric_rate()` (CP-07) now emits a PASS result for columns
+  where the rate does not increase, consistent with all other CP checks (G-02).
+* `check_min_row_count()` and `check_row_count()` now route through a new
+  `table_threshold()` helper, consistent with `col_threshold()` (G-07).
+* `snapshots` table gains a `comparison_mode` column (`'comparison'` or
+  `'single'`) so single-file runs are distinguishable from no-change comparison
+  runs in historical queries (G-04).
+* `snapshots` table gains a `render_status` column (`'success'` or `'failed'`)
+  so orphaned snapshots from a failed render are identifiable (RC-02 / option c).
+* `compare_snapshots()` now uses the full merged per-dataset config for threshold
+  comparisons, so `***` markers in drift reports match the original check run for
+  datasets with rule overrides (G-05 / G-06).
+* `compute_col_stats()` unused `qc_results` parameter removed (D-01).
+* `run_timestamp` is now stored in UTC (RC-07).
+* `check_allowed_values()` (QC-09) and `compare_new_values()` / `compare_dropped_values()`
+  (CP-05, CP-06) cap `observed` at 20 values with an `"... and N more"` suffix (RC-04, RC-05).
+
 # dqcheckr 0.1.1
 
 * `flag_new_columns`, `flag_dropped_columns`, `flag_type_changes` (in CP-02) and
