@@ -1,19 +1,11 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
-
-## Note
-
-* "checking for future file timestamps ... NOTE: unable to verify current time"
-  This note originates from the check environment's inability to resolve an
-  external time server. It is not related to the package code. Observed on
-  macOS in a sandboxed development environment; not expected to appear on CRAN
-  infrastructure.
+0 errors | 0 warnings | 0 notes
 
 ## Test environments
 
-* macOS 25.5.0 (local), R 4.4.x
-* win-builder: R devel (to be checked before submission)
+* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local)
+* win-builder: R devel (checked before submission)
 
 ## Package notes
 
