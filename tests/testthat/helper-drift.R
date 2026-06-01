@@ -74,9 +74,10 @@ make_drift_db <- function(n_snapshots = 2) {
 }
 
 make_drift_config <- function(dir = tempdir()) {
+  dir_fwd <- normalizePath(dir, winslash = "/", mustWork = FALSE)
   writeLines(c(
     'snapshot_db: "data/snapshots.sqlite"',
-    paste0('report_output_dir: "', dir, '"'),
+    paste0('report_output_dir: "', dir_fwd, '"'),
     'default_rules:',
     '  max_missing_rate_change_pp: 2.0',
     '  max_numeric_mean_shift_pct: 0.20',
