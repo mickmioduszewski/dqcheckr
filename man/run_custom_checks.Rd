@@ -21,6 +21,15 @@ define a function \code{custom_checks(df)} returning a list of
 \code{\link{dq_result}} objects. Returns an empty list if
 \code{custom_checks_file} is not set in the config.
 }
+\details{
+The file is sourced into an isolated environment whose parent is
+\code{baseenv()}, so only base R functions are available by default.
+\code{\link{dq_result}} is explicitly injected and can be called without
+qualification. All other dqcheckr exports (e.g. \code{resolve_col_type},
+\code{infer_col_type}) must be qualified: \code{dqcheckr::resolve_col_type()}.
+Any error — missing file, undefined function, or runtime failure — stops the
+run with a clear message.
+}
 \examples{
 cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg     <- load_config("starwars_csv", config_dir = cfg_dir)

@@ -14,12 +14,6 @@
 #'
 #' @keywords internal
 #' @noRd
-#'
-#' The importFrom directives below are not called by any R function in this
-#' package directly. They are declared here so that R CMD check recognises
-#' them as used imports (satisfying DESCRIPTION Imports) and so that the
-#' symbols are available on the search path when the Quarto report template
-#' (inst/templates/report.qmd) is executed by knitr during rendering.
 #' @importFrom kableExtra kbl kable_styling cell_spec
 #' @importFrom ggplot2 ggplot aes geom_line geom_point geom_col labs
 #' @importFrom ggplot2 scale_fill_manual theme_minimal
