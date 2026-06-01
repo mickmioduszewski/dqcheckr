@@ -16,8 +16,9 @@ run_comparison_checks(df_current, df_previous, config)
 }
 \value{
 A list of \code{\link{dq_result}} objects. The list carries
-  attributes \code{new_cols} and \code{dropped_cols} (character vectors)
-  for use by the snapshot writer.
+  attributes \code{new_cols}, \code{dropped_cols}, and
+  \code{type_changed_cols} (character vectors) for use by the snapshot
+  writer.
 }
 \description{
 Runs CP-01 to CP-08 comparing a current delivery against the previous one.

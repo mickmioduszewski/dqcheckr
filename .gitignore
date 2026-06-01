@@ -19,3 +19,7 @@ reports/
 # Compiled / installed
 src/*.so
 src/*.dll
+
+# Pre-built vignette outputs and internal build state
+build/
+inst/doc/

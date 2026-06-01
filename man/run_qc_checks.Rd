@@ -4,7 +4,7 @@
 \alias{run_qc_checks}
 \title{Run all generic quality checks on a dataset}
 \usage{
-run_qc_checks(df, config)
+run_qc_checks(df, config, file_path = NULL)
 }
 \arguments{
 \item{df}{A data frame with all columns as character vectors (as returned by
@@ -12,12 +12,15 @@ run_qc_checks(df, config)
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{file_path}{Character or \code{NULL}. Absolute path to the file, used
+for the optional \code{max_file_size_mb} check in QC-14.}
 }
 \value{
 A list of \code{\link{dq_result}} objects.
 }
 \description{
-Runs the full QC check suite (QC-01 to QC-14, SC-01, SC-02) against a
+Runs the full QC check suite (QC-01 to QC-15, SC-01, SC-02) against a
 single data frame snapshot.
 }
 \examples{

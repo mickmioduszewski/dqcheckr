@@ -6,7 +6,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
                           snapshot_history, config, col_stats = NULL, output_dir,
                           open_report = TRUE) {
   if (!quarto::quarto_available()) {
-    warning("Quarto CLI not found — HTML report skipped. Install from https://quarto.org",
+    warning("Quarto CLI not found -- HTML report skipped. Install from https://quarto.org",
             call. = FALSE)
     return(invisible(NULL))
   }

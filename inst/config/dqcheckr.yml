@@ -17,13 +17,33 @@ default_rules:
   # FAIL if missing rate in any column exceeds this proportion (0-1)
   max_missing_rate: 0.05
 
+  # WARN if non-numeric rate exceeds this proportion (0 = any non-zero → WARN)
+  warn_non_numeric_rate: 0.00
+
   # FAIL if non-numeric value rate in a numeric column exceeds this proportion
   max_non_numeric_rate: 0.01
 
   # FAIL if row count is below this value (0 = disabled)
   min_row_count: 0
 
+  # FAIL if row count exceeds this value (omit to disable)
+  # max_row_count: 1000000
+
+  # FAIL if file size exceeds this value in MB (omit to disable)
+  # max_file_size_mb: 500
+
+  # Outlier detection — omit to disable
+  # max_z_score: 3.0            # flag values where |z| > threshold
+  # iqr_fence_multiplier: 1.5   # flag values outside Q1-k*IQR / Q3+k*IQR
+
   # -- Version comparison thresholds -------------------------------------------
+
+  # WARN (or FAIL if missing_rate_change_severity=fail) when missing rate
+  # increases by more than this many percentage points
+  max_missing_rate_change_pp: 2.0
+
+  # Severity for CP-03 threshold breach: "warn" (default) or "fail"
+  missing_rate_change_severity: warn
 
   # WARN if row count changes by more than this proportion between deliveries
   max_row_count_change_pct: 0.10
@@ -31,22 +51,22 @@ default_rules:
   # WARN if numeric column mean shifts by more than this proportion
   max_numeric_mean_shift_pct: 0.20
 
-  # WARN if missing rate increases by more than this many percentage points
-  max_missing_rate_change_pp: 2.0
-
   # WARN if non-numeric rate increases by more than this many percentage points
   max_non_numeric_rate_change_pp: 1.0
 
   # -- Schema flags -------------------------------------------------------------
 
-  # WARN when new columns appear vs previous delivery
+  # WARN when new columns appear vs previous delivery (CP-02a)
   flag_new_columns: true
 
-  # WARN when columns are dropped vs previous delivery
+  # WARN when columns are dropped vs previous delivery (CP-02b)
   flag_dropped_columns: true
 
-  # WARN when inferred column type changes vs previous delivery
+  # WARN when inferred column type changes vs previous delivery (CP-02c)
   flag_type_changes: true
 
   # WARN (CSV) or FAIL (FWF) when column order changes vs previous delivery
   flag_column_order_change: true
+
+  # Override CP-08 severity regardless of file format: "warn" or "fail"
+  # column_order_severity: warn

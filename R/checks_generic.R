@@ -501,7 +501,7 @@ check_outliers <- function(df, config) {
         check_name = "Outlier detection",
         column     = col,
         status     = "PASS",
-        observed   = sprintf("%d parseable values — too few to test.", length(nn)),
+        observed   = sprintf("%d parseable values -- too few to test.", length(nn)),
         message    = sprintf("Column '%s': outlier check skipped (fewer than 4 values).", col)
       )))
       next

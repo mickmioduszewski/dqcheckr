@@ -19,7 +19,9 @@ A named list representing the merged configuration.
 \description{
 Reads the global \code{dqcheckr.yml} and the dataset-specific YAML, merging
 \code{rule_overrides} from the dataset config on top of \code{default_rules}
-from the global config.
+from the global config. Top-level keys \code{snapshot_db} and
+\code{report_output_dir} are inherited from the global config when absent
+from the dataset config.
 }
 \examples{
 cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")

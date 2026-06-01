@@ -21,7 +21,8 @@ Invisibly, a named list with:
   \describe{
     \item{status}{Overall status string: \code{"PASS"}, \code{"WARN"},
       \code{"FAIL"}, or \code{"INFO"}.}
-    \item{report_path}{Absolute path to the rendered HTML report.}
+    \item{report_path}{Absolute path to the rendered HTML report, or
+      \code{NULL} if rendering was skipped.}
     \item{snapshot_id}{Integer row ID of the snapshot written to SQLite,
       or \code{NULL} if the write failed.}
   }
