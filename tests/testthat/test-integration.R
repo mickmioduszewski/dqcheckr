@@ -51,8 +51,10 @@ test_that("run_dq_check() returns a list with status, report_path, snapshot_id",
 })
 
 test_that("run_dq_check() writes an HTML report file to disk", {
+  skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
   cfg_dir <- setup_integration_env()
   result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+  expect_false(is.null(result$report_path))
   expect_true(file.exists(result$report_path))
   expect_match(result$report_path, "\\.html$")
 })
