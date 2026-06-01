@@ -56,7 +56,7 @@ run_dq_check <- function(dataset_name,
   else
     NULL
 
-  qc_results     <- run_qc_checks(df_curr, config)
+  qc_results     <- run_qc_checks(df_curr, config, file_path = files$current)
   cp_results     <- if (!is.null(df_prev))
     run_comparison_checks(df_curr, df_prev, config)
   else

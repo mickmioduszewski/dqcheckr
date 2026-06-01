@@ -73,26 +73,38 @@ test_that("compare_schema() returns WARN when current has new column", {
   expect_true("extra" %in% attr(res, "new_cols"))
 })
 
-test_that("compare_schema() returns WARN when column is dropped", {
+test_that("compare_schema() returns WARN when column is dropped (CP-02b)", {
   curr <- make_curr()[, -3]
   res  <- compare_schema(curr, make_prev(), base_config())
-  expect_equal(res[[1]]$status, "WARN")
+  # res[[1]] = CP-02a (new cols, PASS); res[[2]] = CP-02b (dropped cols, WARN)
+  expect_equal(res[[2]]$status, "WARN")
+  expect_equal(res[[2]]$check_id, "CP-02b")
   expect_true("country_code" %in% attr(res, "dropped_cols"))
 })
 
-test_that("compare_schema() returns WARN on type change", {
+test_that("compare_schema() returns WARN on type change (CP-02c)", {
   curr                  <- make_curr()
   curr$account_balance  <- c("high", "low", "medium", "high", "low")
   res <- compare_schema(curr, make_prev(), base_config())
-  expect_equal(res[[1]]$status, "WARN")
+  # res[[3]] = CP-02c (type changes)
+  expect_equal(res[[3]]$status, "WARN")
+  expect_equal(res[[3]]$check_id, "CP-02c")
 })
 
-test_that("compare_schema() attaches new_cols and dropped_cols attributes", {
+test_that("compare_schema() returns 3 results with correct check_ids", {
+  res <- compare_schema(make_curr(), make_prev(), base_config())
+  expect_length(res, 3L)
+  expect_equal(vapply(res, `[[`, character(1), "check_id"),
+               c("CP-02a", "CP-02b", "CP-02c"))
+})
+
+test_that("compare_schema() attaches new_cols, dropped_cols and type_changed_cols attributes", {
   curr       <- make_curr()
   curr$new1  <- "x"
   res <- compare_schema(curr, make_prev(), base_config())
   expect_false(is.null(attr(res, "new_cols")))
   expect_false(is.null(attr(res, "dropped_cols")))
+  expect_false(is.null(attr(res, "type_changed_cols")))
 })
 
 # -- CP-03 Missing rate change -------------------------------------------------
@@ -197,8 +209,9 @@ test_that("compare_schema() suppresses new columns when flag_new_columns=FALSE",
   cfg <- base_config()
   cfg$rules$flag_new_columns <- FALSE
   res <- compare_schema(curr, make_prev(), cfg)
+  # CP-02a should be PASS; observed is "None." (not "New: ...")
   expect_equal(res[[1]]$status, "PASS")
-  expect_false(grepl("New columns", res[[1]]$observed))
+  expect_false(grepl("^New:", res[[1]]$observed))
   expect_equal(attr(res, "new_cols"), "extra_col")  # still tracked for SQLite
 })
 
@@ -208,8 +221,9 @@ test_that("compare_schema() suppresses dropped columns when flag_dropped_columns
   cfg <- base_config()
   cfg$rules$flag_dropped_columns <- FALSE
   res <- compare_schema(make_curr(), prev, cfg)
-  expect_equal(res[[1]]$status, "PASS")
-  expect_false(grepl("Dropped", res[[1]]$observed))
+  # CP-02b should be PASS
+  expect_equal(res[[2]]$status, "PASS")
+  expect_false(grepl("^Dropped:", res[[2]]$observed))
   expect_equal(attr(res, "dropped_cols"), "ghost_col")
 })
 
@@ -219,8 +233,9 @@ test_that("compare_schema() suppresses type changes when flag_type_changes=FALSE
   cfg <- base_config()
   cfg$rules$flag_type_changes <- FALSE
   res <- compare_schema(make_curr(), prev, cfg)
-  expect_equal(res[[1]]$status, "PASS")
-  expect_false(grepl("Type changes", res[[1]]$observed))
+  # CP-02c should be PASS
+  expect_equal(res[[3]]$status, "PASS")
+  expect_false(grepl("^Type changes:", res[[3]]$observed))
 })
 
 test_that("compare_column_order() returns empty list when flag_column_order_change=FALSE", {
@@ -245,4 +260,47 @@ test_that("run_comparison_checks() attributes are NULL when no schema changes", 
   res <- run_comparison_checks(make_curr(), make_prev(), base_config())
   expect_length(attr(res, "new_cols"),     0)
   expect_length(attr(res, "dropped_cols"), 0)
+})
+
+# -- CP-03 configurable severity (B-07) ----------------------------------------
+
+test_that("compare_missing_rate() emits FAIL when missing_rate_change_severity=fail", {
+  curr      <- make_curr()
+  curr$name <- NA_character_
+  cfg       <- base_config()
+  cfg$rules$missing_rate_change_severity <- "fail"
+  res    <- compare_missing_rate(curr, make_prev(), cfg)
+  name_r <- Filter(\(r) r$column == "name", res)
+  expect_equal(name_r[[1]]$status, "FAIL")
+})
+
+# -- CP-07 always emits PASS (G-02) --------------------------------------------
+
+test_that("compare_non_numeric_rate() emits a result for all eligible columns including no-change (G-02)", {
+  res <- compare_non_numeric_rate(make_curr(), make_prev(), base_config())
+  # account_balance is numeric in both snapshots; must have a result
+  bal <- Filter(\(r) r$column == "account_balance", res)
+  expect_true(length(bal) >= 1)
+  expect_equal(bal[[1]]$status, "PASS")
+})
+
+# -- CP-08 configurable severity (C-02) ----------------------------------------
+
+test_that("compare_column_order() respects column_order_severity=fail for CSV", {
+  curr <- make_curr()[, rev(names(make_curr()))]
+  cfg  <- base_config()
+  cfg$format <- "csv"
+  cfg$rules$column_order_severity <- "fail"
+  res <- compare_column_order(curr, make_prev(), cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+})
+
+# -- run_comparison_checks() carries type_changed_cols attribute ---------------
+
+test_that("run_comparison_checks() carries type_changed_cols attribute", {
+  curr                 <- make_curr()
+  curr$account_balance <- c("high", "low", "med", "low", "high")
+  res <- run_comparison_checks(curr, make_prev(), base_config())
+  tc  <- attr(res, "type_changed_cols")
+  expect_true(any(grepl("account_balance", tc)))
 })

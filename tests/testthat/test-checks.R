@@ -332,3 +332,134 @@ test_that("check_schema_contract() returns empty list when expected_columns not 
   res <- check_schema_contract(make_df(), base_config())
   expect_equal(length(res), 0)
 })
+
+# -- QC-09 observed capping (RC-04) --------------------------------------------
+
+test_that("check_allowed_values() caps observed at 20 values with suffix", {
+  df  <- data.frame(x = paste0("v", 1:30), stringsAsFactors = FALSE)
+  cfg <- base_config(list(column_rules = list(x = list(allowed_values = c("v1")))))
+  res <- check_allowed_values(df, cfg)
+  expect_match(res[[1]]$observed, "and \\d+ more")
+})
+
+# -- QC-11 warn_non_numeric_rate (C-01) ----------------------------------------
+
+test_that("check_non_numeric() emits WARN when rate is between warn and fail thresholds", {
+  # 10/11 = 90.9% parseable → inferred as numeric; 1/11 non-numeric → WARN
+  df   <- data.frame(x = c("1","2","3","4","5","6","7","8","9","10","bad"),
+                     stringsAsFactors = FALSE)
+  cfg  <- base_config(list(rules = list(
+    max_missing_rate = 0.05, max_non_numeric_rate = 0.30,
+    warn_non_numeric_rate = 0.0, type_inference_threshold = 0.90
+  )))
+  res  <- check_non_numeric(df, cfg)
+  xres <- Filter(\(r) r$column == "x", res)
+  expect_equal(xres[[1]]$status, "WARN")
+})
+
+test_that("check_non_numeric() emits PASS when rate equals zero with warn threshold 0.0", {
+  df  <- data.frame(x = c("1", "2", "3"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(rules = list(
+    max_missing_rate = 0.05, max_non_numeric_rate = 0.01,
+    warn_non_numeric_rate = 0.0, type_inference_threshold = 0.90
+  )))
+  res  <- check_non_numeric(df, cfg)
+  xres <- Filter(\(r) r$column == "x", res)
+  expect_equal(xres[[1]]$status, "PASS")
+})
+
+# -- QC-12 composite key (M-03/B-03) ------------------------------------------
+
+test_that("check_key_uniqueness() detects composite key duplicates", {
+  df  <- data.frame(
+    a = c("X", "X", "X"),
+    b = c("1", "2", "1"),   # (X,1) appears twice
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(key_columns = c("a", "b")))
+  res <- check_key_uniqueness(df, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+  expect_match(res[[1]]$check_id, "QC-12")
+})
+
+test_that("check_key_uniqueness() PASS for unique composite key", {
+  df  <- data.frame(a = c("X","X","Y"), b = c("1","2","1"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(key_columns = c("a", "b")))
+  res <- check_key_uniqueness(df, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+})
+
+test_that("check_key_uniqueness() reports missing composite key column", {
+  df  <- data.frame(a = c("X"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(key_columns = c("a", "missing_col")))
+  res <- check_key_uniqueness(df, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+  expect_match(res[[1]]$observed, "missing_col")
+})
+
+# -- QC-14 max_row_count (M-08) ------------------------------------------------
+
+test_that("check_min_row_count() emits FAIL when rows exceed max_row_count", {
+  df  <- data.frame(x = 1:10, stringsAsFactors = FALSE)
+  cfg <- base_config(list(rules = list(min_row_count = 0, max_row_count = 5)))
+  res <- check_min_row_count(df, cfg)
+  max_r <- Filter(\(r) r$check_name == "Maximum row count", res)
+  expect_equal(max_r[[1]]$status, "FAIL")
+})
+
+test_that("check_min_row_count() PASS when rows within max_row_count", {
+  df  <- data.frame(x = 1:5, stringsAsFactors = FALSE)
+  cfg <- base_config(list(rules = list(min_row_count = 0, max_row_count = 10)))
+  res <- check_min_row_count(df, cfg)
+  max_r <- Filter(\(r) r$check_name == "Maximum row count", res)
+  expect_equal(max_r[[1]]$status, "PASS")
+})
+
+# -- QC-15 outlier detection (M-06) --------------------------------------------
+
+test_that("check_outliers() returns PASS when no threshold configured", {
+  df  <- make_df()
+  cfg <- base_config()
+  res <- check_outliers(df, cfg)
+  statuses <- vapply(res, `[[`, character(1), "status")
+  expect_true(all(statuses == "PASS"))
+})
+
+test_that("check_outliers() detects Z-score outliers", {
+  outlier_val <- 10000
+  df  <- data.frame(
+    x = as.character(c(1, 2, 3, 2, 1, outlier_val)),
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(rules = list(
+    max_missing_rate = 0.05, max_non_numeric_rate = 0.01,
+    type_inference_threshold = 0.90, max_z_score = 2.0
+  )))
+  res  <- check_outliers(df, cfg)
+  xres <- Filter(\(r) r$column == "x", res)
+  expect_equal(xres[[1]]$status, "FAIL")
+})
+
+test_that("check_outliers() detects IQR outliers", {
+  df  <- data.frame(
+    x = as.character(c(1, 2, 3, 2, 1, 999)),
+    stringsAsFactors = FALSE
+  )
+  cfg <- base_config(list(rules = list(
+    max_missing_rate = 0.05, max_non_numeric_rate = 0.01,
+    type_inference_threshold = 0.90, iqr_fence_multiplier = 1.5
+  )))
+  res  <- check_outliers(df, cfg)
+  xres <- Filter(\(r) r$column == "x", res)
+  expect_equal(xres[[1]]$status, "FAIL")
+})
+
+test_that("check_outliers() skips non-numeric columns", {
+  df  <- data.frame(cat = c("a", "b", "c", "d", "e"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(rules = list(
+    max_missing_rate = 0.05, max_non_numeric_rate = 0.01,
+    type_inference_threshold = 0.90, max_z_score = 2.0
+  )))
+  res <- check_outliers(df, cfg)
+  expect_length(res, 0)  # no results for character column
+})
