@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 # End-to-end: run_dq_check() against fixture files in a temp config directory.
 # This test wires up real YAML configs and calls the full pipeline.

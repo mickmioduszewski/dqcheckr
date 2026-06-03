@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 # Tests that render_report() only writes to the configured output_dir
 # (never to the working directory or the package template directory).

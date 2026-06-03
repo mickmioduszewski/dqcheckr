@@ -14,11 +14,4 @@
 #'
 #' @keywords internal
 #' @noRd
-#' @importFrom kableExtra kbl kable_styling cell_spec
-#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_col labs
-#' @importFrom ggplot2 scale_fill_manual theme_minimal
-#' @importFrom gridExtra grid.arrange
-#' @importFrom dplyr %>%
-#' @importFrom tidyr pivot_longer
-#' @importFrom knitr raw_html
 "_PACKAGE"

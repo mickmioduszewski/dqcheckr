@@ -1,23 +1,4 @@
-library(testthat)
-library(dqcheckr)
 
-base_config <- function() {
-  list(
-    format = "csv",
-    rules = list(
-      max_missing_rate               = 0.05,
-      max_non_numeric_rate           = 0.01,
-      min_row_count                  = 0,
-      max_row_count_change_pct       = 0.10,
-      max_numeric_mean_shift_pct     = 0.20,
-      max_missing_rate_change_pp     = 2.0,
-      max_non_numeric_rate_change_pp = 1.0
-    ),
-    column_rules     = list(),
-    key_columns      = NULL,
-    expected_columns = NULL
-  )
-}
 
 make_curr <- function() {
   data.frame(
@@ -171,8 +152,9 @@ test_that("compare_non_numeric_rate() returns PASS when rate unchanged", {
 })
 
 test_that("compare_non_numeric_rate() returns WARN when rate increases significantly", {
-  curr                 <- make_curr()
-  curr$account_balance <- c("N/A", "unknown", "bad", "1000", "2000")
+  # Need t_curr = "numeric": replicate to 10 rows so 9/10 parseable meets 90% threshold
+  curr <- make_curr()[rep(1:5, 2), ]
+  curr$account_balance[1] <- "bad"
   res <- compare_non_numeric_rate(curr, make_prev(), base_config())
   bal <- Filter(\(r) r$column == "account_balance", res)
   expect_equal(bal[[1]]$status, "WARN")

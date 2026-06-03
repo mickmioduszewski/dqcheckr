@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 # -- list_snapshots() ----------------------------------------------------------
 
@@ -240,16 +238,3 @@ test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)"
                                 "numeric_mean_exceeds"])
 })
 
-# -- dqcheckr:::read_pass_rate_trend() ----------------------------------------------------
-
-test_that("dqcheckr:::read_pass_rate_trend() returns one row per snapshot", {
-  db    <- make_drift_db(3)
-  trend <- dqcheckr:::read_pass_rate_trend(db, "test_ds", n = 10)
-  expect_equal(nrow(trend), 3L)
-  expect_true(all(c("snapshot_id", "run_timestamp", "pass_rate") %in% names(trend)))
-})
-
-test_that("dqcheckr:::read_pass_rate_trend() returns empty data frame for missing db", {
-  res <- dqcheckr:::read_pass_rate_trend(tempfile(fileext = ".sqlite"), "ds")
-  expect_equal(nrow(res), 0L)
-})

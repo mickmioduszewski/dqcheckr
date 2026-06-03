@@ -166,7 +166,7 @@ compare_snapshots <- function(dataset_name,
   html_path <- NULL
 
   if (report) {
-    ts        <- format(Sys.time(), "%Y%m%d_%H%M%S")
+    ts        <- format(Sys.time(), "%Y%m%d_%H%M%S", tz = "UTC")
     base_name <- sprintf("drift_%s_%s", dataset_name, ts)
     dir.create(report_dir, showWarnings = FALSE, recursive = TRUE)
     html_path <- file.path(report_dir, paste0(base_name, ".html"))
@@ -183,31 +183,6 @@ compare_snapshots <- function(dataset_name,
     utils::browseURL(html_path)
 
   invisible(drift)
-}
-
-#' Read PASS rate trend for a dataset
-#' @keywords internal
-#' @noRd
-read_pass_rate_trend <- function(db_path, dataset_name, n = 10) {
-  empty <- data.frame(snapshot_id = integer(), run_timestamp = character(),
-                      pass_rate = numeric(), stringsAsFactors = FALSE)
-  if (!file.exists(db_path)) return(empty)
-  tryCatch({
-    con <- .sqlite_connect(db_path)
-    on.exit(DBI::dbDisconnect(con))
-    if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
-    DBI::dbGetQuery(con,
-      "SELECT s.id AS snapshot_id, s.run_timestamp,
-              SUM(CASE WHEN cs.severity_on_breach IS NULL THEN 1.0 ELSE 0.0 END) /
-              COUNT(*) AS pass_rate
-       FROM snapshots s
-       JOIN column_snapshots cs ON cs.snapshot_id = s.id
-       WHERE s.dataset_name = ?
-       GROUP BY s.id, s.run_timestamp
-       ORDER BY s.id
-       LIMIT ?",
-      list(dataset_name, as.integer(n)))
-  }, error = function(e) empty)
 }
 
 # --- Internal helpers ----------------------------------------------------------

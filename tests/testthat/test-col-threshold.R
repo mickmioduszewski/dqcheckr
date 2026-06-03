@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 base_cfg <- function(rules = list(), column_rules = list()) {
   list(rules = rules, column_rules = column_rules, column_types = list())

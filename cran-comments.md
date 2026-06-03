@@ -4,15 +4,15 @@
 
 ## Test environments
 
-* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local)
-* win-builder: R-devel (2026-05-31 r90090, x86_64-w64-mingw32): 0 errors | 0 warnings | 1 note
+* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local): 0 errors | 0 warnings | 1 note
+* win-builder: R-devel x86_64-w64-mingw32 (2026-05-31 r90090 ucrt), Windows Server 2022: 0 errors | 0 warnings | 0 notes
 
 ## Notes
 
-* "Package has a VignetteBuilder field but no prebuilt vignette index."
-  The package uses Quarto for vignette rendering. Quarto may not be available
-  on all check servers. The vignettes build correctly in environments where the
-  Quarto CLI is installed.
+* "Skipping checking HTML validation: 'tidy' doesn't look like recent enough
+  HTML Tidy."
+  This is a local tooling issue (outdated tidy binary on the check machine).
+  It does not appear on CRAN's check servers.
 
 ## Previous CRAN submission errors (v0.1.2) — addressed in v0.2.0
 

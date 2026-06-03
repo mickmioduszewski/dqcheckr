@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 # -- dq_result() ---------------------------------------------------------------
 

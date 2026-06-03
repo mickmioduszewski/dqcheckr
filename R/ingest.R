@@ -81,6 +81,8 @@ read_dataset <- function(path, config) {
       readr::read_delim(
         path,
         delim      = delim,
+        col_names  = config$col_names  %||% TRUE,
+        quote      = config$quote_char %||% '"',
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),
         show_col_types = FALSE

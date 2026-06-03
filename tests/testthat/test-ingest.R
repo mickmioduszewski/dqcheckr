@@ -1,5 +1,3 @@
-library(testthat)
-library(dqcheckr)
 
 fix <- function(f) testthat::test_path("fixtures", f)
 
@@ -41,7 +39,8 @@ test_that("read_dataset() preserves NA as NA after trim", {
 
 test_that("read_dataset() stops on nonexistent file", {
   cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
-  expect_error(read_dataset("/nonexistent/path/file.csv", cfg))
+  expect_error(read_dataset("/nonexistent/path/file.csv", cfg),
+               regexp = "Failed to parse")
 })
 
 test_that("read_dataset() stops on unknown format", {

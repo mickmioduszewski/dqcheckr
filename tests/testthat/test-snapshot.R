@@ -1,28 +1,4 @@
-library(testthat)
-library(dqcheckr)
 
-make_df <- function() {
-  data.frame(
-    id              = paste0("ID00", 1:5),
-    account_balance = c("15000", "8500", "0", "250000", "1200"),
-    stringsAsFactors = FALSE
-  )
-}
-
-base_config <- function() {
-  list(
-    format       = "csv",
-    rules        = list(
-      max_missing_rate     = 0.05,
-      max_non_numeric_rate = 0.01,
-      min_row_count        = 0
-    ),
-    column_rules     = list(),
-    column_types     = list(),
-    key_columns      = NULL,
-    expected_columns = NULL
-  )
-}
 
 make_results <- function() {
   list(
@@ -123,7 +99,7 @@ test_that("write_snapshot() returns a positive integer snapshot_id", {
   db  <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   sid <- write_snapshot(db, "test_ds", "file.csv",
-                        make_df(), make_results(), list(), list(),
+                        make_snapshot_df(), make_results(), list(), list(),
                         base_config())
   expect_true(is.numeric(sid) || is.integer(sid))
   expect_true(sid >= 1)
@@ -133,7 +109,7 @@ test_that("write_snapshot() inserts one row into snapshots table", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   write_snapshot(db, "test_ds", "file.csv",
-                 make_df(), make_results(), list(), list(),
+                 make_snapshot_df(), make_results(), list(), list(),
                  base_config())
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -145,7 +121,7 @@ test_that("write_snapshot() inserts column_snapshots rows", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   write_snapshot(db, "test_ds", "file.csv",
-                 make_df(), make_results(), list(), list(),
+                 make_snapshot_df(), make_results(), list(), list(),
                  base_config())
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -156,7 +132,7 @@ test_that("write_snapshot() inserts column_snapshots rows", {
 test_that("write_snapshot() stores comparison_mode correctly", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
-  write_snapshot(db, "ds", "f.csv", make_df(), make_results(), list(), list(),
+  write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
                  base_config(), comparison_mode = "single")
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -167,7 +143,7 @@ test_that("write_snapshot() stores comparison_mode correctly", {
 test_that("write_snapshot() stores render_status as 'success' initially", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
-  write_snapshot(db, "ds", "f.csv", make_df(), make_results(), list(), list(),
+  write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
                  base_config())
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -178,7 +154,7 @@ test_that("write_snapshot() stores render_status as 'success' initially", {
 test_that(".mark_render_failed() updates render_status to 'failed'", {
   db  <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
-  sid <- write_snapshot(db, "ds", "f.csv", make_df(), make_results(), list(), list(),
+  sid <- write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
                         base_config())
   dqcheckr:::.mark_render_failed(db, sid)
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
@@ -190,7 +166,7 @@ test_that(".mark_render_failed() updates render_status to 'failed'", {
 test_that("write_snapshot() stores UTC timestamp in ISO-8601 format", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
-  write_snapshot(db, "ds", "f.csv", make_df(), make_results(), list(), list(),
+  write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
                  base_config())
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
@@ -205,7 +181,7 @@ test_that("write_snapshot() emits warning but does not stop on write error", {
   impossible <- file.path(fake_dir, "impossible.sqlite")
   expect_warning(
     write_snapshot(impossible, "ds", "f.csv",
-                   make_df(), make_results(), list(), list(),
+                   make_snapshot_df(), make_results(), list(), list(),
                    base_config()),
     regexp = "SQLite"
   )
@@ -273,9 +249,9 @@ test_that("read_recent_snapshots() returns empty data frame when db does not exi
 test_that("read_recent_snapshots() returns only rows for the requested dataset", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
-  write_snapshot(db, "ds_a", "a.csv", make_df(),
+  write_snapshot(db, "ds_a", "a.csv", make_snapshot_df(),
                  make_results(), list(), list(), base_config())
-  write_snapshot(db, "ds_b", "b.csv", make_df(),
+  write_snapshot(db, "ds_b", "b.csv", make_snapshot_df(),
                  make_results(), list(), list(), base_config())
   res <- read_recent_snapshots(db, "ds_a")
   expect_equal(nrow(res), 1L)
@@ -286,7 +262,7 @@ test_that("read_recent_snapshots() returns at most n rows", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   for (i in 1:5)
-    write_snapshot(db, "ds_a", paste0("f", i, ".csv"), make_df(),
+    write_snapshot(db, "ds_a", paste0("f", i, ".csv"), make_snapshot_df(),
                    make_results(), list(), list(), base_config())
   res <- read_recent_snapshots(db, "ds_a", n = 3)
   expect_equal(nrow(res), 3L)

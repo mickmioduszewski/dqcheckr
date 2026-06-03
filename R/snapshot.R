@@ -83,19 +83,17 @@ init_snapshot_db <- function(db_path) {
 #' @noRd
 #' @importFrom stats sd
 compute_col_stats <- function(df, config) {
-  rows <- list()
-
-  for (col in names(df)) {
-    x         <- df[[col]]
-    col_type  <- resolve_col_type(col, x, config)
-    non_empty <- x[!is.na(x) & x != ""]
+  col_frames <- lapply(names(df), function(col) {
+    x          <- df[[col]]
+    col_type   <- resolve_col_type(col, x, config)
+    non_empty  <- x[!is.na(x) & x != ""]
     miss_count <- sum(is.na(x) | x == "")
     miss_rate  <- miss_count / nrow(df)
     dist_count <- length(unique(non_empty))
 
     miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
 
-    rows <- c(rows, list(
+    stat_rows <- list(
       data.frame(column_name = col, dq_check = "inferred_type",
                  value = col_type, threshold = NA_character_,
                  severity_on_breach = NA_character_, stringsAsFactors = FALSE),
@@ -109,7 +107,7 @@ compute_col_stats <- function(df, config) {
       data.frame(column_name = col, dq_check = "distinct_count",
                  value = as.character(dist_count), threshold = NA_character_,
                  severity_on_breach = NA_character_, stringsAsFactors = FALSE)
-    ))
+    )
 
     if (col_type == "numeric") {
       vals <- suppressWarnings(as.numeric(x))
@@ -119,7 +117,7 @@ compute_col_stats <- function(df, config) {
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
       nn_threshold <- col_threshold(config, col, "max_non_numeric_rate", 0.01)
 
-      rows <- c(rows, list(
+      stat_rows <- c(stat_rows, list(
         data.frame(column_name = col, dq_check = "numeric_parseable_mean",
                    value = if (length(nn) > 0) as.character(mean(nn)) else NA_character_,
                    threshold = NA_character_, severity_on_breach = NA_character_,
@@ -145,9 +143,11 @@ compute_col_stats <- function(df, config) {
                    severity_on_breach = "FAIL", stringsAsFactors = FALSE)
       ))
     }
-  }
 
-  do.call(rbind, rows)
+    do.call(rbind, stat_rows)
+  })
+
+  do.call(rbind, col_frames)
 }
 
 #' Write a run snapshot to the SQLite database

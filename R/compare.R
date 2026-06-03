@@ -258,9 +258,7 @@ compare_non_numeric_rate <- function(df_current, df_previous, config) {
   for (col in common_cols) {
     t_curr <- resolve_col_type(col, df_current[[col]],  config)
     t_prev <- resolve_col_type(col, df_previous[[col]], config)
-    if (!t_curr %in% c("numeric", "character") &&
-        !t_prev %in% c("numeric", "character")) next
-    if (t_curr == "character" && t_prev == "character") next
+    if (t_curr != "numeric" || t_prev != "numeric") next
 
     .nn_rate <- function(x) {
       ne <- x[!is.na(x) & x != ""]

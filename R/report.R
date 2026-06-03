@@ -19,7 +19,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
   file_path  <- normalizePath(file_path,  mustWork = FALSE)
 
-  ts    <- format(Sys.time(), "%Y%m%d_%H%M%S")
+  ts    <- format(Sys.time(), "%Y%m%d_%H%M%S", tz = "UTC")
   fname <- sprintf("%s_%s.html", dataset_name, ts)
   out   <- file.path(output_dir, fname)
 
