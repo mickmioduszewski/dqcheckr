@@ -21,7 +21,8 @@
 list_snapshots <- function(dataset_name = NULL,
                            db_path = NULL) {
   if (is.null(db_path))
-    rlang::abort('`db_path` must be supplied (e.g. db_path = "data/snapshots.sqlite")')
+    rlang::abort('`db_path` must be supplied (e.g. db_path = "data/snapshots.sqlite")',
+                 class = c("dqcheckr_invalid_argument", "dqcheckr_error"))
   empty <- data.frame(
     id = integer(), dataset_name = character(), file_name = character(),
     run_timestamp = character(), row_count = integer(),
@@ -31,7 +32,7 @@ list_snapshots <- function(dataset_name = NULL,
 
   tryCatch({
     con <- .sqlite_connect(db_path)
-    on.exit(DBI::dbDisconnect(con))
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
     if (!"snapshots" %in% DBI::dbListTables(con)) return(invisible(empty))
 
     if (is.null(dataset_name)) {
@@ -134,10 +135,11 @@ compare_snapshots <- function(dataset_name,
     db_path <- normalizePath(thresholds$snapshot_db, mustWork = FALSE)
 
   if (!file.exists(db_path))
-    rlang::abort(paste0("Snapshot database not found: ", db_path))
+    rlang::abort(paste0("Snapshot database not found: ", db_path),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   con <- .sqlite_connect(db_path)
-  on.exit(DBI::dbDisconnect(con))
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
 
   snaps <- DBI::dbGetQuery(con,
     "SELECT * FROM snapshots WHERE dataset_name = ? ORDER BY id",
@@ -147,18 +149,19 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(sprintf(
       "Need at least 2 snapshots for '%s'. Found %d.",
       dataset_name, nrow(snaps)
-    ))
+    ), class = c("dqcheckr_not_found", "dqcheckr_error"))
 
   id_prev <- snapshot_id_prev %||% snaps$id[nrow(snaps) - 1]
   id_curr <- snapshot_id_curr %||% snaps$id[nrow(snaps)]
 
   if (id_prev == id_curr)
-    rlang::abort("snapshot_id_prev and snapshot_id_curr must differ.")
+    rlang::abort("snapshot_id_prev and snapshot_id_curr must differ.",
+                 class = c("dqcheckr_invalid_argument", "dqcheckr_error"))
 
   if (id_prev > id_curr)
     rlang::abort(
       "snapshot_id_prev must be older than snapshot_id_curr (lower ID first).",
-      class = "dqcheckr_error"
+      class = c("dqcheckr_invalid_argument", "dqcheckr_error")
     )
 
   drift <- .compute_drift(con, dataset_name, id_prev, id_curr, thresholds)
@@ -190,7 +193,8 @@ compare_snapshots <- function(dataset_name,
 .load_drift_thresholds <- function(config_dir = ".") {
   cfg_file <- file.path(config_dir, "dqcheckr.yml")
   if (!file.exists(cfg_file))
-    rlang::abort(paste0("Global config not found: ", cfg_file))
+    rlang::abort(paste0("Global config not found: ", cfg_file),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   cfg <- yaml::read_yaml(cfg_file)
   dr  <- cfg$default_rules %||% list()
@@ -223,9 +227,11 @@ compare_snapshots <- function(dataset_name,
   snap_curr <- snaps[snaps$id == id_curr, ]
 
   if (nrow(snap_prev) == 0)
-    rlang::abort(sprintf("Snapshot ID %d not found.", id_prev))
+    rlang::abort(sprintf("Snapshot ID %d not found.", id_prev),
+                 class = c("dqcheckr_not_found", "dqcheckr_error"))
   if (nrow(snap_curr) == 0)
-    rlang::abort(sprintf("Snapshot ID %d not found.", id_curr))
+    rlang::abort(sprintf("Snapshot ID %d not found.", id_curr),
+                 class = c("dqcheckr_not_found", "dqcheckr_error"))
 
   stats_prev <- .get_col_stats(con, id_prev)
   stats_curr <- .get_col_stats(con, id_curr)
@@ -357,7 +363,8 @@ compare_snapshots <- function(dataset_name,
 .write_drift_html_report <- function(drift, outfile) {
   template <- system.file("templates", "drift_report.qmd", package = "dqcheckr")
   if (!nzchar(template))
-    rlang::abort("Drift report template not found in package installation.")
+    rlang::abort("Drift report template not found in package installation.",
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
   if (!quarto::quarto_available()) {
     warning("Quarto CLI not found -- HTML drift report skipped. Install from https://quarto.org",
             call. = FALSE)

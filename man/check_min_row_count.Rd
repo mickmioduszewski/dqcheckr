@@ -24,13 +24,13 @@ A list of \code{\link{dq_result}} objects (one to three entries
 Runs up to three sub-checks, each returning a separate
 \code{\link{dq_result}}:
 \enumerate{
-  \item \strong{File size} — only when \code{file_path} is supplied and
+  \item \strong{File size} -- only when \code{file_path} is supplied and
     \code{max_file_size_mb} is configured in \code{rules}: FAIL if the file
     exceeds the size limit.
-  \item \strong{Minimum row count} — FAIL if \code{row_count <
+  \item \strong{Minimum row count} -- FAIL if \code{row_count <
     min_row_count}. Skipped (PASS with a note) when \code{min_row_count}
     is \code{0}.
-  \item \strong{Maximum row count} — only when \code{max_row_count} is
+  \item \strong{Maximum row count} -- only when \code{max_row_count} is
     configured in \code{rules}: FAIL if \code{row_count > max_row_count}.
 }
 }

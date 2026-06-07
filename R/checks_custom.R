@@ -10,7 +10,7 @@
 #' \code{\link{dq_result}} is explicitly injected and can be called without
 #' qualification. All other dqcheckr exports (e.g. \code{resolve_col_type},
 #' \code{infer_col_type}) must be qualified: \code{dqcheckr::resolve_col_type()}.
-#' Any error — missing file, undefined function, or runtime failure — stops the
+#' Any error -- missing file, undefined function, or runtime failure -- stops the
 #' run with a clear message.
 #'
 #' @param df A data frame. The current delivery.
@@ -32,7 +32,8 @@ run_custom_checks <- function(df, config) {
   if (is.null(path)) return(list())
 
   if (!file.exists(path)) {
-    rlang::abort(paste0("Custom checks file not found: ", path))
+    rlang::abort(paste0("Custom checks file not found: ", path),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
   }
 
   env <- new.env(parent = baseenv())
@@ -41,22 +42,26 @@ run_custom_checks <- function(df, config) {
     source(path, local = env),
     error = function(e)
       rlang::abort(paste0("Failed to source custom checks file '", path, "': ",
-                          conditionMessage(e)))
+                          conditionMessage(e)),
+                   class = c("dqcheckr_parse_error", "dqcheckr_error"))
   )
 
   if (!exists("custom_checks", envir = env, inherits = FALSE)) {
-    rlang::abort(paste0("custom_checks() function not defined in: ", path))
+    rlang::abort(paste0("custom_checks() function not defined in: ", path),
+                 class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
   }
 
   results <- tryCatch(
     env$custom_checks(df),
     error = function(e)
-      rlang::abort(paste0("custom_checks() runtime error: ", conditionMessage(e)))
+      rlang::abort(paste0("custom_checks() runtime error: ", conditionMessage(e)),
+                   class = c("dqcheckr_custom_check_runtime_error", "dqcheckr_error"))
   )
 
   if (!is.list(results)) {
     rlang::abort(paste0("custom_checks() must return a list of dq_result objects, got: ",
-                        class(results)))
+                        class(results)),
+                 class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
   }
 
   results

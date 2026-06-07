@@ -34,6 +34,7 @@ dq_result <- function(check_id, check_name, column = NA_character_,
   if (is.null(status) || !status %in% valid_statuses) {
     rlang::abort(sprintf("status must be one of: %s (got: %s)",
                          paste(valid_statuses, collapse = ", "), status),
+                 class = c("dqcheckr_invalid_argument", "dqcheckr_error"),
                  .internal = FALSE)
   }
   list(
@@ -73,9 +74,11 @@ load_config <- function(dataset_name, config_dir) {
   dataset_path <- file.path(config_dir, paste0(dataset_name, ".yml"))
 
   if (!file.exists(global_path))
-    rlang::abort(paste0("Global config not found: ", global_path))
+    rlang::abort(paste0("Global config not found: ", global_path),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
   if (!file.exists(dataset_path))
-    rlang::abort(paste0("Dataset config not found: ", dataset_path))
+    rlang::abort(paste0("Dataset config not found: ", dataset_path),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   global_cfg  <- yaml::read_yaml(global_path)
   dataset_cfg <- yaml::read_yaml(dataset_path)
@@ -100,7 +103,7 @@ load_config <- function(dataset_name, config_dir) {
       rlang::abort(sprintf(
         "Invalid column_types value(s): %s. Must be one of: %s",
         paste(bad, collapse = ", "), paste(valid_types, collapse = ", ")
-      ))
+      ), class = c("dqcheckr_invalid_config", "dqcheckr_error"))
   }
 
   dataset_cfg

@@ -11,7 +11,7 @@
 init_snapshot_db <- function(db_path) {
   dir.create(dirname(db_path), recursive = TRUE, showWarnings = FALSE)
   con <- .sqlite_connect(db_path)
-  on.exit(DBI::dbDisconnect(con))
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
 
   DBI::dbExecute(con, "
     CREATE TABLE IF NOT EXISTS snapshots (
@@ -71,7 +71,7 @@ init_snapshot_db <- function(db_path) {
 .mark_render_failed <- function(db_path, snapshot_id) {
   tryCatch({
     con <- .sqlite_connect(db_path)
-    on.exit(DBI::dbDisconnect(con))
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
     DBI::dbExecute(con,
       "UPDATE snapshots SET render_status = 'failed' WHERE id = ?",
       list(snapshot_id))
@@ -160,7 +160,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
   tryCatch({
     init_snapshot_db(db_path)
     con <- .sqlite_connect(db_path)
-    on.exit(DBI::dbDisconnect(con))
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
 
     all_results <- c(qc_results, cp_results, custom_results)
     statuses    <- vapply(all_results, `[[`, character(1), "status")
@@ -289,7 +289,7 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
 
   tryCatch({
     con <- .sqlite_connect(db_path)
-    on.exit(DBI::dbDisconnect(con))
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
     if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
     DBI::dbGetQuery(con,
       "SELECT * FROM snapshots

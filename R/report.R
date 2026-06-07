@@ -13,7 +13,8 @@ render_report <- function(dataset_name, file_name, file_path, df,
 
   template <- system.file("templates", "report.qmd", package = "dqcheckr")
   if (!nzchar(template))
-    rlang::abort("Report template not found in package installation.")
+    rlang::abort("Report template not found in package installation.",
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
@@ -33,7 +34,10 @@ render_report <- function(dataset_name, file_name, file_path, df,
     dataset_name     = dataset_name,
     file_name        = file_name,
     file_path        = file_path,
-    run_timestamp    = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    # Intentionally local time (tz = "") -- this is the "Run time" shown to
+    # the user in the report (report.qmd:71), unlike the UTC timestamps used
+    # for filename slugs and snapshot DB keys elsewhere in this file.
+    run_timestamp    = format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = ""),
     df               = df,
     qc_results       = qc_results,
     cp_results       = cp_results,

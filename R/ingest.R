@@ -22,12 +22,14 @@
 detect_files <- function(config) {
   if (!is.null(config$current_file)) {
     if (!file.exists(config$current_file)) {
-      rlang::abort(paste0("current_file not found: ", config$current_file))
+      rlang::abort(paste0("current_file not found: ", config$current_file),
+                   class = c("dqcheckr_missing_file", "dqcheckr_error"))
     }
     previous <- NULL
     if (!is.null(config$previous_file)) {
       if (!file.exists(config$previous_file)) {
-        rlang::abort(paste0("previous_file not found: ", config$previous_file))
+        rlang::abort(paste0("previous_file not found: ", config$previous_file),
+                     class = c("dqcheckr_missing_file", "dqcheckr_error"))
       }
       previous <- config$previous_file
     }
@@ -36,12 +38,14 @@ detect_files <- function(config) {
 
   folder <- config$folder
   if (is.null(folder) || !dir.exists(folder)) {
-    rlang::abort(paste0("Folder not found: ", folder %||% "(NULL)"))
+    rlang::abort(paste0("Folder not found: ", folder %||% "(NULL)"),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
   }
 
   files <- list.files(folder, full.names = TRUE)
   if (length(files) == 0) {
-    rlang::abort(paste0("No files found in folder: ", folder))
+    rlang::abort(paste0("No files found in folder: ", folder),
+                 class = c("dqcheckr_missing_file", "dqcheckr_error"))
   }
 
   files <- files[order(file.mtime(files), basename(files), decreasing = TRUE)]
@@ -87,11 +91,13 @@ read_dataset <- function(path, config) {
         locale     = readr::locale(encoding = enc),
         show_col_types = FALSE
       ),
-      error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)))
+      error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)),
+                                       class = c("dqcheckr_parse_error", "dqcheckr_error"))
     )
   } else if (fmt == "fwf") {
     if (is.null(config$fwf_widths)) {
-      rlang::abort("fwf_widths must be set in config for fixed-width files")
+      rlang::abort("fwf_widths must be set in config for fixed-width files",
+                   class = c("dqcheckr_invalid_config", "dqcheckr_error"))
     }
     df <- tryCatch(
       readr::read_fwf(
@@ -105,10 +111,12 @@ read_dataset <- function(path, config) {
         skip       = config$fwf_skip %||% 0L,
         show_col_types = FALSE
       ),
-      error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)))
+      error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)),
+                                       class = c("dqcheckr_parse_error", "dqcheckr_error"))
     )
   } else {
-    rlang::abort(paste0("Unsupported format: '", config$format, "'. Must be 'csv' or 'fwf'."))
+    rlang::abort(paste0("Unsupported format: '", config$format, "'. Must be 'csv' or 'fwf'."),
+                 class = c("dqcheckr_invalid_config", "dqcheckr_error"))
   }
 
   df <- as.data.frame(df, stringsAsFactors = FALSE)
