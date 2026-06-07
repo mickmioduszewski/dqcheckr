@@ -1,21 +1,27 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
 
 This is a resubmission (v0.2.1, a patch release over the accepted v0.2.0).
 
 ## Test environments
 
-* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local): 0 errors | 0 warnings | 0 notes
-* win-builder: R-devel, Windows Server 2022 (to be re-run before submission;
-  results will be attached here)
+* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
+  `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
+  0 errors | 0 warnings | 1 note
+* win-builder: R-devel, Windows Server 2022 (submitted; results pending —
+  to be attached here once the results email arrives)
+* win-builder: R-release, Windows Server 2022 (submitted; results pending —
+  to be attached here once the results email arrives)
 
 ## Notes
 
-None outstanding. The previous local-only NOTE about an outdated 'tidy'
-binary on the check machine ("Skipping checking HTML validation: 'tidy'
-doesn't look like recent enough HTML Tidy") does not reproduce in this
-check run and does not appear on CRAN's check servers in any case.
+* "Skipping checking HTML validation: 'tidy' doesn't look like recent enough
+  HTML Tidy."
+  This is a local tooling issue (outdated `tidy` binary on the check
+  machine, used only for validating the rendered HTML manual). It does not
+  appear on CRAN's check servers and has appeared identically in every
+  local check of this package since v0.2.0.
 
 ## What changed since v0.2.0
 
