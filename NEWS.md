@@ -1,3 +1,26 @@
+# dqcheckr 0.2.1
+
+## Bug fixes
+
+* Report and drift filename slugs now use UTC consistently, matching the
+  UTC timestamps stored in the snapshot DB.
+* Removed redundant `@importFrom` declarations for template-only packages.
+* Removed dead `read_pass_rate_trend()` function from `drift.R`.
+* `CP-07` type-change comparison now uses a single guard so it only runs the
+  non-numeric rate comparison when both snapshots classify the column as
+  numeric — eliminates spurious `WARN`s on type-changed columns.
+* `read_dataset()` now forwards the `col_names` config key to
+  `readr::read_delim()`, so headerless CSVs are read correctly.
+* `read_dataset()` now forwards the `quote_char` config key to
+  `readr::read_delim()` as `quote =`.
+
+## Internal
+
+* All `rlang::abort()` calls (27 sites) now carry a typed, two-level class
+  hierarchy (`c("<specific>", "dqcheckr_error")`), letting callers catch
+  errors broadly or precisely.
+* Consolidated shared test fixtures into `helper.R`.
+
 # dqcheckr 0.2.0
 
 ## New features
