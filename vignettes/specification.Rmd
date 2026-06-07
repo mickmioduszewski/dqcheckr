@@ -1,8 +1,8 @@
 ---
 title: "dqcheckr — Software Specification"
 author: "Mick Mioduszewski"
-date: "2026-06-01"
-version: "0.2.0"
+date: "2026-06-08"
+version: "0.2.1"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Software Specification}
@@ -14,9 +14,9 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 ```
 
-**Version**: 0.2.0
+**Version**: 0.2.1
 **Author**: Mick Mioduszewski
-**Date**: 2026-06-01
+**Date**: 2026-06-08
 
 ---
 
