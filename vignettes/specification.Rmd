@@ -5,7 +5,7 @@ date: "2026-06-08"
 version: "0.2.1"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Software Specification}
+  %\VignetteIndexEntry{dqcheckr — Software Specification}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

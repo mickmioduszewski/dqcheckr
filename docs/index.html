@@ -4,159 +4,134 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Automated Data Quality Checks for Recurring Dataset Deliveries • dqcheckr</title>
-<script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
-<link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Automated Data Quality Checks for Recurring Dataset Deliveries">
-<meta name="description" content="Automates quality verification of recurring external dataset deliveries. For each new file arrival, it runs single-snapshot quality checks, compares the file to the previous delivery, writes a self-contained HTML report via Quarto, and records summary statistics in a local SQLite database for long-term trend tracking using DuckDB. Supports CSV and fixed-width formats. Custom organisation-specific checks can be supplied as plain R files.">
-<meta property="og:description" content="Automates quality verification of recurring external dataset deliveries. For each new file arrival, it runs single-snapshot quality checks, compares the file to the previous delivery, writes a self-contained HTML report via Quarto, and records summary statistics in a local SQLite database for long-term trend tracking using DuckDB. Supports CSV and fixed-width formats. Custom organisation-specific checks can be supplied as plain R files.">
+<!-- jquery --><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script><!-- Bootstrap --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha256-bZLfwXAP04zRMK2BjiO8iu9pf4FbLqX6zitd+tIvLhE=" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha256-nuL8/2cJ5NDSSwnKD8VqreErSWHtnEP9E7AySL+1ev4=" crossorigin="anonymous"></script><!-- bootstrap-toc --><link rel="stylesheet" href="bootstrap-toc.css">
+<script src="bootstrap-toc.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
+<!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- pkgdown --><link href="pkgdown.css" rel="stylesheet">
+<script src="pkgdown.js"></script><meta property="og:title" content="Automated Data Quality Checks for Recurring Dataset Deliveries">
+<meta property="og:description" content="Automates quality verification of recurring external dataset deliveries. For each new file arrival, it runs single-snapshot quality checks, compares the file to the previous delivery, writes a self-contained HTML report, and records summary statistics in a local SQLite database for long-term trend tracking. Supports CSV and fixed-width formats. Custom organisation-specific checks can be supplied as plain R files.">
+<!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
+<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+<![endif]-->
 </head>
-<body>
-    <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
+<body data-spy="scroll" data-target="#toc">
 
 
-    <nav class="navbar navbar-expand-lg fixed-top bg-light" data-bs-theme="light" aria-label="Site navigation"><div class="container">
+    <div class="container template-home">
+      <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <span class="navbar-brand">
+        <a class="navbar-link" href="index.html">dqcheckr</a>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.1</span>
+      </span>
+    </div>
 
-    <a class="navbar-brand me-2" href="index.html">dqcheckr</a>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+<li>
+  <a href="articles/dqcheckr.html">Get started</a>
+</li>
+<li>
+  <a href="reference/index.html">Reference</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Articles
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
-
-
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="articles/dqcheckr.html">Get started</a></li>
-<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/specification.html">dqcheckr — Software Specification</a></li>
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+<li>
+      <a href="articles/specification.html">dqcheckr — Software Specification</a>
+    </li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
+<li>
+  <a href="news/index.html">Changelog</a>
+</li>
       </ul>
-<ul class="navbar-nav">
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/mickmioduszewski/dqcheckr/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
+<ul class="nav navbar-nav navbar-right">
+<li>
+  <a href="https://github.com/mickmioduszewski/dqcheckr/" class="external-link">
+    <span class="fab fa-github fa-lg"></span>
+
+  </a>
+</li>
       </ul>
 </div>
-
-
+<!--/.nav-collapse -->
   </div>
-</nav><div class="container template-home">
-<div class="row">
-  <main id="main" class="col-md-9"><div class="section level1">
+<!--/.container -->
+</div>
+<!--/.navbar -->
+
+
+
+      </header><div class="row">
+  <div class="contents col-md-9">
+<div class="section level1">
 <div class="page-header"><h1 id="dqcheckr">dqcheckr<a class="anchor" aria-label="anchor" href="#dqcheckr"></a>
 </h1></div>
 <p>Automated data quality checks for recurring dataset deliveries.</p>
-<p>For each new file arrival, <code>dqcheckr</code> runs single-snapshot quality checks, compares the file to the previous delivery, writes a self-contained HTML report, and records summary statistics in a local SQLite database for long-term trend tracking. Supports CSV and fixed-width (FWF) formats. Custom organisation-specific checks can be supplied as plain R files.</p>
+<p>For each new file arrival, <code>dqcheckr</code> runs a battery of quality checks, compares the file to the previous delivery, writes a self-contained HTML report, and records summary statistics in a local SQLite database so that quality trends can be tracked over time. Supports CSV and fixed-width formats. Custom organisation-specific checks can be supplied as plain R files.</p>
+<p>This is a CLI/API package — no UI. If you’d rather configure and run checks without writing R code, see <a href="https://github.com/mickmioduszewski/dqcheckrGUI" class="external-link">dqcheckrGUI</a>, a Shiny front-end built on top of this package.</p>
+<div class="section level2">
+<h2 id="what-it-does">What it does<a class="anchor" aria-label="anchor" href="#what-it-does"></a>
+</h2>
+<ul>
+<li>Runs single-snapshot quality checks (schema, missing rates, types, patterns, bounds, and more) against an incoming file</li>
+<li>Compares the file to the previous delivery (row/column differences, drift)</li>
+<li>Writes a self-contained HTML report for each run</li>
+<li>Records summary statistics in a SQLite snapshot database for long-term trend tracking and historical drift comparison</li>
+<li>Lets you supply your own organisation-specific checks as plain R files</li>
+</ul>
+</div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install from GitHub</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"dqcheckr"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># or, the development version from GitHub</span></span>
 <span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/install-deprecated.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"mickmioduszewski/dqcheckr"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
-<p>Create two YAML files in a <code>config/</code> directory:</p>
-<p><strong><code>config/dqcheckr.yml</code></strong> — global defaults:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">snapshot_db</span><span class="kw">:</span><span class="at"> output/snapshots.sqlite</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">report_output_dir</span><span class="kw">:</span><span class="at"> output/reports/</span></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">default_rules</span><span class="kw">:</span></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="at">  </span><span class="fu">type_inference_threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.90</span></span></code></pre></div>
-<p><strong><code>config/my_dataset.yml</code></strong> — dataset-specific settings:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">folder</span><span class="kw">:</span><span class="at"> data/</span></span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at"> csv</span></span></code></pre></div>
-<p>Then run:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<p>A data officer runs a single command for each arriving dataset:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/mickmioduszewski/dqcheckr" class="external-link">dqcheckr</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"my_dataset"</span>, config_dir <span class="op">=</span> <span class="st">"config"</span><span class="op">)</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">status</span>      <span class="co"># "PASS", "WARN", "FAIL", or "INFO"</span></span>
-<span><span class="va">result</span><span class="op">$</span><span class="va">report_path</span> <span class="co"># path to the HTML report</span></span></code></pre></div>
-<p>The HTML report opens automatically in your browser (in interactive sessions). Historical run data accumulates in the SQLite snapshot database and is shown as a trend chart in subsequent reports.</p>
-</div>
-<div class="section level2">
-<h2 id="per-column-type-overrides">Per-column type overrides<a class="anchor" aria-label="anchor" href="#per-column-type-overrides"></a>
-</h2>
-<p>Some columns are numerically formatted but semantically character — phone numbers, postcodes, unit numbers. Add <code>column_types</code> to the dataset YAML to prevent false positives in type-sensitive checks (QC-11, CP-02, CP-04, CP-07):</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">column_types</span><span class="kw">:</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="at">  </span><span class="fu">TenantPhone</span><span class="kw">:</span><span class="at">     character</span></span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="at">  </span><span class="fu">PremisesPostCode</span><span class="kw">:</span><span class="at"> character</span></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="at">  </span><span class="fu">BSBCode</span><span class="kw">:</span><span class="at">         character</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="per-column-threshold-overrides">Per-column threshold overrides<a class="anchor" aria-label="anchor" href="#per-column-threshold-overrides"></a>
-</h2>
-<p>Some columns have known characteristics that make global thresholds meaningless. Add threshold keys directly inside <code>column_rules</code>:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="at">  </span><span class="fu">LandlordEmail</span><span class="kw">:</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="at">    </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.00</span><span class="co">          # almost always absent by design</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="at">  </span><span class="fu">BondAmount</span><span class="kw">:</span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="at">    </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.00</span><span class="co">          # must always be present</span></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="at">    </span><span class="fu">max_numeric_mean_shift_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span></code></pre></div>
-<p>Resolution order: <code>column_rules.&lt;col&gt;.&lt;threshold&gt;</code> → <code>rule_overrides</code> → <code>default_rules</code>.</p>
-</div>
-<div class="section level2">
-<h2 id="historical-drift-comparison">Historical drift comparison<a class="anchor" aria-label="anchor" href="#historical-drift-comparison"></a>
-</h2>
-<p>After running checks across multiple deliveries, compare any two historical snapshots directly from the SQLite database — no original files required:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># See what snapshots are available</span></span>
-<span><span class="fu"><a href="reference/list_snapshots.html">list_snapshots</a></span><span class="op">(</span><span class="st">"my_dataset"</span>, config_dir <span class="op">=</span> <span class="st">"config"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Compare snapshot #1 to snapshot #7, produce an HTML drift report</span></span>
-<span><span class="fu"><a href="reference/compare_snapshots.html">compare_snapshots</a></span><span class="op">(</span><span class="st">"my_dataset"</span>,</span>
-<span>                  snapshot_id_prev <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>                  snapshot_id_curr <span class="op">=</span> <span class="fl">7</span>,</span>
-<span>                  config_dir <span class="op">=</span> <span class="st">"config"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="custom-checks">Custom checks<a class="anchor" aria-label="anchor" href="#custom-checks"></a>
-</h2>
-<p>Supply a plain R file that defines a <code>custom_checks(df)</code> function returning a list of <code><a href="reference/dq_result.html">dq_result()</a></code> objects. Declare a second argument <code>config</code> to access type overrides via <code><a href="reference/resolve_col_type.html">resolve_col_type()</a></code>:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># config/my_checks.R</span></span>
-<span><span class="va">custom_checks</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">df</span>, <span class="va">config</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    <span class="fu"><a href="reference/dq_result.html">dq_result</a></span><span class="op">(</span><span class="st">"CC-01"</span>, <span class="st">"Revenue positive"</span>,</span>
-<span>              column  <span class="op">=</span> <span class="st">"revenue"</span>,</span>
-<span>              status  <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">revenue</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">0</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="st">"FAIL"</span> <span class="kw">else</span> <span class="st">"PASS"</span>,</span>
-<span>              observed <span class="op">=</span> <span class="st">"checked"</span>,</span>
-<span>              message  <span class="op">=</span> <span class="st">"Revenue must be non-negative."</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
-<p>Point to it in your dataset YAML:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> config/my_checks.R</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="demonstrations">Demonstrations<a class="anchor" aria-label="anchor" href="#demonstrations"></a>
-</h2>
-<p>The package includes two runnable demonstrations using the Star Wars dataset. Copy them to a local directory and run them directly in RStudio:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Copy to ~/dqcheckr_demo</span></span>
-<span><span class="va">dest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/path.expand.html" class="external-link">path.expand</a></span><span class="op">(</span><span class="st">"~"</span><span class="op">)</span>, <span class="st">"dqcheckr_demo"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.copy</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"demonstrations"</span>, package <span class="op">=</span> <span class="st">"dqcheckr"</span><span class="op">)</span>,</span>
-<span>          <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">dirname</a></span><span class="op">(</span><span class="va">dest</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.rename</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">dirname</a></span><span class="op">(</span><span class="va">dest</span><span class="op">)</span>, <span class="st">"demonstrations"</span><span class="op">)</span>, <span class="va">dest</span><span class="op">)</span></span></code></pre></div>
-<p>Then open <code>demo.R</code> (named-file mode, CSV + FWF) or <code>demo2.R</code> (folder-scan mode, version comparison, custom checks) in RStudio, set the working directory to the copied folder, and source the script.</p>
+<span><span class="fu"><a href="reference/run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"customer_accounts"</span>, config_dir <span class="op">=</span> <span class="st">"path/to/configs"</span><span class="op">)</span></span></code></pre></div>
+<p>This prints a one-line console summary, writes an HTML report, and returns <code>list(status, report_path, snapshot_id)</code> invisibly.</p>
+<p>Two YAML files control every run: a global <code>dqcheckr.yml</code> (default thresholds shared across datasets) and a per-dataset <code>&lt;dataset_name&gt;.yml</code> (file location, expected columns, column-level rules and overrides).</p>
 </div>
 <div class="section level2">
 <h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p>See <code><a href="articles/dqcheckr.html">vignette("dqcheckr")</a></code> for a full description of all configuration options, every check (QC-01 to QC-14, SC-01/02, CP-01 to CP-08), per-column type overrides, per-column threshold overrides, historical drift comparison, and a worked example using the Star Wars dataset.</p>
+<p>See <code><a href="articles/dqcheckr.html">vignette("dqcheckr")</a></code> for a full walkthrough of configuration and the available checks, or the <a href="https://mickmioduszewski.github.io/dqcheckr/" class="external-link">package documentation site</a>.</p>
+</div>
+<div class="section level2">
+<h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
+</h2>
+<p>MIT</p>
 </div>
 </div>
-  </main><aside class="col-md-3"><div class="links">
+  </div>
+
+  <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
+    <div class="links">
 <h2 data-toc-skip>Links</h2>
 <ul class="list-unstyled">
 <li><a href="https://cloud.r-project.org/package=dqcheckr" class="external-link">View on CRAN</a></li>
@@ -191,20 +166,23 @@
 
 
 
-  </aside>
+  </div>
 </div>
 
 
-    <footer><div class="pkgdown-footer-left">
-  <p>Developed by Mick Mioduszewski.</p>
+      <footer><div class="copyright">
+  <p></p>
+<p>Developed by Mick Mioduszewski.</p>
 </div>
 
-<div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+<div class="pkgdown">
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
 </div>
 
-    </footer>
+      </footer>
 </div>
+
 
 
 
