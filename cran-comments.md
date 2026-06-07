@@ -1,18 +1,34 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 0 notes
+
+This is a resubmission (v0.2.1, a patch release over the accepted v0.2.0).
 
 ## Test environments
 
-* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local): 0 errors | 0 warnings | 1 note
-* win-builder: R-devel x86_64-w64-mingw32 (2026-05-31 r90090 ucrt), Windows Server 2022: 0 errors | 0 warnings | 0 notes
+* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0 (local): 0 errors | 0 warnings | 0 notes
+* win-builder: R-devel, Windows Server 2022 (to be re-run before submission;
+  results will be attached here)
 
 ## Notes
 
-* "Skipping checking HTML validation: 'tidy' doesn't look like recent enough
-  HTML Tidy."
-  This is a local tooling issue (outdated tidy binary on the check machine).
-  It does not appear on CRAN's check servers.
+None outstanding. The previous local-only NOTE about an outdated 'tidy'
+binary on the check machine ("Skipping checking HTML validation: 'tidy'
+doesn't look like recent enough HTML Tidy") does not reproduce in this
+check run and does not appear on CRAN's check servers in any case.
+
+## What changed since v0.2.0
+
+* Bug fixes to filename/timestamp consistency (UTC slugs matching the
+  snapshot DB), the CP-07 type-change comparison guard, and config-key
+  forwarding (`col_names`, `quote_char`) to `readr::read_delim()`.
+* Removed dead code (`read_pass_rate_trend()`).
+* All `rlang::abort()` calls now carry typed, two-level error classes
+  (`c("<specific>", "dqcheckr_error")`) so callers can catch errors
+  structurally.
+* Test-suite consolidation (shared fixtures, regexp-guarded `expect_error()`,
+  removed redundant `library()` calls).
+* See NEWS.md for the full list.
 
 ## Previous CRAN submission errors (v0.1.2) — addressed in v0.2.0
 
