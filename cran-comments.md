@@ -9,10 +9,10 @@ This is a resubmission (v0.2.1, a patch release over the accepted v0.2.0).
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
   0 errors | 0 warnings | 1 note
-* win-builder: R-devel, Windows Server 2022 (submitted; results pending —
-  to be attached here once the results email arrives)
-* win-builder: R-release, Windows Server 2022 (submitted; results pending —
-  to be attached here once the results email arrives)
+* win-builder: R-devel (R Under development (unstable), 2026-06-06 r90114
+  ucrt), Windows Server 2022: Status: OK -- 0 errors | 0 warnings | 0 notes
+* win-builder: R-release (R 4.6.0, 2026-04-24 ucrt), Windows Server 2022:
+  Status: OK -- 0 errors | 0 warnings | 0 notes
 
 ## Notes
 
