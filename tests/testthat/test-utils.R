@@ -157,5 +157,6 @@ test_that("load_config() stops when dataset yml is missing", {
   dir.create(sub, showWarnings = FALSE)
   writeLines(c("default_rules:", "  max_missing_rate: 0.05"),
              file.path(sub, "dqcheckr.yml"))
-  expect_error(load_config("nonexistent_ds", sub))
+  expect_error(load_config("nonexistent_ds", sub),
+               class = "dqcheckr_missing_file")
 })

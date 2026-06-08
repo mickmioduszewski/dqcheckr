@@ -32,7 +32,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">dqcheckr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.2</span>
       </span>
     </div>
 
@@ -367,6 +367,26 @@ widths and names. If the file has a header row, set
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">fwf_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">fwf_widths</span><span class="kw">:</span><span class="at">    </span><span class="kw">[</span><span class="dv">10</span><span class="kw">,</span><span class="at"> </span><span class="dv">20</span><span class="kw">,</span><span class="at"> </span><span class="dv">3</span><span class="kw">,</span><span class="at"> </span><span class="dv">10</span><span class="kw">,</span><span class="at"> </span><span class="dv">12</span><span class="kw">,</span><span class="at"> </span><span class="dv">11</span><span class="kw">]</span></span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">fwf_col_names</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">id</span><span class="kw">,</span><span class="at"> name</span><span class="kw">,</span><span class="at"> country_code</span><span class="kw">,</span><span class="at"> account_status</span><span class="kw">,</span><span class="at"> account_balance</span><span class="kw">,</span><span class="at"> created_date</span><span class="kw">]</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="csv-files-with-an-unusable-header-row">CSV files with an unusable header row<a class="anchor" aria-label="anchor" href="#csv-files-with-an-unusable-header-row"></a>
+</h3>
+<p>Some deliveries repeat column names in the header (e.g. a file that
+bundles several record groups per row under identical labels:
+<code>PayeeName</code>, <code>Amount</code>, <code>PayeeName</code>,
+<code>Amount</code>, …). A header like that cannot be used as-is. Supply
+explicit <code>col_names</code> to name the columns positionally, and
+set <code>csv_skip: 1</code> so the original header row is dropped
+rather than read as data:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at"> csv</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">col_names</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">PayeeName</span><span class="kw">,</span><span class="at"> Amount</span><span class="kw">,</span><span class="at"> PayeeName_</span><span class="dv">2</span><span class="kw">,</span><span class="at"> Amount_</span><span class="dv">2</span><span class="kw">,</span><span class="at"> PayeeName_</span><span class="dv">3</span><span class="kw">,</span><span class="at"> Amount_</span><span class="dv">3</span><span class="kw">]</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">csv_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span></code></pre></div>
+<p><code>csv_skip</code> is the CSV analogue of <code>fwf_skip</code>;
+it defaults to <code>0</code>, so existing configs are unaffected. For a
+genuinely headerless file, supply <code>col_names</code> and leave
+<code>csv_skip</code> at <code>0</code>. (The <code>dqcheckrGUI</code>
+wizard sets both keys for you when it detects duplicate or invalid
+header names.)</p>
 <hr>
 </div>
 </div>
@@ -630,19 +650,19 @@ values is still classified as numeric, making those bad values visible
 to QC-11 (non-numeric contamination). It is configurable per dataset via
 <code>type_inference_threshold</code> in <code>default_rules</code> or
 <code>rule_overrides</code>:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># raise threshold — stricter, fewer columns classified as numeric</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="at">  </span><span class="fu">type_inference_threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.95</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co"># lower threshold — more lenient, columns with more noise still classified numeric</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="at">  </span><span class="fu">type_inference_threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.80</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># raise threshold — stricter, fewer columns classified as numeric</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="at">  </span><span class="fu">type_inference_threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.95</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co"># lower threshold — more lenient, columns with more noise still classified numeric</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="at">  </span><span class="fu">type_inference_threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.80</span></span></code></pre></div>
 <p>Changing the threshold affects QC-06, QC-07, QC-08, QC-11, CP-02,
 CP-04, CP-05, CP-06, and CP-07. Note that changing it between runs may
 cause CP-02 to report a spurious type change on columns that sit close
 to the old and new thresholds, even if the underlying data did not
 change.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/infer_col_type.html">infer_col_type</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2024-01-15"</span>, <span class="st">"2024-06-30"</span><span class="op">)</span><span class="op">)</span>  <span class="co"># "date"</span></span>
 <span><span class="fu"><a href="../reference/infer_col_type.html">infer_col_type</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"100"</span>, <span class="st">"200"</span>, <span class="st">"N/A"</span><span class="op">)</span><span class="op">)</span>          <span class="co"># "character" (only 67% numeric)</span></span>
 <span><span class="fu"><a href="../reference/infer_col_type.html">infer_col_type</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"100"</span>, <span class="st">"200"</span>, <span class="st">"N/A"</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"50"</span>, <span class="fl">17</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>  <span class="co"># "numeric" (95% numeric)</span></span>
@@ -654,7 +674,7 @@ change.</p>
 <div class="section level2">
 <h2 id="running-a-check">Running a check<a class="anchor" aria-label="anchor" href="#running-a-check"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_dq_check.html">run_dq_check</a></span><span class="op">(</span></span>
 <span>  dataset_name <span class="op">=</span> <span class="st">"customer_accounts"</span>,</span>
 <span>  config_dir   <span class="op">=</span> <span class="st">"path/to/configs"</span>,   <span class="co"># contains dqcheckr.yml + customer_accounts.yml</span></span>
@@ -699,7 +719,7 @@ recorded)</li>
 going through the full pipeline. All checks share the same signature —
 <code>(df, config)</code> — and return a list of <code>dq_result</code>
 objects.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/mickmioduszewski/dqcheckr" class="external-link">dqcheckr</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Build a minimal config programmatically</span></span>
@@ -755,7 +775,7 @@ objects.</p>
 <p>Create a plain <code>.R</code> file that defines
 <code>custom_checks(df)</code>. It receives the trimmed data frame and
 must return a list of <code>dq_result</code> objects.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># File: custom/customer_accounts_checks.R</span></span>
 <span></span>
 <span><span class="va">custom_checks</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">df</span><span class="op">)</span> <span class="op">{</span></span>
@@ -781,7 +801,7 @@ must return a list of <code>dq_result</code> objects.</p>
 <span>  <span class="va">results</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p>Point to it in the dataset config:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
 <p>The file is sourced in an isolated environment (not the global
 session) whose parent is <code><a href="https://rdrr.io/r/base/environment.html" class="external-link">baseenv()</a></code>.
 <code><a href="../reference/dq_result.html">dq_result()</a></code> is explicitly available without qualification.
@@ -804,7 +824,7 @@ in per-column trend queries.</p>
 <p>Every run writes two rows to a shared SQLite database: one row in
 <code>snapshots</code> (run-level summary) and one row per column-stat
 in <code>column_snapshots</code>.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dbi.r-dbi.org" class="external-link">DBI</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rsqlite.r-dbi.org" class="external-link">RSQLite</a></span><span class="op">)</span></span>
 <span></span>
@@ -830,7 +850,7 @@ in <code>column_snapshots</code>.</p>
 <span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span><span class="op">)</span></span></code></pre></div>
 <p>Because all datasets share one database, you can query across
 them:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQuery.html" class="external-link">dbGetQuery</a></span><span class="op">(</span><span class="va">con</span>,</span>
 <span>  <span class="st">"SELECT dataset_name, COUNT(*) AS runs,</span></span>
 <span><span class="st">          SUM(check_fail_count) AS total_failures</span></span>
@@ -845,7 +865,7 @@ automatically on the first run if they do not exist.</p>
 </h2>
 <p>The following uses <code><a href="https://dplyr.tidyverse.org/reference/starwars.html" class="external-link">dplyr::starwars</a></code> exported to CSV and
 fixed-width files.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Config directory contains:</span></span>
 <span><span class="co">#   dqcheckr.yml         — global thresholds</span></span>
 <span><span class="co">#   starwars_csv.yml     — CSV dataset config</span></span>

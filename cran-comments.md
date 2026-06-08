@@ -2,17 +2,16 @@
 
 0 errors | 0 warnings | 1 note
 
-This is a resubmission (v0.2.1, a patch release over the accepted v0.2.0).
+This is a maintenance update (v0.2.2) of a package currently on CRAN as
+v0.2.1.
 
 ## Test environments
 
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
   0 errors | 0 warnings | 1 note
-* win-builder: R-devel (R Under development (unstable), 2026-06-06 r90114
-  ucrt), Windows Server 2022: Status: OK -- 0 errors | 0 warnings | 0 notes
-* win-builder: R-release (R 4.6.0, 2026-04-24 ucrt), Windows Server 2022:
-  Status: OK -- 0 errors | 0 warnings | 0 notes
+* win-builder: R-devel and R-release, Windows Server 2022 (pending for this
+  version)
 
 ## Notes
 
@@ -20,62 +19,30 @@ This is a resubmission (v0.2.1, a patch release over the accepted v0.2.0).
   HTML Tidy."
   This is a local tooling issue (outdated `tidy` binary on the check
   machine, used only for validating the rendered HTML manual). It does not
-  appear on CRAN's check servers and has appeared identically in every
-  local check of this package since v0.2.0.
+  appear on CRAN's check servers and has appeared identically in every local
+  check of this package since v0.2.0.
 
-## What changed since v0.2.0
+## What changed since v0.2.1
 
-* Bug fixes to filename/timestamp consistency (UTC slugs matching the
-  snapshot DB), the CP-07 type-change comparison guard, and config-key
-  forwarding (`col_names`, `quote_char`) to `readr::read_delim()`.
-* Removed dead code (`read_pass_rate_trend()`).
-* All `rlang::abort()` calls now carry typed, two-level error classes
-  (`c("<specific>", "dqcheckr_error")`) so callers can catch errors
-  structurally.
-* Test-suite consolidation (shared fixtures, regexp-guarded `expect_error()`,
-  removed redundant `library()` calls).
+* New optional CSV config key `csv_skip` (parallel to the existing
+  `fwf_skip`): `read_dataset()` forwards it as `skip =` to
+  `readr::read_delim()`, so a config can supply an explicit `col_names` list
+  *and* drop the file's original header row. Defaults to `0L`, so existing
+  configs are byte-for-byte unaffected.
+* Internal quality polish: `?dqcheckr` package help now resolves, an
+  out-of-range `csv_skip` edge case is tested, and all negative tests assert
+  on a typed error class. No user-facing behaviour change.
 * See NEWS.md for the full list.
 
-## Previous CRAN submission errors (v0.1.2) — addressed in v0.2.0
+## Reverse dependencies
 
-### CRAN policy violation: writes to user library during checks
-
-CRAN's Debian check servers remount the user library read-only before running
-checks. v0.1.2 violated the CRAN policy on filesystem writes because
-rmarkdown::render() was called with the Rmd template resolved via
-system.file(), which resolves to the installed package directory inside the
-user library. knitr then attempted to write intermediate files (the .knit.md
-scratch file) adjacent to the template, hitting the read-only mount and
-producing:
-
-  Error in file(con, "w"): cannot open the connection
-
-This was the direct cause of all 4 test failures in test-integration.R.
-
-### Fix in v0.2.0
-
-Reports have been migrated from rmarkdown to Quarto. The key change in
-render_report() and the drift equivalent .write_drift_html_report() is that
-the .qmd template is first copied to an isolated tempfile() directory before
-quarto::quarto_render() is called. Quarto and knitr write all intermediate
-and output files to that temp directory. Nothing is written to or near the
-package installation path.
-
-Additionally, render_report() now checks quarto::quarto_available() at the
-top of the function and returns NULL with an informative warning when the
-Quarto CLI is not installed. This means the package installs, loads, and runs
-all quality checks cleanly on servers without the Quarto CLI.
-
-Integration tests that do not exercise the HTML report path (status and
-snapshot_id assertions) now wrap run_dq_check() in suppressWarnings() to
-avoid spurious WARN entries from the expected "Quarto not available" warning
-emitted on servers without the CLI.
+None on CRAN.
 
 ## Package notes
 
 * The package requires the Quarto CLI for HTML report rendering.
-  render_report() and compare_snapshots() return NULL with an informative
-  warning when Quarto is not available, so the package installs and runs
-  without the CLI being present.
+  `render_report()` and `compare_snapshots()` return `NULL` with an
+  informative warning when Quarto is not available, so the package installs
+  and runs all quality checks cleanly on servers without the CLI.
 * All examples that invoke Quarto, write files, or require a configured
-  dataset are wrapped in \donttest{}.
+  dataset are wrapped in `\donttest{}`.

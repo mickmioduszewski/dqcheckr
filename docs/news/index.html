@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">dqcheckr</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.1</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.2</span>
       </span>
     </div>
 
@@ -60,6 +60,13 @@
       <small>Source: <a href="https://github.com/mickmioduszewski/dqcheckr/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.2.2" id="dqcheckr-022">dqcheckr 0.2.2<a class="anchor" aria-label="anchor" href="#dqcheckr-022"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-2-2">New features<a class="anchor" aria-label="anchor" href="#new-features-0-2-2"></a></h3>
+<ul><li>New optional CSV config key <code>csv_skip</code> (parallel to <code>fwf_skip</code>): <code><a href="../reference/read_dataset.html">read_dataset()</a></code> now forwards <code>skip = config$csv_skip %||% 0L</code> to <code><a href="https://readr.tidyverse.org/reference/read_delim.html" class="external-link">readr::read_delim()</a></code>. This lets a config supply an explicit <code>col_names</code> list <em>and</em> drop the file’s original header row — required for delivery files whose header repeats column names (e.g. RBB RefundsPaid), where the real header is unusable and must be replaced positionally. Defaults to <code>0L</code>, so existing configs are byte-for-byte unaffected.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.2.1" id="dqcheckr-021">dqcheckr 0.2.1<a class="anchor" aria-label="anchor" href="#dqcheckr-021"></a></h2>
 <div class="section level3">

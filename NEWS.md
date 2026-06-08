@@ -1,3 +1,25 @@
+# dqcheckr 0.2.2
+
+## New features
+
+* New optional CSV config key `csv_skip` (parallel to `fwf_skip`):
+  `read_dataset()` now forwards `skip = config$csv_skip %||% 0L` to
+  `readr::read_delim()`. This lets a config supply an explicit `col_names`
+  list *and* drop the file's original header row — required for delivery
+  files whose header repeats column names (e.g. a header that repeats
+  `Name`/`Amount` per bundled record), where the real header is unusable and
+  must be replaced positionally. Defaults to `0L`, so existing configs are
+  byte-for-byte unaffected.
+
+## Internal
+
+* `?dqcheckr` package help now resolves (the `"_PACKAGE"` doc block no
+  longer carries `@noRd`).
+* Added a test for an out-of-range `csv_skip` value (skip exceeding the row
+  count yields a zero-row frame).
+* All negative tests now assert on a typed error class rather than using a
+  bare `expect_error()`.
+
 # dqcheckr 0.2.1
 
 ## Bug fixes

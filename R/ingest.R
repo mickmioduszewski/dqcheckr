@@ -63,8 +63,12 @@ detect_files <- function(config) {
 #' @param path Character. Path to the file to read.
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}. Must include \code{format} (\code{"csv"} or
-#'   \code{"fwf"}). For FWF files, \code{fwf_widths} is required and
-#'   \code{fwf_col_names} and \code{fwf_skip} are optional.
+#'   \code{"fwf"}). For CSV files, \code{col_names} (an explicit column-name
+#'   list) and \code{csv_skip} (number of leading lines to drop, e.g. a real
+#'   header row that is being replaced by \code{col_names}) are optional and
+#'   default to using the file's own header and \code{0L} respectively. For
+#'   FWF files, \code{fwf_widths} is required and \code{fwf_col_names} and
+#'   \code{fwf_skip} are optional.
 #'
 #' @return A data frame with all columns as character vectors.
 #'
@@ -86,6 +90,7 @@ read_dataset <- function(path, config) {
         path,
         delim      = delim,
         col_names  = config$col_names  %||% TRUE,
+        skip       = config$csv_skip   %||% 0L,
         quote      = config$quote_char %||% '"',
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),

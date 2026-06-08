@@ -225,6 +225,25 @@ fwf_widths:    [10, 20, 3, 10, 12, 11]
 fwf_col_names: [id, name, country_code, account_status, account_balance, created_date]
 ```
 
+### CSV files with an unusable header row
+
+Some deliveries repeat column names in the header (e.g. a file that bundles
+several record groups per row under identical labels: `PayeeName`, `Amount`,
+`PayeeName`, `Amount`, …). A header like that cannot be used as-is. Supply
+explicit `col_names` to name the columns positionally, and set `csv_skip: 1`
+so the original header row is dropped rather than read as data:
+
+```yaml
+format: csv
+col_names: [PayeeName, Amount, PayeeName_2, Amount_2, PayeeName_3, Amount_3]
+csv_skip: 1
+```
+
+`csv_skip` is the CSV analogue of `fwf_skip`; it defaults to `0`, so existing
+configs are unaffected. For a genuinely headerless file, supply `col_names`
+and leave `csv_skip` at `0`. (The `dqcheckrGUI` wizard sets both keys for you
+when it detects duplicate or invalid header names.)
+
 ---
 
 ## The quality checks

@@ -210,6 +210,12 @@ folder: "data/incoming/customer_accounts/"
 format: csv                 # csv | fwf
 encoding: "UTF-8"
 delimiter: ","              # csv only
+quote_char: '"'             # csv only — quote character (default ")
+col_names: ~                # csv only — explicit column names (overrides the
+                            #   file header); required for headerless files
+csv_skip: 0                 # csv only — leading lines to drop (default 0). Set
+                            #   to 1 with col_names to replace an unusable header
+                            #   row, e.g. one that repeats column names.
 fwf_widths: ~               # fwf only
 fwf_col_names: ~            # fwf only
 fwf_skip: 0                 # fwf only — header rows to skip (default 0)

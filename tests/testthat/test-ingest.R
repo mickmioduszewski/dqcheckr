@@ -37,6 +37,44 @@ test_that("read_dataset() preserves NA as NA after trim", {
   expect_true(is.na(df$b[1]) || df$b[1] == "")
 })
 
+test_that("read_dataset() applies csv_skip + col_names to drop a header row", {
+  # A duplicate-header file: the real header is unusable (repeated names), so
+  # the caller supplies explicit col_names and csv_skip = 1 to drop the header.
+  tmp <- tempfile(fileext = ".csv")
+  writeLines(c("name,name,name", "a,b,c", "d,e,f"), tmp)
+  cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",",
+              col_names = c("name", "name_2", "name_3"), csv_skip = 1L)
+  df  <- read_dataset(tmp, cfg)
+  expect_equal(names(df), c("name", "name_2", "name_3"))
+  expect_equal(nrow(df), 2L)                 # no phantom header row
+  expect_equal(df$name, c("a", "d"))
+  unlink(tmp)
+})
+
+test_that("read_dataset() with csv_skip >= row count yields zero data rows, not an error", {
+  # Edge case: csv_skip larger than the data. readr drops every line; with an
+  # explicit col_names the result is a 0-row frame with the right columns -- it
+  # must not error or invent rows.
+  tmp <- tempfile(fileext = ".csv")
+  writeLines(c("name,name", "a,b"), tmp)   # 1 header + 1 data row
+  cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",",
+              col_names = c("name", "name_2"), csv_skip = 5L)
+  df  <- read_dataset(tmp, cfg)
+  expect_equal(names(df), c("name", "name_2"))
+  expect_equal(nrow(df), 0L)
+  unlink(tmp)
+})
+
+test_that("read_dataset() omitting csv_skip is byte-identical to legacy behaviour", {
+  tmp <- tempfile(fileext = ".csv")
+  writeLines(c("a,b", "1,2", "3,4"), tmp)
+  cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
+  df  <- read_dataset(tmp, cfg)
+  expect_equal(names(df), c("a", "b"))       # file header used unchanged
+  expect_equal(nrow(df), 2L)
+  unlink(tmp)
+})
+
 test_that("read_dataset() stops on nonexistent file", {
   cfg <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
   expect_error(read_dataset("/nonexistent/path/file.csv", cfg),

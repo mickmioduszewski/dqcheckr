@@ -11,8 +11,12 @@ read_dataset(path, config)
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}. Must include \code{format} (\code{"csv"} or
-\code{"fwf"}). For FWF files, \code{fwf_widths} is required and
-\code{fwf_col_names} and \code{fwf_skip} are optional.}
+\code{"fwf"}). For CSV files, \code{col_names} (an explicit column-name
+list) and \code{csv_skip} (number of leading lines to drop, e.g. a real
+header row that is being replaced by \code{col_names}) are optional and
+default to using the file's own header and \code{0L} respectively. For
+FWF files, \code{fwf_widths} is required and \code{fwf_col_names} and
+\code{fwf_skip} are optional.}
 }
 \value{
 A data frame with all columns as character vectors.

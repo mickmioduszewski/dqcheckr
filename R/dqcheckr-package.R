@@ -25,5 +25,4 @@
 #' @importFrom knitr raw_html
 #'
 #' @keywords internal
-#' @noRd
 "_PACKAGE"
