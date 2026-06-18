@@ -10,8 +10,10 @@ v0.2.1.
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
   0 errors | 0 warnings | 1 note
-* win-builder: R-devel and R-release, Windows Server 2022 (pending for this
-  version)
+* win-builder: R-devel (R Under development (unstable), 2026-06-17 r90169
+  ucrt): Status OK -- 0 errors | 0 warnings | 0 notes
+* win-builder: R-release (R 4.6.0 ucrt): Status OK -- 0 errors | 0 warnings
+  | 0 notes
 
 ## Notes
 
