@@ -95,7 +95,7 @@ run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
 #> Error in detect_files(config): current_file not found: 
 drift <- compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE)
-#> Error in compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE): Snapshot database not found: /tmp/RtmpNHg38Z/snap.sqlite
+#> Error in compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE): Snapshot database not found: /tmp/Rtmp0RNS2R/snap.sqlite
 names(drift)
 #> Error: object 'drift' not found
 # }
