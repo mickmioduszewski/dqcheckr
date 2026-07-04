@@ -14,7 +14,7 @@ Description:
     tracking. Supports 'CSV' and fixed-width formats. Custom organisation-specific
     checks can be supplied as plain R files.
 License: MIT + file LICENSE
-URL: https://github.com/mickmioduszewski/dqcheckr
+URL: https://mickmioduszewski.github.io/dqcheckr/, https://github.com/mickmioduszewski/dqcheckr
 BugReports: https://github.com/mickmioduszewski/dqcheckr/issues
 Encoding: UTF-8
 Language: en-GB
@@ -23,7 +23,8 @@ Imports: readr, DBI, RSQLite, quarto, knitr, kableExtra, ggplot2,
         gridExtra, dplyr, tidyr, yaml, rlang, stats, utils
 Suggests: testthat (>= 3.1.0),
     withr,
-    rmarkdown
+    rmarkdown,
+    pkgdown
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

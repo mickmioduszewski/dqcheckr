@@ -1,0 +1,55 @@
+url: https://mickmioduszewski.github.io/dqcheckr/
+
+template:
+  bootstrap: 5
+
+home:
+  title: dqcheckr — Automated Data Quality Checks for Recurring Dataset Deliveries
+
+navbar:
+  structure:
+    left: [intro, articles, reference, news]
+    right: [search, github]
+  components:
+    github:
+      icon: fab fa-github
+      href: https://github.com/mickmioduszewski/dqcheckr
+      aria-label: GitHub
+
+articles:
+  - title: Guides
+    navbar: ~
+    contents:
+      - dqcheckr
+      - specification
+
+reference:
+  - title: Run a quality check
+    desc: The top-level pipeline and the check-suite runners it orchestrates.
+    contents:
+      - run_dq_check
+      - run_qc_checks
+      - run_comparison_checks
+      - run_custom_checks
+  - title: Individual checks
+    desc: The QC and schema checks run by `run_qc_checks()`.
+    contents:
+      - starts_with("check_")
+  - title: Snapshots and drift
+    desc: The SQLite snapshot history and cross-run drift comparison.
+    contents:
+      - compare_snapshots
+      - list_snapshots
+      - read_recent_snapshots
+  - title: Configuration and ingest
+    contents:
+      - load_config
+      - detect_files
+      - read_dataset
+  - title: Building blocks
+    desc: Helpers for writing custom checks and interpreting results.
+    contents:
+      - dq_result
+      - overall_status
+      - infer_col_type
+      - resolve_col_type
