@@ -1,0 +1,43 @@
+# Read recent snapshot history from the SQLite database
+
+Retrieves the `n` most recent run records for a given dataset from the
+snapshot database, ordered newest-first.
+
+## Usage
+
+``` r
+read_recent_snapshots(db_path, dataset_name, n = 10)
+```
+
+## Arguments
+
+- db_path:
+
+  Character. Path to the SQLite database file.
+
+- dataset_name:
+
+  Character. Dataset name to filter on.
+
+- n:
+
+  Integer. Maximum number of records to return. Defaults to 10.
+
+## Value
+
+A data frame with one row per run and columns including `id`,
+`dataset_name`, `run_timestamp`, `file_name`, `row_count`, `col_count`,
+`overall_status`, `check_pass_count`, `check_warn_count`,
+`check_fail_count`, `check_info_count`, `new_cols_vs_previous`,
+`missing_cols_vs_previous`, `new_cols_vs_schema`,
+`missing_cols_vs_schema`, `comparison_mode`, `render_status`,
+`type_changed_cols_vs_previous`, and `report_file` (the rendered
+report's filename, `NA` for snapshots written before dqcheckr 0.2.3).
+Returns an empty data frame with the same columns if the database does
+not exist or contains no records for the dataset.
+
+## Examples
+
+``` r
+history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
+```
