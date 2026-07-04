@@ -10,8 +10,10 @@
 #' \code{\link{dq_result}} is explicitly injected and can be called without
 #' qualification. All other dqcheckr exports (e.g. \code{resolve_col_type},
 #' \code{infer_col_type}) must be qualified: \code{dqcheckr::resolve_col_type()}.
-#' Any error -- missing file, undefined function, or runtime failure -- stops the
-#' run with a clear message.
+#' Any error -- missing file, undefined function, runtime failure, or a
+#' malformed result element (each element must have the seven
+#' \code{\link{dq_result}} fields and a valid status) -- stops the run with a
+#' clear message.
 #'
 #' @param df A data frame. The current delivery.
 #' @param config Named list. Merged configuration as returned by
@@ -62,6 +64,32 @@ run_custom_checks <- function(df, config) {
     rlang::abort(paste0("custom_checks() must return a list of dq_result objects, got: ",
                         class(results)),
                  class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
+  }
+
+  # Validate each element at this boundary — where the check author can act
+  # on the message. Malformed results would otherwise fail much later inside
+  # overall_status() or the snapshot writer with misleading errors.
+  required_fields <- c("check_id", "check_name", "column", "status",
+                       "observed", "threshold", "message")
+  valid_statuses  <- c("PASS", "WARN", "FAIL", "INFO")
+  for (i in seq_along(results)) {
+    r <- results[[i]]
+    if (!is.list(r) || !all(required_fields %in% names(r))) {
+      rlang::abort(sprintf(
+        paste0("custom_checks() result %d is not a dq_result object. Each ",
+               "element must be a named list with fields: %s. Build results ",
+               "with dq_result()."),
+        i, paste(required_fields, collapse = ", ")),
+        class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
+    }
+    if (!is.character(r$status) || length(r$status) != 1 ||
+        !r$status %in% valid_statuses) {
+      rlang::abort(sprintf(
+        "custom_checks() result %d has invalid status (%s). Must be one of: %s.",
+        i, paste(deparse(r$status), collapse = ""),
+        paste(valid_statuses, collapse = ", ")),
+        class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
+    }
   }
 
   results

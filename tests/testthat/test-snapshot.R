@@ -267,3 +267,46 @@ test_that("read_recent_snapshots() returns at most n rows", {
   res <- read_recent_snapshots(db, "ds_a", n = 3)
   expect_equal(nrow(res), 3L)
 })
+
+# -- run_time threading (0.2.3, B-04) --------------------------------------------
+
+test_that("write_snapshot() stores the supplied run_time as run_timestamp", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  rt <- as.POSIXct("2026-07-04 01:02:03", tz = "UTC")
+  id <- write_snapshot(db, "ts_ds", "f.csv", make_accounts_df(),
+                       make_results(), list(), list(), base_config(),
+                       run_time = rt)
+  expect_false(is.null(id))
+  snaps <- read_recent_snapshots(db, "ts_ds")
+  expect_equal(snaps$run_timestamp[1], "2026-07-04T01:02:03Z")
+})
+
+# -- Batched column-level custom results (0.2.3, B-06/P-04) -----------------------
+
+test_that("write_snapshot() records column-level custom results", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  custom <- list(
+    dq_result("CUST-01", "org rule", column = "id",
+              status = "WARN", observed = "5", threshold = "3", message = "m"),
+    dq_result("CUST-02", "table rule",                    # no column: not stored
+              status = "PASS", observed = "ok", message = "m")
+  )
+  id <- write_snapshot(db, "cust_ds", "f.csv", make_accounts_df(),
+                       make_results(), list(), custom, base_config())
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  rows <- DBI::dbGetQuery(con,
+    "SELECT * FROM column_snapshots WHERE dq_check LIKE 'CUST-%' AND snapshot_id = ?",
+    list(id))
+  expect_equal(nrow(rows), 1)
+  expect_equal(rows$column_name, "id")
+  expect_equal(rows$severity_on_breach, "WARN")
+})
+
+test_that("compute_col_stats() defines missing_rate as 0 for a zero-row frame", {
+  stats <- compute_col_stats(make_accounts_df()[0, ], base_config())
+  mr <- stats[stats$dq_check == "missing_rate", "value"]
+  expect_true(all(mr == "0"))
+})

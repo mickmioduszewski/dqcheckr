@@ -27,7 +27,9 @@ check_missing_rate <- function(df, config) {
   lapply(names(df), function(col) {
     threshold     <- col_threshold(config, col, "max_missing_rate", 0.05)
     missing_count <- sum(.missing_vals(df[[col]]))
-    missing_rate  <- missing_count / nrow(df)
+    # 0/0 would be NaN and poison the threshold comparison; an empty file is
+    # reported as a FAIL by QC-14 ("Empty file"), so rates are defined as 0.
+    missing_rate  <- if (nrow(df) > 0) missing_count / nrow(df) else 0
     status <- if (missing_rate > threshold) "FAIL" else "PASS"
     dq_result(
       check_id   = "QC-01",
@@ -196,6 +198,11 @@ check_col_count <- function(df, config) {
 #'   \code{\link{read_dataset}}).
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types Optional named character vector of pre-resolved column types
+#'   (one element per column, as produced by \code{\link{resolve_col_type}}).
+#'   When \code{NULL} (the default), types are resolved internally. Supplying
+#'   this avoids re-running type inference when several checks share one data
+#'   frame.
 #'
 #' @return A list of \code{\link{dq_result}} objects, one per column, all with
 #'   status \code{"INFO"}.
@@ -208,9 +215,10 @@ check_col_count <- function(df, config) {
 #' check_inferred_types(df, cfg)
 #'
 #' @export
-check_inferred_types <- function(df, config) {
+check_inferred_types <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   lapply(names(df), function(col) {
-    typ <- resolve_col_type(col, df[[col]], config)
+    typ <- types[[col]]
     dq_result(
       check_id   = "QC-06",
       check_name = "Inferred type",
@@ -233,6 +241,8 @@ check_inferred_types <- function(df, config) {
 #'   \code{\link{read_dataset}}).
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types Optional named character vector of pre-resolved column types;
+#'   see \code{\link{check_inferred_types}}.
 #'
 #' @return A list of \code{\link{dq_result}} objects (one per numeric column),
 #'   all with status \code{"INFO"}. Returns an empty list if no numeric columns
@@ -247,10 +257,11 @@ check_inferred_types <- function(df, config) {
 #'
 #' @importFrom stats sd
 #' @export
-check_numeric_stats <- function(df, config) {
+check_numeric_stats <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   results <- list()
   for (col in names(df)) {
-    if (resolve_col_type(col, df[[col]], config) != "numeric") next
+    if (types[[col]] != "numeric") next
     vals <- suppressWarnings(as.numeric(df[[col]]))
     vals <- vals[!is.na(vals)]
     if (length(vals) == 0) next
@@ -278,6 +289,8 @@ check_numeric_stats <- function(df, config) {
 #'   \code{\link{read_dataset}}).
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types Optional named character vector of pre-resolved column types;
+#'   see \code{\link{check_inferred_types}}.
 #'
 #' @return A list of \code{\link{dq_result}} objects (one per character column),
 #'   all with status \code{"INFO"}. Returns an empty list if no character
@@ -291,10 +304,11 @@ check_numeric_stats <- function(df, config) {
 #' check_distinct_counts(df, cfg)
 #'
 #' @export
-check_distinct_counts <- function(df, config) {
+check_distinct_counts <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   results <- list()
   for (col in names(df)) {
-    if (resolve_col_type(col, df[[col]], config) != "character") next
+    if (types[[col]] != "character") next
     n_distinct <- length(unique(df[[col]][!.missing_vals(df[[col]])]))
     results <- c(results, list(dq_result(
       check_id   = "QC-08",
@@ -444,6 +458,8 @@ check_numeric_bounds <- function(df, config) {
 #'   \code{\link{read_dataset}}).
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types Optional named character vector of pre-resolved column types;
+#'   see \code{\link{check_inferred_types}}.
 #'
 #' @return A list of \code{\link{dq_result}} objects, one per numeric column.
 #'   Returns an empty list if no numeric columns are found.
@@ -456,10 +472,11 @@ check_numeric_bounds <- function(df, config) {
 #' check_non_numeric(df, cfg)
 #'
 #' @export
-check_non_numeric <- function(df, config) {
+check_non_numeric <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   results <- list()
   for (col in names(df)) {
-    if (resolve_col_type(col, df[[col]], config) != "numeric") next
+    if (types[[col]] != "numeric") next
     non_empty <- df[[col]][!.missing_vals(df[[col]])]
     if (length(non_empty) == 0) next
     bad  <- non_empty[is.na(suppressWarnings(as.numeric(non_empty)))]
@@ -609,7 +626,26 @@ check_pattern <- function(df, config) {
     pattern <- col_rules[[col]]$pattern
     if (is.null(pattern) || !col %in% names(df)) next
     non_empty  <- df[[col]][!.missing_vals(df[[col]])]
-    bad_count  <- sum(!grepl(pattern, non_empty, perl = TRUE))
+    # An invalid regex in hand-edited YAML must fail this check, not abort
+    # the whole run with a raw grepl() error (PCRE also emits a compilation
+    # warning before the error — suppress it; the FAIL result carries the
+    # message).
+    bad_count  <- tryCatch(
+      suppressWarnings(sum(!grepl(pattern, non_empty, perl = TRUE))),
+      error = function(e) e)
+    if (inherits(bad_count, "error")) {
+      results <- c(results, list(dq_result(
+        check_id   = "QC-13",
+        check_name = "Pattern / regex",
+        column     = col,
+        status     = "FAIL",
+        observed   = "Pattern could not be evaluated",
+        threshold  = pattern,
+        message    = sprintf("Column '%s': invalid regex pattern '%s' (%s).",
+                             col, pattern, conditionMessage(bad_count))
+      )))
+      next
+    }
     status     <- if (bad_count > 0) "FAIL" else "PASS"
     results <- c(results, list(dq_result(
       check_id   = "QC-13",
@@ -630,9 +666,12 @@ check_pattern <- function(df, config) {
 
 #' QC-14: Check row count bounds and optional file size
 #'
-#' Runs up to three sub-checks, each returning a separate
+#' Runs up to four sub-checks, each returning a separate
 #' \code{\link{dq_result}}:
 #' \enumerate{
+#'   \item \strong{Empty file} -- FAIL when the file contains no data rows at
+#'     all. Emitted unconditionally (independent of \code{min_row_count}) so
+#'     that an empty delivery always fails the run.
 #'   \item \strong{File size} -- only when \code{file_path} is supplied and
 #'     \code{max_file_size_mb} is configured in \code{rules}: FAIL if the file
 #'     exceeds the size limit.
@@ -663,6 +702,18 @@ check_pattern <- function(df, config) {
 #' @export
 check_min_row_count <- function(df, config, file_path = NULL) {
   results <- list()
+
+  # Empty-file check: a delivery with zero data rows must always FAIL,
+  # regardless of whether min_row_count is configured.
+  if (nrow(df) == 0) {
+    results <- c(results, list(dq_result(
+      check_id   = "QC-14",
+      check_name = "Empty file",
+      status     = "FAIL",
+      observed   = "0 rows",
+      message    = "File contains no data rows."
+    )))
+  }
 
   # File size check (runs before row count; requires file_path)
   if (!is.null(file_path) && file.exists(file_path)) {
@@ -746,6 +797,8 @@ check_min_row_count <- function(df, config, file_path = NULL) {
 #'   \code{\link{read_dataset}}).
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types Optional named character vector of pre-resolved column types;
+#'   see \code{\link{check_inferred_types}}.
 #'
 #' @return A list of \code{\link{dq_result}} objects, one per numeric column.
 #'   Status is \code{"FAIL"} when outliers are detected; \code{"PASS"}
@@ -760,10 +813,11 @@ check_min_row_count <- function(df, config, file_path = NULL) {
 #'
 #' @importFrom stats median IQR quantile
 #' @export
-check_outliers <- function(df, config) {
+check_outliers <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   results <- list()
   for (col in names(df)) {
-    if (resolve_col_type(col, df[[col]], config) != "numeric") next
+    if (types[[col]] != "numeric") next
 
     max_z  <- col_threshold(config, col, "max_z_score")
     iqr_k  <- col_threshold(config, col, "iqr_fence_multiplier")
@@ -930,6 +984,9 @@ check_schema_contract <- function(df, config) {
 #'   \code{\link{load_config}}.
 #' @param file_path Character or \code{NULL}. Absolute path to the file, used
 #'   for the optional \code{max_file_size_mb} check in QC-14.
+#' @param types Optional named character vector of pre-resolved column types;
+#'   see \code{\link{check_inferred_types}}. When \code{NULL} (the default),
+#'   types are resolved once here and shared by all type-dependent checks.
 #'
 #' @return A list of \code{\link{dq_result}} objects.
 #'
@@ -941,23 +998,24 @@ check_schema_contract <- function(df, config) {
 #' results <- run_qc_checks(df, cfg)
 #'
 #' @export
-run_qc_checks <- function(df, config, file_path = NULL) {
+run_qc_checks <- function(df, config, file_path = NULL, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   c(
     check_missing_rate(df, config),
     check_empty_column(df, config),
     check_duplicate_rows(df, config),
     check_row_count(df, config),
     check_col_count(df, config),
-    check_inferred_types(df, config),
-    check_numeric_stats(df, config),
-    check_distinct_counts(df, config),
+    check_inferred_types(df, config, types = types),
+    check_numeric_stats(df, config, types = types),
+    check_distinct_counts(df, config, types = types),
     check_allowed_values(df, config),
     check_numeric_bounds(df, config),
-    check_non_numeric(df, config),
+    check_non_numeric(df, config, types = types),
     check_key_uniqueness(df, config),
     check_pattern(df, config),
     check_min_row_count(df, config, file_path = file_path),
-    check_outliers(df, config),
+    check_outliers(df, config, types = types),
     check_schema_contract(df, config)
   )
 }

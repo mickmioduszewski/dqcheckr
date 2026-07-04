@@ -173,7 +173,9 @@ compare_snapshots <- function(dataset_name,
     base_name <- sprintf("drift_%s_%s", dataset_name, ts)
     dir.create(report_dir, showWarnings = FALSE, recursive = TRUE)
     html_path <- file.path(report_dir, paste0(base_name, ".html"))
-    .write_drift_html_report(drift, html_path)
+    # NULL when Quarto is unavailable — the message and browseURL below must
+    # not reference a report that was never written.
+    html_path <- .write_drift_html_report(drift, html_path)
   }
 
   message(sprintf(

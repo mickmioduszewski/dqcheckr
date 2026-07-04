@@ -4,7 +4,7 @@
 \alias{check_numeric_stats}
 \title{QC-07: Report numeric summary statistics}
 \usage{
-check_numeric_stats(df, config)
+check_numeric_stats(df, config, types = NULL)
 }
 \arguments{
 \item{df}{A data frame with all columns as character vectors (as returned by
@@ -12,6 +12,9 @@ check_numeric_stats(df, config)
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{types}{Optional named character vector of pre-resolved column types;
+see \code{\link{check_inferred_types}}.}
 }
 \value{
 A list of \code{\link{dq_result}} objects (one per numeric column),

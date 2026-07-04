@@ -286,3 +286,45 @@ test_that("run_comparison_checks() carries type_changed_cols attribute", {
   tc  <- attr(res, "type_changed_cols")
   expect_true(any(grepl("account_balance", tc)))
 })
+
+# -- Zero-row current delivery (0.2.3, B-01) ------------------------------------
+
+test_that("run_comparison_checks() handles a zero-row current delivery without error", {
+  prev <- make_accounts_df()
+  curr <- prev[0, ]
+  res  <- run_comparison_checks(curr, prev, base_config())
+  expect_true(length(res) > 0)
+  statuses <- vapply(res, `[[`, character(1), "status")
+  expect_true(all(statuses %in% c("PASS", "WARN", "FAIL", "INFO")))
+})
+
+# -- CP-04 unparseable current column (0.2.3, B-02) -------------------------------
+
+test_that("CP-04 emits WARN instead of erroring when the current column has no parseable numerics", {
+  prev <- make_accounts_df()
+  curr <- make_accounts_df()
+  curr$account_balance <- letters[1:5]                       # nothing parses
+  cfg  <- base_config(list(column_types = list(account_balance = "numeric")))
+  res  <- run_comparison_checks(curr, prev, cfg)
+  cp04 <- Filter(\(r) r$check_id == "CP-04" &&
+                      !is.na(r$column) && r$column == "account_balance", res)
+  expect_length(cp04, 1)
+  expect_equal(cp04[[1]]$status, "WARN")
+  expect_match(cp04[[1]]$message, "cannot be computed")
+})
+
+# -- Precomputed types argument (0.2.3, P-01) -----------------------------------
+
+test_that("run_comparison_checks() with precomputed types matches default behaviour", {
+  curr <- make_accounts_df()
+  prev <- make_accounts_df()
+  prev$account_balance <- c("100", "200", "300", "400", "500")
+  cfg  <- base_config()
+  types_curr <- vapply(names(curr), \(c) resolve_col_type(c, curr[[c]], cfg), character(1))
+  types_prev <- vapply(names(prev), \(c) resolve_col_type(c, prev[[c]], cfg), character(1))
+  expect_identical(
+    run_comparison_checks(curr, prev, cfg,
+                          types_current = types_curr, types_previous = types_prev),
+    run_comparison_checks(curr, prev, cfg)
+  )
+})

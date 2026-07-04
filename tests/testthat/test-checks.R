@@ -430,3 +430,69 @@ test_that("check_outliers() skips non-numeric columns", {
   res <- check_outliers(df, cfg)
   expect_length(res, 0)  # no results for character column
 })
+
+# -- Zero-row deliveries (0.2.3, B-01) ------------------------------------------
+
+test_that("check_missing_rate() handles a zero-row data frame without error", {
+  df  <- make_accounts_df()[0, ]
+  res <- check_missing_rate(df, base_config())
+  statuses <- vapply(res, `[[`, character(1), "status")
+  expect_true(all(statuses == "PASS"))   # rates defined as 0 for empty input
+})
+
+test_that("run_qc_checks() on a zero-row data frame completes and FAILs via QC-14 'Empty file'", {
+  df  <- make_accounts_df()[0, ]
+  res <- run_qc_checks(df, base_config())
+  empty <- Filter(\(r) r$check_name == "Empty file", res)
+  expect_length(empty, 1)
+  expect_equal(empty[[1]]$status, "FAIL")
+  expect_equal(overall_status(res), "FAIL")
+})
+
+test_that("QC-14 'Empty file' fires even when min_row_count is 0 (disabled)", {
+  df  <- make_accounts_df()[0, ]
+  res <- check_min_row_count(df, base_config())   # base_config: min_row_count = 0
+  empty <- Filter(\(r) r$check_name == "Empty file", res)
+  expect_length(empty, 1)
+  expect_equal(empty[[1]]$status, "FAIL")
+})
+
+test_that("QC-14 emits no 'Empty file' result for a non-empty file", {
+  res <- check_min_row_count(make_accounts_df(), base_config())
+  expect_length(Filter(\(r) r$check_name == "Empty file", res), 0)
+})
+
+# -- QC-13 invalid regex (0.2.3, B-09) ------------------------------------------
+
+test_that("check_pattern() FAILs (not errors) on an invalid regex from config", {
+  cfg <- base_config(list(column_rules = list(id = list(pattern = "([A-"))))
+  res <- check_pattern(make_accounts_df(), cfg)
+  expect_length(res, 1)
+  expect_equal(res[[1]]$status, "FAIL")
+  expect_match(res[[1]]$message, "invalid regex")
+})
+
+test_that("check_pattern() still evaluates valid patterns normally", {
+  cfg <- base_config(list(column_rules = list(id = list(pattern = "^ID[0-9]{3}$"))))
+  res <- check_pattern(make_accounts_df(), cfg)
+  expect_equal(res[[1]]$status, "PASS")
+})
+
+# -- Precomputed types argument (0.2.3, P-01) -----------------------------------
+
+test_that("run_qc_checks() with precomputed types matches default behaviour", {
+  df    <- make_accounts_df()
+  cfg   <- base_config()
+  types <- vapply(names(df), \(c) resolve_col_type(c, df[[c]], cfg), character(1))
+  expect_identical(run_qc_checks(df, cfg, types = types),
+                   run_qc_checks(df, cfg))
+})
+
+test_that("type-dependent checks honour a supplied types map", {
+  df  <- make_accounts_df()
+  cfg <- base_config()
+  all_char <- setNames(rep("character", ncol(df)), names(df))
+  expect_length(check_numeric_stats(df, cfg, types = all_char), 0)
+  inferred <- check_inferred_types(df, cfg, types = all_char)
+  expect_true(all(vapply(inferred, \(r) r$observed == "character", logical(1))))
+})

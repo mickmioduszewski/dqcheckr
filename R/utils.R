@@ -31,9 +31,10 @@
 dq_result <- function(check_id, check_name, column = NA_character_,
                       status, observed, threshold = NA_character_, message) {
   valid_statuses <- c("PASS", "WARN", "FAIL", "INFO")
-  if (is.null(status) || !status %in% valid_statuses) {
+  if (is.null(status) || length(status) != 1 || !status %in% valid_statuses) {
     rlang::abort(sprintf("status must be one of: %s (got: %s)",
-                         paste(valid_statuses, collapse = ", "), status),
+                         paste(valid_statuses, collapse = ", "),
+                         paste(deparse(status), collapse = "")),
                  class = c("dqcheckr_invalid_argument", "dqcheckr_error"),
                  .internal = FALSE)
   }
@@ -43,7 +44,8 @@ dq_result <- function(check_id, check_name, column = NA_character_,
     column     = column,
     status     = status,
     observed   = as.character(observed),
-    threshold  = if (is.na(threshold)) NA_character_ else as.character(threshold),
+    threshold  = if (is.null(threshold) || length(threshold) != 1 || is.na(threshold))
+      NA_character_ else as.character(threshold),
     message    = as.character(message)
   )
 }
@@ -105,6 +107,16 @@ load_config <- function(dataset_name, config_dir) {
         paste(bad, collapse = ", "), paste(valid_types, collapse = ", ")
       ), class = c("dqcheckr_invalid_config", "dqcheckr_error"))
   }
+
+  # column_order_severity flows straight into a dq_result status (CP-08), so
+  # a typo like "error" would otherwise abort the run mid-check.
+  sev <- dataset_cfg$rules$column_order_severity
+  if (!is.null(sev) &&
+      !(length(sev) == 1 && tolower(sev) %in% c("pass", "warn", "fail", "info")))
+    rlang::abort(sprintf(
+      "Invalid column_order_severity value: %s. Must be one of: pass, warn, fail, info",
+      paste(deparse(sev), collapse = "")
+    ), class = c("dqcheckr_invalid_config", "dqcheckr_error"))
 
   dataset_cfg
 }
@@ -174,6 +186,22 @@ resolve_col_type <- function(col, x, config) {
   override <- (config$column_types %||% list())[[col]]
   if (!is.null(override)) return(override)
   infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+}
+
+#' Resolve types for every column of a data frame in one pass
+#'
+#' Named character vector of \code{resolve_col_type()} results, computed once
+#' so the check suite doesn't re-run full-column type inference (five date
+#' parses plus a numeric parse per call) for every check that needs a type.
+#'
+#' @param df A data frame with all columns as character vectors.
+#' @param config Named list. Merged configuration.
+#' @return Named character vector, one element per column of \code{df}.
+#' @keywords internal
+#' @noRd
+resolve_col_types <- function(df, config) {
+  vapply(names(df), function(col) resolve_col_type(col, df[[col]], config),
+         character(1))
 }
 
 #' Look up the effective threshold for a column, with per-column fallback

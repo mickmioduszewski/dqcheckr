@@ -4,7 +4,13 @@
 \alias{run_comparison_checks}
 \title{Run all version comparison checks between two dataset snapshots}
 \usage{
-run_comparison_checks(df_current, df_previous, config)
+run_comparison_checks(
+  df_current,
+  df_previous,
+  config,
+  types_current = NULL,
+  types_previous = NULL
+)
 }
 \arguments{
 \item{df_current}{A data frame. The current delivery.}
@@ -13,6 +19,12 @@ run_comparison_checks(df_current, df_previous, config)
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{types_current, types_previous}{Optional named character vectors of
+pre-resolved column types for the current and previous data frames (as
+produced by \code{\link{resolve_col_type}} per column). When \code{NULL}
+(the default), types are resolved once here and shared by all
+type-dependent comparison checks.}
 }
 \value{
 A list of \code{\link{dq_result}} objects. The list carries

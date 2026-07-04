@@ -160,3 +160,46 @@ test_that("load_config() stops when dataset yml is missing", {
   expect_error(load_config("nonexistent_ds", sub),
                class = "dqcheckr_missing_file")
 })
+
+# -- dq_result() argument hardening (0.2.3, B-05) ---------------------------------
+
+test_that("dq_result() accepts threshold = NULL as absent", {
+  r <- dq_result("QC-99", "test", status = "PASS", observed = "ok",
+                 threshold = NULL, message = "ok")
+  expect_identical(r$threshold, NA_character_)
+})
+
+test_that("dq_result() rejects invalid status values with a typed error", {
+  expect_error(
+    dq_result("QC-99", "t", status = "ERROR", observed = "o", message = "m"),
+    class = "dqcheckr_invalid_argument")
+  expect_error(
+    dq_result("QC-99", "t", status = c("PASS", "FAIL"), observed = "o", message = "m"),
+    class = "dqcheckr_invalid_argument")
+})
+
+# -- load_config() column_order_severity validation (0.2.3, B-09) -----------------
+
+test_that("load_config() rejects an invalid column_order_severity", {
+  tmp <- tempfile("cfg_"); dir.create(tmp)
+  on.exit(unlink(tmp, recursive = TRUE))
+  writeLines("default_rules: {}", file.path(tmp, "dqcheckr.yml"))
+  writeLines(c("dataset_name: sev_ds",
+               "rule_overrides:",
+               "  column_order_severity: error"),
+             file.path(tmp, "sev_ds.yml"))
+  expect_error(load_config("sev_ds", tmp), class = "dqcheckr_invalid_config")
+})
+
+test_that("load_config() accepts valid column_order_severity values", {
+  tmp <- tempfile("cfg_"); dir.create(tmp)
+  on.exit(unlink(tmp, recursive = TRUE))
+  writeLines("default_rules: {}", file.path(tmp, "dqcheckr.yml"))
+  for (sev in c("pass", "warn", "fail", "info", "FAIL")) {
+    writeLines(c("dataset_name: sev_ok",
+                 "rule_overrides:",
+                 sprintf("  column_order_severity: %s", sev)),
+               file.path(tmp, "sev_ok.yml"))
+    expect_no_error(load_config("sev_ok", tmp))
+  }
+})

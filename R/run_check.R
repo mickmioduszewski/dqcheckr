@@ -49,6 +49,12 @@ run_dq_check <- function(dataset_name,
                          open_report  = TRUE) {
   config <- load_config(dataset_name, config_dir)
 
+  # Single clock read for the whole run: the snapshot's run_timestamp and the
+  # report filename must come from the same instant, because consumers (the
+  # GUI's history links) reconstruct the report filename from the stored
+  # timestamp.
+  run_time <- Sys.time()
+
   files   <- detect_files(config)
   df_curr <- read_dataset(files$current, config)
   df_prev <- if (!is.null(files$previous))
@@ -56,14 +62,18 @@ run_dq_check <- function(dataset_name,
   else
     NULL
 
-  qc_results     <- run_qc_checks(df_curr, config, file_path = files$current)
+  # Resolve column types once; every type-dependent check shares this map.
+  types_curr <- resolve_col_types(df_curr, config)
+
+  qc_results     <- run_qc_checks(df_curr, config, file_path = files$current,
+                                  types = types_curr)
   cp_results     <- if (!is.null(df_prev))
-    run_comparison_checks(df_curr, df_prev, config)
+    run_comparison_checks(df_curr, df_prev, config, types_current = types_curr)
   else
     list()
   custom_results <- run_custom_checks(df_curr, config)
 
-  col_stats <- compute_col_stats(df_curr, config)
+  col_stats <- compute_col_stats(df_curr, config, types = types_curr)
 
   db_path         <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
                                    mustWork = FALSE)
@@ -73,7 +83,8 @@ run_dq_check <- function(dataset_name,
     basename(files$current),
     df_curr, qc_results, cp_results, custom_results, config,
     col_stats       = col_stats,
-    comparison_mode = comparison_mode
+    comparison_mode = comparison_mode,
+    run_time        = run_time
   )
 
   snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)
@@ -91,7 +102,8 @@ run_dq_check <- function(dataset_name,
       config           = config,
       col_stats        = col_stats,
       output_dir       = config$report_output_dir %||% "reports/",
-      open_report      = open_report
+      open_report      = open_report,
+      run_time         = run_time
     ),
     error = function(e) {
       if (!is.null(snapshot_id)) .mark_render_failed(db_path, snapshot_id)

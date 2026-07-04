@@ -1,3 +1,47 @@
+# dqcheckr 0.2.3
+
+## Bug fixes
+
+* A delivery with zero data rows (e.g. a header-only CSV) no longer aborts
+  `run_dq_check()` with an untyped "missing value where TRUE/FALSE needed"
+  error. Missing rates are defined as 0 for empty inputs, and QC-14 gains an
+  unconditional "Empty file" FAIL sub-check so an empty delivery always fails
+  the run — with a snapshot and report — instead of crashing it.
+* CP-04 (numeric mean shift) no longer errors when a numeric column has no
+  parseable values in the current delivery; it now emits a WARN result saying
+  the mean shift cannot be computed.
+* `detect_files()` no longer considers subdirectories of `folder` when
+  picking the current/previous file by modification time.
+* `dq_result(threshold = NULL)` now yields an `NA` threshold instead of
+  failing with "argument is of length zero"; invalid vector `status` values
+  produce a clear typed error.
+* An invalid regex in a `column_rules` `pattern` now produces a QC-13 FAIL
+  result naming the pattern instead of aborting the run; an invalid
+  `column_order_severity` is rejected at `load_config()` time with a typed
+  `dqcheckr_invalid_config` error instead of aborting mid-check.
+* `run_custom_checks()` now validates each returned element (required fields
+  and a valid status) and aborts with `dqcheckr_invalid_custom_checks` naming
+  the offending element, instead of failing later with misleading errors.
+* Snapshot writes are now wrapped in a single transaction, so a failure can
+  no longer leave a `snapshots` row without its `column_snapshots` stats;
+  column-level custom results are batch-inserted.
+* The snapshot `run_timestamp` and the report filename are now derived from
+  one timestamp taken at the start of the run. Previously they came from two
+  separate clock reads, so links that reconstruct the report filename from
+  the snapshot timestamp (as the GUI does) could intermittently point at a
+  file with a name one second off.
+* `compare_snapshots()` no longer announces (and offers to open) a drift
+  report path when Quarto is unavailable and no report was written.
+
+## Performance
+
+* Column types are now inferred once per data frame and shared across all
+  type-dependent checks. `run_qc_checks()` and the individual check functions
+  gain an optional `types` argument; previously each of QC-06/07/08/11/15,
+  the column statistics, and five comparison checks re-ran full-column type
+  inference (five date parses plus a numeric parse) independently — the
+  dominant cost on large files.
+
 # dqcheckr 0.2.2
 
 ## New features

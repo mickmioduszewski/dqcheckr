@@ -75,3 +75,52 @@ test_that("run_dq_check() returns PASS status for the clean fixture pair", {
   )
   expect_equal(result$status, "PASS")
 })
+
+# -- Empty (header-only) delivery completes with FAIL (0.2.3, B-01) ---------------
+
+test_that("run_dq_check() completes with FAIL for an empty (header-only) delivery", {
+  tmp <- tempdir()
+  cfg <- file.path(tmp, "dq_empty_integ")
+  dir.create(cfg, showWarnings = FALSE)
+  on.exit(unlink(cfg, recursive = TRUE))
+
+  empty_csv <- file.path(cfg, "empty_delivery.csv")
+  writeLines("id,name,amount", empty_csv)                # header only, 0 data rows
+
+  writeLines(c(
+    "default_rules:",
+    "  max_missing_rate: 0.05"
+  ), file.path(cfg, "dqcheckr.yml"))
+  writeLines(c(
+    "dataset_name: 'empty_ds'",
+    sprintf("current_file: '%s'", empty_csv),
+    "format: csv",
+    sprintf("snapshot_db: '%s'", file.path(cfg, "snapshots.sqlite")),
+    sprintf("report_output_dir: '%s'", file.path(cfg, "reports"))
+  ), file.path(cfg, "empty_ds.yml"))
+
+  result <- suppressWarnings(
+    run_dq_check("empty_ds", config_dir = cfg, open_report = FALSE)
+  )
+  expect_equal(result$status, "FAIL")                    # reported, not crashed
+  expect_false(is.null(result$snapshot_id))              # snapshot was written
+})
+
+# -- Report filename slug matches the snapshot run_timestamp (0.2.3, B-04) --------
+
+test_that("report filename slug matches the snapshot run_timestamp", {
+  cfg_dir <- setup_integration_env()
+  result  <- suppressWarnings(
+    run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+  )
+  skip_if(is.null(result$report_path), "Report not rendered (Quarto unavailable)")
+
+  snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
+                                 "integ_ds", n = 1)
+  # Reconstruct the slug from the stored timestamp exactly the way the GUI's
+  # make_report_filename() does.
+  ts_raw <- gsub("[^0-9]", "", substr(snaps$run_timestamp[1], 1, 19))
+  slug   <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
+  expect_equal(basename(result$report_path),
+               sprintf("integ_ds_%s.html", slug))
+})

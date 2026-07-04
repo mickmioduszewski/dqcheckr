@@ -1,7 +1,13 @@
 #' Compute missing rate for a vector
+#'
+#' Defined as 0 for a zero-length vector — mean(logical(0)) would be NaN and
+#' poison downstream threshold comparisons (empty files are reported by QC-14).
 #' @keywords internal
 #' @noRd
-.missing_rate_vec <- function(x) mean(is.na(x) | x == "")
+.missing_rate_vec <- function(x) {
+  if (length(x) == 0) return(0)
+  mean(is.na(x) | x == "")
+}
 
 #' CP-01: Compare row count between deliveries
 #' @keywords internal
@@ -48,7 +54,10 @@ compare_row_count <- function(df_current, df_previous, config) {
 #'
 #' @keywords internal
 #' @noRd
-compare_schema <- function(df_current, df_previous, config) {
+compare_schema <- function(df_current, df_previous, config,
+                           types_current = NULL, types_previous = NULL) {
+  types_current  <- types_current  %||% resolve_col_types(df_current,  config)
+  types_previous <- types_previous %||% resolve_col_types(df_previous, config)
   flag_new   <- isTRUE(config$rules$flag_new_columns     %||% TRUE)
   flag_drop  <- isTRUE(config$rules$flag_dropped_columns %||% TRUE)
   flag_type  <- isTRUE(config$rules$flag_type_changes    %||% TRUE)
@@ -59,8 +68,8 @@ compare_schema <- function(df_current, df_previous, config) {
 
   type_changed_cols <- character(0)
   for (col in common_cols) {
-    t_curr <- resolve_col_type(col, df_current[[col]],  config)
-    t_prev <- resolve_col_type(col, df_previous[[col]], config)
+    t_curr <- types_current[[col]]
+    t_prev <- types_previous[[col]]
     if (t_curr != t_prev)
       type_changed_cols <- c(type_changed_cols,
                              sprintf("%s (%s -> %s)", col, t_prev, t_curr))
@@ -159,16 +168,36 @@ compare_missing_rate <- function(df_current, df_previous, config) {
 #' CP-04: Compare numeric column means between deliveries
 #' @keywords internal
 #' @noRd
-compare_numeric_mean <- function(df_current, df_previous, config) {
+compare_numeric_mean <- function(df_current, df_previous, config,
+                                 types_current = NULL, types_previous = NULL) {
+  types_current  <- types_current  %||% resolve_col_types(df_current,  config)
+  types_previous <- types_previous %||% resolve_col_types(df_previous, config)
   threshold   <- config$rules$max_numeric_mean_shift_pct %||% 0.20
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (resolve_col_type(col, df_current[[col]],  config) != "numeric") next
-    if (resolve_col_type(col, df_previous[[col]], config) != "numeric") next
+    if (types_current[[col]]  != "numeric") next
+    if (types_previous[[col]] != "numeric") next
     mean_curr <- mean(suppressWarnings(as.numeric(df_current[[col]])),  na.rm = TRUE)
     mean_prev <- mean(suppressWarnings(as.numeric(df_previous[[col]])), na.rm = TRUE)
     if (is.nan(mean_prev) || mean_prev == 0) next
+    # mean(numeric(0)) is NaN: the current delivery has no parseable numeric
+    # values in a column that resolves as numeric. That is drift worth
+    # reporting, not a reason to crash the threshold comparison.
+    if (is.nan(mean_curr)) {
+      results <- c(results, list(dq_result(
+        check_id   = "CP-04",
+        check_name = "Numeric mean shift",
+        column     = col,
+        status     = "WARN",
+        observed   = sprintf("mean: not computable (previous: %.4g)", mean_prev),
+        threshold  = sprintf("+/-%.0f%%", threshold * 100),
+        message    = sprintf(paste0("Column '%s' has no parseable numeric values ",
+                                    "in the current delivery; mean shift cannot ",
+                                    "be computed."), col)
+      )))
+      next
+    }
     shift_pct <- abs((mean_curr - mean_prev) / mean_prev)
     status    <- if (shift_pct > threshold) "WARN" else "PASS"
     results <- c(results, list(dq_result(
@@ -193,11 +222,13 @@ compare_numeric_mean <- function(df_current, df_previous, config) {
 #' CP-05: Detect new distinct values in character columns
 #' @keywords internal
 #' @noRd
-compare_new_values <- function(df_current, df_previous, config) {
+compare_new_values <- function(df_current, df_previous, config,
+                               types_current = NULL) {
+  types_current <- types_current %||% resolve_col_types(df_current, config)
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (resolve_col_type(col, df_current[[col]], config) != "character") next
+    if (types_current[[col]] != "character") next
     curr_vals <- unique(df_current[[col]][!is.na(df_current[[col]]) &
                                           df_current[[col]] != ""])
     prev_vals <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
@@ -222,11 +253,13 @@ compare_new_values <- function(df_current, df_previous, config) {
 #' CP-06: Detect dropped distinct values in character columns
 #' @keywords internal
 #' @noRd
-compare_dropped_values <- function(df_current, df_previous, config) {
+compare_dropped_values <- function(df_current, df_previous, config,
+                                   types_current = NULL) {
+  types_current <- types_current %||% resolve_col_types(df_current, config)
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    if (resolve_col_type(col, df_current[[col]], config) != "character") next
+    if (types_current[[col]] != "character") next
     curr_vals    <- unique(df_current[[col]][!is.na(df_current[[col]]) &
                                              df_current[[col]] != ""])
     prev_vals    <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
@@ -251,13 +284,16 @@ compare_dropped_values <- function(df_current, df_previous, config) {
 #' CP-07: Compare non-numeric rate in numeric columns between deliveries
 #' @keywords internal
 #' @noRd
-compare_non_numeric_rate <- function(df_current, df_previous, config) {
+compare_non_numeric_rate <- function(df_current, df_previous, config,
+                                     types_current = NULL, types_previous = NULL) {
+  types_current  <- types_current  %||% resolve_col_types(df_current,  config)
+  types_previous <- types_previous %||% resolve_col_types(df_previous, config)
   threshold   <- config$rules$max_non_numeric_rate_change_pp %||% 1.0
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
-    t_curr <- resolve_col_type(col, df_current[[col]],  config)
-    t_prev <- resolve_col_type(col, df_previous[[col]], config)
+    t_curr <- types_current[[col]]
+    t_prev <- types_previous[[col]]
     if (t_curr != "numeric" || t_prev != "numeric") next
 
     .nn_rate <- function(x) {
@@ -336,6 +372,11 @@ compare_column_order <- function(df_current, df_previous, config) {
 #' @param df_previous A data frame. The previous delivery.
 #' @param config Named list. Merged configuration as returned by
 #'   \code{\link{load_config}}.
+#' @param types_current,types_previous Optional named character vectors of
+#'   pre-resolved column types for the current and previous data frames (as
+#'   produced by \code{\link{resolve_col_type}} per column). When \code{NULL}
+#'   (the default), types are resolved once here and shared by all
+#'   type-dependent comparison checks.
 #'
 #' @return A list of \code{\link{dq_result}} objects. The list carries
 #'   attributes \code{new_cols}, \code{dropped_cols}, and
@@ -352,8 +393,14 @@ compare_column_order <- function(df_current, df_previous, config) {
 #' results   <- run_comparison_checks(curr, prev, cfg)
 #'
 #' @export
-run_comparison_checks <- function(df_current, df_previous, config) {
-  schema_res   <- compare_schema(df_current, df_previous, config)
+run_comparison_checks <- function(df_current, df_previous, config,
+                                  types_current = NULL, types_previous = NULL) {
+  types_current  <- types_current  %||% resolve_col_types(df_current,  config)
+  types_previous <- types_previous %||% resolve_col_types(df_previous, config)
+
+  schema_res   <- compare_schema(df_current, df_previous, config,
+                                 types_current = types_current,
+                                 types_previous = types_previous)
   new_cols          <- attr(schema_res, "new_cols")
   dropped_cols      <- attr(schema_res, "dropped_cols")
   type_changed_cols <- attr(schema_res, "type_changed_cols")
@@ -362,10 +409,16 @@ run_comparison_checks <- function(df_current, df_previous, config) {
     compare_row_count(df_current, df_previous, config),
     schema_res,
     compare_missing_rate(df_current, df_previous, config),
-    compare_numeric_mean(df_current, df_previous, config),
-    compare_new_values(df_current, df_previous, config),
-    compare_dropped_values(df_current, df_previous, config),
-    compare_non_numeric_rate(df_current, df_previous, config),
+    compare_numeric_mean(df_current, df_previous, config,
+                         types_current = types_current,
+                         types_previous = types_previous),
+    compare_new_values(df_current, df_previous, config,
+                       types_current = types_current),
+    compare_dropped_values(df_current, df_previous, config,
+                           types_current = types_current),
+    compare_non_numeric_rate(df_current, df_previous, config,
+                             types_current = types_current,
+                             types_previous = types_previous),
     compare_column_order(df_current, df_previous, config)
   )
 

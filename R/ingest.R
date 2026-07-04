@@ -43,6 +43,9 @@ detect_files <- function(config) {
   }
 
   files <- list.files(folder, full.names = TRUE)
+  # list.files() includes subdirectories in a non-recursive listing; a newly
+  # created folder must never be picked as the "current file" by mtime.
+  files <- files[!dir.exists(files)]
   if (length(files) == 0) {
     rlang::abort(paste0("No files found in folder: ", folder),
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))

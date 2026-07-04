@@ -21,9 +21,12 @@ A list of \code{\link{dq_result}} objects (one to three entries
   depending on which sub-checks are active).
 }
 \description{
-Runs up to three sub-checks, each returning a separate
+Runs up to four sub-checks, each returning a separate
 \code{\link{dq_result}}:
 \enumerate{
+  \item \strong{Empty file} -- FAIL when the file contains no data rows at
+    all. Emitted unconditionally (independent of \code{min_row_count}) so
+    that an empty delivery always fails the run.
   \item \strong{File size} -- only when \code{file_path} is supplied and
     \code{max_file_size_mb} is configured in \code{rules}: FAIL if the file
     exceeds the size limit.

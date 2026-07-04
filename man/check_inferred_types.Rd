@@ -4,7 +4,7 @@
 \alias{check_inferred_types}
 \title{QC-06: Report inferred column types}
 \usage{
-check_inferred_types(df, config)
+check_inferred_types(df, config, types = NULL)
 }
 \arguments{
 \item{df}{A data frame with all columns as character vectors (as returned by
@@ -12,6 +12,12 @@ check_inferred_types(df, config)
 
 \item{config}{Named list. Merged configuration as returned by
 \code{\link{load_config}}.}
+
+\item{types}{Optional named character vector of pre-resolved column types
+(one element per column, as produced by \code{\link{resolve_col_type}}).
+When \code{NULL} (the default), types are resolved internally. Supplying
+this avoids re-running type inference when several checks share one data
+frame.}
 }
 \value{
 A list of \code{\link{dq_result}} objects, one per column, all with

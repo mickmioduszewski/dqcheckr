@@ -172,3 +172,26 @@ test_that("detect_files() uses filename as tiebreaker when mtimes are equal (RC-
   expect_equal(basename(result$current),  "b_delivery.csv")
   expect_equal(basename(result$previous), "a_delivery.csv")
 })
+
+# -- detect_files() ignores directories (0.2.3, B-03) -----------------------------
+
+test_that("detect_files() ignores subdirectories in folder mode", {
+  folder <- tempfile("dqdir_")
+  dir.create(folder)
+  on.exit(unlink(folder, recursive = TRUE))
+  data_file <- file.path(folder, "delivery.csv")
+  writeLines(c("id,name", "1,a"), data_file)
+  Sys.sleep(0.05)
+  dir.create(file.path(folder, "archive"))   # newer mtime than the data file
+  files <- detect_files(list(folder = folder))
+  expect_equal(files$current, data_file)
+  expect_null(files$previous)
+})
+
+test_that("detect_files() errors when a folder contains only subdirectories", {
+  folder <- tempfile("dqdir_")
+  dir.create(file.path(folder, "only_subdir"), recursive = TRUE)
+  on.exit(unlink(folder, recursive = TRUE))
+  expect_error(detect_files(list(folder = folder)),
+               class = "dqcheckr_missing_file")
+})

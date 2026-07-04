@@ -4,7 +4,10 @@
 render_report <- function(dataset_name, file_name, file_path, df,
                           qc_results, cp_results, custom_results,
                           snapshot_history, config, col_stats = NULL, output_dir,
-                          open_report = TRUE) {
+                          open_report = TRUE, run_time = NULL) {
+  # run_time is the run's single timestamp (see run_dq_check) so the filename
+  # slug matches the snapshot's run_timestamp exactly.
+  run_time <- run_time %||% Sys.time()
   if (!quarto::quarto_available()) {
     warning("Quarto CLI not found -- HTML report skipped. Install from https://quarto.org",
             call. = FALSE)
@@ -20,7 +23,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
   file_path  <- normalizePath(file_path,  mustWork = FALSE)
 
-  ts    <- format(Sys.time(), "%Y%m%d_%H%M%S", tz = "UTC")
+  ts    <- format(run_time, "%Y%m%d_%H%M%S", tz = "UTC")
   fname <- sprintf("%s_%s.html", dataset_name, ts)
   out   <- file.path(output_dir, fname)
 
@@ -37,7 +40,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
     # Intentionally local time (tz = "") -- this is the "Run time" shown to
     # the user in the report (report.qmd:71), unlike the UTC timestamps used
     # for filename slugs and snapshot DB keys elsewhere in this file.
-    run_timestamp    = format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = ""),
+    run_timestamp    = format(run_time, "%Y-%m-%d %H:%M:%S", tz = ""),
     df               = df,
     qc_results       = qc_results,
     cp_results       = cp_results,

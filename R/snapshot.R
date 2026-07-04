@@ -82,13 +82,16 @@ init_snapshot_db <- function(db_path) {
 #' @keywords internal
 #' @noRd
 #' @importFrom stats sd
-compute_col_stats <- function(df, config) {
+compute_col_stats <- function(df, config, types = NULL) {
+  types <- types %||% resolve_col_types(df, config)
   col_frames <- lapply(names(df), function(col) {
     x          <- df[[col]]
-    col_type   <- resolve_col_type(col, x, config)
+    col_type   <- types[[col]]
     non_empty  <- x[!is.na(x) & x != ""]
     miss_count <- sum(is.na(x) | x == "")
-    miss_rate  <- miss_count / nrow(df)
+    # Defined as 0 for a zero-row frame; 0/0 would store literal "NaN" in the
+    # snapshot DB and poison drift arithmetic.
+    miss_rate  <- if (nrow(df) > 0) miss_count / nrow(df) else 0
     dist_count <- length(unique(non_empty))
 
     miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
@@ -156,7 +159,12 @@ compute_col_stats <- function(df, config) {
 write_snapshot <- function(db_path, dataset_name, file_name, df,
                            qc_results, cp_results, custom_results, config,
                            col_stats = NULL,
-                           comparison_mode = "comparison") {
+                           comparison_mode = "comparison",
+                           run_time = NULL) {
+  # One clock read per run: run_dq_check() passes the same run_time here and
+  # to render_report() so the report filename reconstructed from the stored
+  # run_timestamp (e.g. by the GUI) always matches the file actually written.
+  run_time <- run_time %||% Sys.time()
   tryCatch({
     init_snapshot_db(db_path)
     con <- .sqlite_connect(db_path)
@@ -198,50 +206,59 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
       miss_schema <- NA_character_
     }
 
-    DBI::dbExecute(con,
-      "INSERT INTO snapshots
-       (dataset_name, run_timestamp, file_name, row_count, col_count,
-        check_pass_count, check_warn_count, check_fail_count, check_info_count,
-        overall_status,
-        new_cols_vs_previous, missing_cols_vs_previous,
-        new_cols_vs_schema, missing_cols_vs_schema,
-        comparison_mode, render_status, type_changed_cols_vs_previous)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', ?)",
-      list(dataset_name,
-           format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-           file_name,
-           nrow(df), ncol(df),
-           pass_count, warn_count, fail_count, info_count,
-           o_status,
-           new_cols_prev_str, drop_cols_prev_str,
-           new_schema, miss_schema,
-           comparison_mode,
-           type_chg_str)
-    )
-
-    snapshot_id <- DBI::dbGetQuery(con,
-      "SELECT last_insert_rowid() AS id")$id[[1]]
-
     if (is.null(col_stats)) col_stats <- compute_col_stats(df, config)
-    col_stats$snapshot_id <- snapshot_id
 
-    DBI::dbAppendTable(con, "column_snapshots",
-      col_stats[, c("snapshot_id", "column_name", "dq_check",
-                    "value", "threshold", "severity_on_breach")])
+    # All writes in one transaction: a failure part-way (disk full, malformed
+    # value) must not leave a snapshots row without its column_snapshots stats,
+    # which would silently poison later drift comparisons.
+    DBI::dbWithTransaction(con, {
+      DBI::dbExecute(con,
+        "INSERT INTO snapshots
+         (dataset_name, run_timestamp, file_name, row_count, col_count,
+          check_pass_count, check_warn_count, check_fail_count, check_info_count,
+          overall_status,
+          new_cols_vs_previous, missing_cols_vs_previous,
+          new_cols_vs_schema, missing_cols_vs_schema,
+          comparison_mode, render_status, type_changed_cols_vs_previous)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', ?)",
+        list(dataset_name,
+             format(run_time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+             file_name,
+             nrow(df), ncol(df),
+             pass_count, warn_count, fail_count, info_count,
+             o_status,
+             new_cols_prev_str, drop_cols_prev_str,
+             new_schema, miss_schema,
+             comparison_mode,
+             type_chg_str)
+      )
 
-    for (r in custom_results) {
-      if (!is.na(r$column)) {
-        sev <- if (r$status %in% c("WARN", "FAIL")) r$status else NA_character_
-        DBI::dbExecute(con,
-          "INSERT INTO column_snapshots
-           (snapshot_id, column_name, dq_check, value, threshold, severity_on_breach)
-           VALUES (?, ?, ?, ?, ?, ?)",
-          list(snapshot_id, r$column, r$check_id,
-               r$observed, r$threshold, sev))
+      snapshot_id <- DBI::dbGetQuery(con,
+        "SELECT last_insert_rowid() AS id")$id[[1]]
+
+      col_stats$snapshot_id <- snapshot_id
+
+      DBI::dbAppendTable(con, "column_snapshots",
+        col_stats[, c("snapshot_id", "column_name", "dq_check",
+                      "value", "threshold", "severity_on_breach")])
+
+      custom_col <- Filter(function(r) !is.na(r$column), custom_results)
+      if (length(custom_col) > 0) {
+        DBI::dbAppendTable(con, "column_snapshots", data.frame(
+          snapshot_id = snapshot_id,
+          column_name = vapply(custom_col, `[[`, character(1), "column"),
+          dq_check    = vapply(custom_col, `[[`, character(1), "check_id"),
+          value       = vapply(custom_col, `[[`, character(1), "observed"),
+          threshold   = vapply(custom_col, `[[`, character(1), "threshold"),
+          severity_on_breach = vapply(custom_col, function(r)
+            if (r$status %in% c("WARN", "FAIL")) r$status else NA_character_,
+            character(1)),
+          stringsAsFactors = FALSE
+        ))
       }
-    }
 
-    snapshot_id
+      snapshot_id
+    })
   },
   error = function(e) {
     warning("SQLite write failed: ", conditionMessage(e))
