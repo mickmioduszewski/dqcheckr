@@ -41,6 +41,7 @@ setup_integration_env <- function() {
 }
 
 test_that("run_dq_check() returns a list with status, report_path, snapshot_id", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   cfg_dir <- setup_integration_env()
   result  <- suppressWarnings(
     run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
@@ -51,6 +52,7 @@ test_that("run_dq_check() returns a list with status, report_path, snapshot_id",
 })
 
 test_that("run_dq_check() writes an HTML report file to disk", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
   cfg_dir <- setup_integration_env()
   result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
@@ -60,6 +62,7 @@ test_that("run_dq_check() writes an HTML report file to disk", {
 })
 
 test_that("run_dq_check() writes a snapshot to the SQLite database", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   cfg_dir <- setup_integration_env()
   result  <- suppressWarnings(
     run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
@@ -69,6 +72,7 @@ test_that("run_dq_check() writes a snapshot to the SQLite database", {
 })
 
 test_that("run_dq_check() returns PASS status for the clean fixture pair", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   cfg_dir <- setup_integration_env()
   result  <- suppressWarnings(
     run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
@@ -79,6 +83,7 @@ test_that("run_dq_check() returns PASS status for the clean fixture pair", {
 # -- Empty (header-only) delivery completes with FAIL (0.2.3, B-01) ---------------
 
 test_that("run_dq_check() completes with FAIL for an empty (header-only) delivery", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   tmp <- tempdir()
   cfg <- file.path(tmp, "dq_empty_integ")
   dir.create(cfg, showWarnings = FALSE)
@@ -109,6 +114,7 @@ test_that("run_dq_check() completes with FAIL for an empty (header-only) deliver
 # -- Report filename slug matches the snapshot run_timestamp (0.2.3, B-04) --------
 
 test_that("report filename slug matches the snapshot run_timestamp", {
+  skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   cfg_dir <- setup_integration_env()
   result  <- suppressWarnings(
     run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
