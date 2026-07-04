@@ -135,6 +135,20 @@ load_config <- function(dataset_name, config_dir) {
 #' @return A single character string: \code{"date"}, \code{"numeric"},
 #'   \code{"character"}, or \code{"unknown"}.
 #'
+#' @details
+#' Date formats are tried in this fixed precedence order:
+#' \code{"\%Y-\%m-\%d"}, \code{"\%d/\%m/\%Y"}, \code{"\%m/\%d/\%Y"},
+#' \code{"\%Y\%m\%d"}, \code{"\%d-\%m-\%Y"}. A column is classified as
+#' \code{"date"} only when \emph{every} non-empty value parses under one
+#' format; a single malformed date therefore flips the whole column to
+#' \code{"numeric"} or \code{"character"} (such flips between deliveries are
+#' surfaced by check CP-02c). Two caveats follow from the precedence rules:
+#' ambiguous day/month values resolve day-first (\code{"\%d/\%m/\%Y"} is
+#' tried before \code{"\%m/\%d/\%Y"}), and all-8-digit identifier columns
+#' whose values happen to parse under \code{"\%Y\%m\%d"} classify as dates.
+#' Pin the type with an entry in the \code{column_types} config map when the
+#' heuristic gets a column wrong.
+#'
 #' @examples
 #' infer_col_type(c("2024-01-01", "2024-06-15"))   # "date"
 #' infer_col_type(c("1.5", "2.0", "3.1"))          # "numeric"
@@ -148,8 +162,14 @@ infer_col_type <- function(x, threshold = 0.90) {
 
   if (length(non_empty) == 0) return("unknown")
 
+  # Cheap rejection: a format that fails anywhere in the first 100 values
+  # cannot pass the all-must-parse rule, so skip the full-column parse for
+  # it. Results are identical; only non-matching formats get cheaper.
+  head_sample  <- non_empty[seq_len(min(100L, length(non_empty)))]
   date_formats <- c("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y%m%d", "%d-%m-%Y")
   for (fmt in date_formats) {
+    parsed_head <- suppressWarnings(as.Date(head_sample, format = fmt))
+    if (any(is.na(parsed_head))) next
     parsed <- suppressWarnings(as.Date(non_empty, format = fmt))
     if (!any(is.na(parsed))) return("date")
   }
@@ -186,6 +206,40 @@ resolve_col_type <- function(col, x, config) {
   override <- (config$column_types %||% list())[[col]]
   if (!is.null(override)) return(override)
   infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+}
+
+#' Canonical report filename for a run
+#'
+#' Single source of truth for the report filename slug, used by both the
+#' snapshot writer (stored in the \code{report_file} column) and the report
+#' renderer, so the two can never disagree.
+#'
+#' @param dataset_name Character. Dataset name.
+#' @param run_time POSIXct. The run's single timestamp.
+#' @return Character filename, e.g. \code{"mydata_20260704_101112.html"}.
+#' @keywords internal
+#' @noRd
+report_filename <- function(dataset_name, run_time) {
+  sprintf("%s_%s.html", dataset_name,
+          format(run_time, "%Y%m%d_%H%M%S", tz = "UTC"))
+}
+
+#' Move a file, falling back to copy+delete across filesystems
+#'
+#' \code{file.rename()} fails (returning FALSE, no error) when source and
+#' target are on different filesystems -- e.g. a tempdir render moved to a
+#' network-share report directory. Without the fallback the rendered report
+#' would silently never arrive while the caller still returns its path.
+#'
+#' @keywords internal
+#' @noRd
+.move_file <- function(from, to) {
+  if (suppressWarnings(file.rename(from, to))) return(invisible(TRUE))
+  if (!file.copy(from, to, overwrite = TRUE))
+    rlang::abort(paste0("Failed to move rendered report to: ", to),
+                 class = c("dqcheckr_write_error", "dqcheckr_error"))
+  unlink(from)
+  invisible(TRUE)
 }
 
 #' Resolve types for every column of a data frame in one pass

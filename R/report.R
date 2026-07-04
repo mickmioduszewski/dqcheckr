@@ -23,8 +23,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
   file_path  <- normalizePath(file_path,  mustWork = FALSE)
 
-  ts    <- format(run_time, "%Y%m%d_%H%M%S", tz = "UTC")
-  fname <- sprintf("%s_%s.html", dataset_name, ts)
+  fname <- report_filename(dataset_name, run_time)
   out   <- file.path(output_dir, fname)
 
   if (is.null(col_stats)) col_stats <- compute_col_stats(df, config)
@@ -65,7 +64,7 @@ render_report <- function(dataset_name, file_name, file_path, df,
   )
 
   rendered <- file.path(render_dir, fname)
-  if (file.exists(rendered)) file.rename(rendered, out)
+  if (file.exists(rendered)) .move_file(rendered, out)
 
   if (open_report && interactive()) utils::browseURL(out)
 

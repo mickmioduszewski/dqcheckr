@@ -47,6 +47,11 @@ Reads two historical snapshot records (by ID) from the SQLite database and
 computes table-level, schema, and per-column statistical drift. Optionally
 renders an HTML drift report.
 }
+\note{
+As with \code{\link{run_dq_check}}, a relative \code{snapshot_db} or
+  \code{report_output_dir} from the config resolves against the R
+  process's working directory, not against \code{config_dir}.
+}
 \examples{
 \donttest{
 tmp     <- tempdir()

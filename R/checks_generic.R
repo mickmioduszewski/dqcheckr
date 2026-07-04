@@ -354,8 +354,15 @@ check_allowed_values <- function(df, config) {
   for (col in names(col_rules)) {
     allowed <- col_rules[[col]]$allowed_values
     if (is.null(allowed) || !col %in% names(df)) next
+    allowed_vec <- unlist(allowed, use.names = FALSE)
     vals <- df[[col]][!.missing_vals(df[[col]])]
-    bad  <- setdiff(unique(vals), allowed)
+    bad  <- setdiff(unique(vals), as.character(allowed_vec))
+    # When YAML supplied numbers, compare numerically too: as.character(2.1)
+    # is "2.1", so a file value of "2.10" would otherwise FAIL spuriously.
+    if (length(bad) > 0 && is.numeric(allowed_vec)) {
+      bad_num <- suppressWarnings(as.numeric(bad))
+      bad <- bad[is.na(bad_num) | !bad_num %in% allowed_vec]
+    }
     status <- if (length(bad) > 0) "FAIL" else "PASS"
     results <- c(results, list(dq_result(
       check_id   = "QC-09",
@@ -366,7 +373,7 @@ check_allowed_values <- function(df, config) {
         paste("Unexpected values:", .cap_values(bad))
       else
         "All values are in the allowed list.",
-      threshold  = paste("Allowed:", paste(allowed, collapse = ", ")),
+      threshold  = paste("Allowed:", paste(allowed_vec, collapse = ", ")),
       message    = if (length(bad) > 0)
         sprintf("Column '%s' contains %d unexpected value(s): %s.",
                 col, length(bad), .cap_values(bad))
@@ -410,18 +417,15 @@ check_numeric_bounds <- function(df, config) {
     max_val <- col_rules[[col]]$max_value
     if (is.null(min_val) && is.null(max_val)) next
     if (!col %in% names(df)) next
-    vals    <- suppressWarnings(as.numeric(df[[col]]))
-    violate <- character(0)
-    if (!is.null(min_val)) {
-      below   <- df[[col]][!is.na(vals) & vals < min_val]
-      violate <- c(violate, unique(below))
-    }
-    if (!is.null(max_val)) {
-      above   <- df[[col]][!is.na(vals) & vals > max_val]
-      violate <- c(violate, unique(above))
-    }
-    violate <- unique(violate)
-    status  <- if (length(violate) > 0) "FAIL" else "PASS"
+    vals <- suppressWarnings(as.numeric(df[[col]]))
+    # Count violating ROWS; a million rows of the same bad value must not
+    # read as "1 out-of-range value". Unique values are kept for display.
+    viol <- rep(FALSE, length(vals))
+    if (!is.null(min_val)) viol <- viol | (!is.na(vals) & vals < min_val)
+    if (!is.null(max_val)) viol <- viol | (!is.na(vals) & vals > max_val)
+    n_rows   <- sum(viol)
+    examples <- unique(df[[col]][viol])
+    status   <- if (n_rows > 0) "FAIL" else "PASS"
     thr_parts <- c(
       if (!is.null(min_val)) paste("min:", min_val),
       if (!is.null(max_val)) paste("max:", max_val)
@@ -431,13 +435,14 @@ check_numeric_bounds <- function(df, config) {
       check_name = "Numeric bounds",
       column     = col,
       status     = status,
-      observed   = if (length(violate) > 0)
-        paste("Out-of-range values:", paste(head(violate, 5), collapse = ", "))
+      observed   = if (n_rows > 0)
+        paste("Out-of-range values:", paste(head(examples, 5), collapse = ", "))
       else
         "All values are within bounds.",
       threshold  = paste(thr_parts, collapse = "; "),
-      message    = if (length(violate) > 0)
-        sprintf("Column '%s' has %d out-of-range value(s).", col, length(violate))
+      message    = if (n_rows > 0)
+        sprintf("Column '%s' has %d out-of-range row(s) (%d distinct value(s)).",
+                col, n_rows, length(examples))
       else
         sprintf("Column '%s' values are all within bounds.", col)
     )))

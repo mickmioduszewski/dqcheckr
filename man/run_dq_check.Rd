@@ -32,6 +32,14 @@ Orchestrates the complete dqcheckr pipeline: loads configuration, detects
 files, runs QC and comparison checks, writes a snapshot to SQLite, and
 renders an HTML report.
 }
+\note{
+Relative \code{snapshot_db} and \code{report_output_dir} config
+  values resolve against the R process's \emph{working directory}, not
+  against \code{config_dir}. Run from the deployment root (the directory
+  containing \code{config/}, \code{data/}, \code{reports/}) or use
+  absolute paths in the config; otherwise a fresh snapshot database is
+  silently created wherever the process happens to be running.
+}
 \examples{
 \donttest{
 tmp <- gsub("\\\\\\\\", "/", tempdir())

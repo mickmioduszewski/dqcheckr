@@ -203,3 +203,17 @@ test_that("load_config() accepts valid column_order_severity values", {
     expect_no_error(load_config("sev_ok", tmp))
   }
 })
+
+# -- infer_col_type() head-sample shortcut is behaviour-preserving (0.2.3, P-02) --
+
+test_that("infer_col_type() results unchanged with >100 values", {
+  dates <- format(seq(as.Date("2020-01-01"), by = "day", length.out = 250), "%Y-%m-%d")
+  expect_equal(infer_col_type(dates), "date")
+  nums <- as.character(seq_len(250))
+  expect_equal(infer_col_type(nums), "numeric")
+  # a bad date beyond the head sample still rejects the date classification
+  dates_bad <- c(dates, "not-a-date")
+  expect_equal(infer_col_type(dates_bad), "character")
+  chars <- c(rep("alpha", 150), rep("beta", 150))
+  expect_equal(infer_col_type(chars), "character")
+})

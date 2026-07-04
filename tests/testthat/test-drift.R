@@ -238,3 +238,29 @@ test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)"
                                 "numeric_mean_exceeds"])
 })
 
+
+# -- Snapshot IDs validated against the dataset (0.2.3, L-04) ---------------------
+
+test_that("compare_snapshots() rejects snapshot IDs from another dataset", {
+  db  <- tempfile(fileext = ".sqlite")
+  tmp <- tempfile("cfg_"); dir.create(tmp)
+  on.exit({ unlink(db); unlink(tmp, recursive = TRUE) })
+  writeLines(sprintf("snapshot_db: '%s'", db), file.path(tmp, "dqcheckr.yml"))
+
+  for (i in 1:2) {
+    write_snapshot(db, "ds_a", "a.csv", make_accounts_df(),
+                   list(), list(), list(), base_config())
+    write_snapshot(db, "ds_b", "b.csv", make_accounts_df(),
+                   list(), list(), list(), base_config())
+  }
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  ids_b <- DBI::dbGetQuery(con,
+    "SELECT id FROM snapshots WHERE dataset_name = 'ds_b'")$id
+  DBI::dbDisconnect(con)
+
+  expect_error(
+    compare_snapshots("ds_a",
+                      snapshot_id_prev = ids_b[1], snapshot_id_curr = ids_b[2],
+                      db_path = db, config_dir = tmp, report = FALSE),
+    class = "dqcheckr_not_found")
+})

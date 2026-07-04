@@ -310,3 +310,41 @@ test_that("compute_col_stats() defines missing_rate as 0 for a zero-row frame", 
   mr <- stats[stats$dq_check == "missing_rate", "value"]
   expect_true(all(mr == "0"))
 })
+
+# -- report_file column (0.2.3, B-04 second half) --------------------------------
+
+test_that("write_snapshot() stores report_file and migration adds the column", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
+  write_snapshot(db, "rf_ds", "f.csv", make_accounts_df(),
+                 make_results(), list(), list(), base_config(),
+                 run_time = rt, report_file = "rf_ds_20260704_101112.html")
+  snaps <- read_recent_snapshots(db, "rf_ds")
+  expect_equal(snaps$report_file[1], "rf_ds_20260704_101112.html")
+})
+
+test_that("report_file is NA when not supplied (pre-0.2.3 writers)", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  write_snapshot(db, "rf_na_ds", "f.csv", make_accounts_df(),
+                 make_results(), list(), list(), base_config())
+  snaps <- read_recent_snapshots(db, "rf_na_ds")
+  expect_true(is.na(snaps$report_file[1]))
+})
+
+test_that("read_recent_snapshots() empty fallback matches the live schema", {
+  empty <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  # Same columns whether the DB exists or not
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  write_snapshot(db, "schema_ds", "f.csv", make_accounts_df(),
+                 make_results(), list(), list(), base_config())
+  live <- read_recent_snapshots(db, "schema_ds")
+  expect_setequal(names(empty), names(live))
+})
+
+test_that("report_filename() produces the documented slug", {
+  rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
+  expect_equal(report_filename("mydata", rt), "mydata_20260704_101112.html")
+})

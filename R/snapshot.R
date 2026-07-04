@@ -32,7 +32,8 @@ init_snapshot_db <- function(db_path) {
       missing_cols_vs_schema        TEXT,
       comparison_mode               TEXT    NOT NULL DEFAULT 'comparison',
       render_status                 TEXT    NOT NULL DEFAULT 'success',
-      type_changed_cols_vs_previous TEXT
+      type_changed_cols_vs_previous TEXT,
+      report_file                   TEXT
     )
   ")
 
@@ -54,7 +55,8 @@ init_snapshot_db <- function(db_path) {
   new_col_defs <- list(
     comparison_mode               = "TEXT NOT NULL DEFAULT 'comparison'",
     render_status                 = "TEXT NOT NULL DEFAULT 'success'",
-    type_changed_cols_vs_previous = "TEXT"
+    type_changed_cols_vs_previous = "TEXT",
+    report_file                   = "TEXT"
   )
   for (col_name in names(new_col_defs)) {
     if (!col_name %in% existing_cols)
@@ -96,21 +98,14 @@ compute_col_stats <- function(df, config, types = NULL) {
 
     miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
 
-    stat_rows <- list(
-      data.frame(column_name = col, dq_check = "inferred_type",
-                 value = col_type, threshold = NA_character_,
-                 severity_on_breach = NA_character_, stringsAsFactors = FALSE),
-      data.frame(column_name = col, dq_check = "missing_count",
-                 value = as.character(miss_count), threshold = NA_character_,
-                 severity_on_breach = NA_character_, stringsAsFactors = FALSE),
-      data.frame(column_name = col, dq_check = "missing_rate",
-                 value = as.character(miss_rate),
-                 threshold = as.character(miss_threshold),
-                 severity_on_breach = "FAIL", stringsAsFactors = FALSE),
-      data.frame(column_name = col, dq_check = "distinct_count",
-                 value = as.character(dist_count), threshold = NA_character_,
-                 severity_on_breach = NA_character_, stringsAsFactors = FALSE)
-    )
+    # Parallel vectors, one data.frame per column — not one per stat row.
+    checks     <- c("inferred_type", "missing_count", "missing_rate",
+                    "distinct_count")
+    values     <- c(col_type, as.character(miss_count),
+                    as.character(miss_rate), as.character(dist_count))
+    thresholds <- c(NA_character_, NA_character_,
+                    as.character(miss_threshold), NA_character_)
+    severities <- c(NA_character_, NA_character_, "FAIL", NA_character_)
 
     if (col_type == "numeric") {
       vals <- suppressWarnings(as.numeric(x))
@@ -120,34 +115,28 @@ compute_col_stats <- function(df, config, types = NULL) {
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
       nn_threshold <- col_threshold(config, col, "max_non_numeric_rate", 0.01)
 
-      stat_rows <- c(stat_rows, list(
-        data.frame(column_name = col, dq_check = "numeric_parseable_mean",
-                   value = if (length(nn) > 0) as.character(mean(nn)) else NA_character_,
-                   threshold = NA_character_, severity_on_breach = NA_character_,
-                   stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "numeric_sd",
-                   value = if (length(nn) > 1) as.character(sd(nn)) else NA_character_,
-                   threshold = NA_character_, severity_on_breach = NA_character_,
-                   stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "numeric_min",
-                   value = if (length(nn) > 0) as.character(min(nn)) else NA_character_,
-                   threshold = NA_character_, severity_on_breach = NA_character_,
-                   stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "numeric_max",
-                   value = if (length(nn) > 0) as.character(max(nn)) else NA_character_,
-                   threshold = NA_character_, severity_on_breach = NA_character_,
-                   stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "non_numeric_count",
-                   value = as.character(nn_count), threshold = NA_character_,
-                   severity_on_breach = NA_character_, stringsAsFactors = FALSE),
-        data.frame(column_name = col, dq_check = "non_numeric_rate",
-                   value = as.character(nn_rate),
-                   threshold = as.character(nn_threshold),
-                   severity_on_breach = "FAIL", stringsAsFactors = FALSE)
-      ))
+      checks     <- c(checks,
+                      "numeric_parseable_mean", "numeric_sd",
+                      "numeric_min", "numeric_max",
+                      "non_numeric_count", "non_numeric_rate")
+      values     <- c(values,
+                      if (length(nn) > 0) as.character(mean(nn)) else NA_character_,
+                      if (length(nn) > 1) as.character(sd(nn))   else NA_character_,
+                      if (length(nn) > 0) as.character(min(nn))  else NA_character_,
+                      if (length(nn) > 0) as.character(max(nn))  else NA_character_,
+                      as.character(nn_count),
+                      as.character(nn_rate))
+      thresholds <- c(thresholds,
+                      NA_character_, NA_character_, NA_character_, NA_character_,
+                      NA_character_, as.character(nn_threshold))
+      severities <- c(severities,
+                      NA_character_, NA_character_, NA_character_, NA_character_,
+                      NA_character_, "FAIL")
     }
 
-    do.call(rbind, stat_rows)
+    data.frame(column_name = col, dq_check = checks, value = values,
+               threshold = thresholds, severity_on_breach = severities,
+               stringsAsFactors = FALSE)
   })
 
   do.call(rbind, col_frames)
@@ -160,10 +149,13 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
                            qc_results, cp_results, custom_results, config,
                            col_stats = NULL,
                            comparison_mode = "comparison",
-                           run_time = NULL) {
+                           run_time = NULL,
+                           report_file = NULL) {
   # One clock read per run: run_dq_check() passes the same run_time here and
   # to render_report() so the report filename reconstructed from the stored
   # run_timestamp (e.g. by the GUI) always matches the file actually written.
+  # report_file stores that filename outright so consumers don't have to
+  # reconstruct it at all (render failures are flagged via render_status).
   run_time <- run_time %||% Sys.time()
   tryCatch({
     init_snapshot_db(db_path)
@@ -219,8 +211,9 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
           overall_status,
           new_cols_vs_previous, missing_cols_vs_previous,
           new_cols_vs_schema, missing_cols_vs_schema,
-          comparison_mode, render_status, type_changed_cols_vs_previous)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', ?)",
+          comparison_mode, render_status, type_changed_cols_vs_previous,
+          report_file)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', ?, ?)",
         list(dataset_name,
              format(run_time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
              file_name,
@@ -230,7 +223,8 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
              new_cols_prev_str, drop_cols_prev_str,
              new_schema, miss_schema,
              comparison_mode,
-             type_chg_str)
+             type_chg_str,
+             report_file %||% NA_character_)
       )
 
       snapshot_id <- DBI::dbGetQuery(con,
@@ -282,15 +276,19 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   \code{check_info_count}, \code{new_cols_vs_previous},
 #'   \code{missing_cols_vs_previous}, \code{new_cols_vs_schema},
 #'   \code{missing_cols_vs_schema}, \code{comparison_mode},
-#'   \code{render_status}, and \code{type_changed_cols_vs_previous}.
-#'   Returns an empty data frame if the database does not exist or contains no
-#'   records for the dataset.
+#'   \code{render_status}, \code{type_changed_cols_vs_previous}, and
+#'   \code{report_file} (the rendered report's filename, \code{NA} for
+#'   snapshots written before dqcheckr 0.2.3).
+#'   Returns an empty data frame with the same columns if the database does
+#'   not exist or contains no records for the dataset.
 #'
 #' @examples
 #' history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
 #'
 #' @export
 read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
+  # Kept in sync with the snapshots table schema (init_snapshot_db) so code
+  # branching on any column behaves identically on the no-database path.
   empty <- data.frame(
     id = integer(), dataset_name = character(), run_timestamp = character(),
     file_name = character(), row_count = integer(), col_count = integer(),
@@ -298,7 +296,9 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
     check_fail_count = integer(), check_info_count = integer(),
     overall_status = character(), new_cols_vs_previous = character(),
     missing_cols_vs_previous = character(), new_cols_vs_schema = character(),
-    missing_cols_vs_schema = character(),
+    missing_cols_vs_schema = character(), comparison_mode = character(),
+    render_status = character(), type_changed_cols_vs_previous = character(),
+    report_file = character(),
     stringsAsFactors = FALSE
   )
 

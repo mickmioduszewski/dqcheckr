@@ -21,9 +21,11 @@ A data frame with one row per run and columns including
   \code{check_info_count}, \code{new_cols_vs_previous},
   \code{missing_cols_vs_previous}, \code{new_cols_vs_schema},
   \code{missing_cols_vs_schema}, \code{comparison_mode},
-  \code{render_status}, and \code{type_changed_cols_vs_previous}.
-  Returns an empty data frame if the database does not exist or contains no
-  records for the dataset.
+  \code{render_status}, \code{type_changed_cols_vs_previous}, and
+  \code{report_file} (the rendered report's filename, \code{NA} for
+  snapshots written before dqcheckr 0.2.3).
+  Returns an empty data frame with the same columns if the database does
+  not exist or contains no records for the dataset.
 }
 \description{
 Retrieves the \code{n} most recent run records for a given dataset from the

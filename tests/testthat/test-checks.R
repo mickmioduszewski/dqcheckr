@@ -496,3 +496,44 @@ test_that("type-dependent checks honour a supplied types map", {
   inferred <- check_inferred_types(df, cfg, types = all_char)
   expect_true(all(vapply(inferred, \(r) r$observed == "character", logical(1))))
 })
+
+# -- QC-10 counts rows, not unique values (0.2.3, L-02) ---------------------------
+
+test_that("check_numeric_bounds() counts violating rows", {
+  df  <- make_accounts_df()
+  df$account_balance <- c("-5", "-5", "-5", "100", "200")
+  cfg <- base_config(list(column_rules = list(account_balance = list(min_value = 0))))
+  res <- check_numeric_bounds(df, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+  expect_match(res[[1]]$message, "3 out-of-range row\\(s\\)")
+  expect_match(res[[1]]$message, "1 distinct value\\(s\\)")
+})
+
+# -- QC-09 numeric allowed_values coercion (0.2.3, L-03) --------------------------
+
+test_that("check_allowed_values() matches numeric YAML values across formatting", {
+  df  <- make_accounts_df()
+  df$account_balance <- c("1", "2.10", "2.1", "1.0", "2.100")
+  cfg <- base_config(list(column_rules = list(
+    account_balance = list(allowed_values = c(1, 2.1)))))   # numeric, as YAML gives
+  res <- check_allowed_values(df, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+})
+
+test_that("check_allowed_values() still FAILs genuinely disallowed values", {
+  df  <- make_accounts_df()
+  df$account_balance <- c("1", "2.1", "99", "1", "2.1")
+  cfg <- base_config(list(column_rules = list(
+    account_balance = list(allowed_values = c(1, 2.1)))))
+  res <- check_allowed_values(df, cfg)
+  expect_equal(res[[1]]$status, "FAIL")
+  expect_match(res[[1]]$observed, "99")
+})
+
+test_that("check_allowed_values() character rules keep exact string matching", {
+  df  <- make_accounts_df()
+  cfg <- base_config(list(column_rules = list(
+    country_code = list(allowed_values = c("GB", "US", "DE", "FR")))))
+  res <- check_allowed_values(df, cfg)
+  expect_equal(res[[1]]$status, "PASS")
+})

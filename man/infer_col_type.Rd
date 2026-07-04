@@ -22,6 +22,20 @@ A single character string: \code{"date"}, \code{"numeric"},
 Classifies a character vector as \code{"date"}, \code{"numeric"},
 \code{"character"}, or \code{"unknown"} by applying rules in priority order.
 }
+\details{
+Date formats are tried in this fixed precedence order:
+\code{"\%Y-\%m-\%d"}, \code{"\%d/\%m/\%Y"}, \code{"\%m/\%d/\%Y"},
+\code{"\%Y\%m\%d"}, \code{"\%d-\%m-\%Y"}. A column is classified as
+\code{"date"} only when \emph{every} non-empty value parses under one
+format; a single malformed date therefore flips the whole column to
+\code{"numeric"} or \code{"character"} (such flips between deliveries are
+surfaced by check CP-02c). Two caveats follow from the precedence rules:
+ambiguous day/month values resolve day-first (\code{"\%d/\%m/\%Y"} is
+tried before \code{"\%m/\%d/\%Y"}), and all-8-digit identifier columns
+whose values happen to parse under \code{"\%Y\%m\%d"} classify as dates.
+Pin the type with an entry in the \code{column_types} config map when the
+heuristic gets a column wrong.
+}
 \examples{
 infer_col_type(c("2024-01-01", "2024-06-15"))   # "date"
 infer_col_type(c("1.5", "2.0", "3.1"))          # "numeric"

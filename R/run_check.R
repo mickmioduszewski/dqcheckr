@@ -11,6 +11,13 @@
 #' @param open_report Logical. Whether to open the HTML report in the browser
 #'   after rendering (only takes effect in interactive sessions).
 #'
+#' @note Relative \code{snapshot_db} and \code{report_output_dir} config
+#'   values resolve against the R process's \emph{working directory}, not
+#'   against \code{config_dir}. Run from the deployment root (the directory
+#'   containing \code{config/}, \code{data/}, \code{reports/}) or use
+#'   absolute paths in the config; otherwise a fresh snapshot database is
+#'   silently created wherever the process happens to be running.
+#'
 #' @return Invisibly, a named list with:
 #'   \describe{
 #'     \item{status}{Overall status string: \code{"PASS"}, \code{"WARN"},
@@ -84,7 +91,8 @@ run_dq_check <- function(dataset_name,
     df_curr, qc_results, cp_results, custom_results, config,
     col_stats       = col_stats,
     comparison_mode = comparison_mode,
-    run_time        = run_time
+    run_time        = run_time,
+    report_file     = report_filename(dataset_name, run_time)
   )
 
   snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)

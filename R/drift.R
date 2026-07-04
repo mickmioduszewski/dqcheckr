@@ -75,6 +75,10 @@ list_snapshots <- function(dataset_name = NULL,
 #' @param open_report Logical. Whether to open the HTML report in the browser
 #'   after rendering (only takes effect in interactive sessions).
 #'
+#' @note As with \code{\link{run_dq_check}}, a relative \code{snapshot_db} or
+#'   \code{report_output_dir} from the config resolves against the R
+#'   process's working directory, not against \code{config_dir}.
+#'
 #' @return Invisibly, a named list with elements \code{dataset_name},
 #'   \code{snap_prev}, \code{snap_curr}, \code{table_drift},
 #'   \code{schema_changes}, \code{missing_rate_changes},
@@ -153,6 +157,16 @@ compare_snapshots <- function(dataset_name,
 
   id_prev <- snapshot_id_prev %||% snaps$id[nrow(snaps) - 1]
   id_curr <- snapshot_id_curr %||% snaps$id[nrow(snaps)]
+
+  # Explicit IDs must belong to this dataset — .compute_drift() queries by ID
+  # only, so an unchecked ID from another dataset would silently produce a
+  # cross-dataset "drift" comparison.
+  for (id in c(id_prev, id_curr)) {
+    if (!id %in% snaps$id)
+      rlang::abort(
+        sprintf("Snapshot ID %d not found for dataset '%s'.", id, dataset_name),
+        class = c("dqcheckr_not_found", "dqcheckr_error"))
+  }
 
   if (id_prev == id_curr)
     rlang::abort("snapshot_id_prev and snapshot_id_curr must differ.",
@@ -395,6 +409,6 @@ compare_snapshots <- function(dataset_name,
   )
 
   rendered <- file.path(render_dir, basename(outfile))
-  if (file.exists(rendered)) file.rename(rendered, outfile)
+  if (file.exists(rendered)) .move_file(rendered, outfile)
   invisible(outfile)
 }

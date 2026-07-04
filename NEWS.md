@@ -32,6 +32,36 @@
   file with a name one second off.
 * `compare_snapshots()` no longer announces (and offers to open) a drift
   report path when Quarto is unavailable and no report was written.
+* Explicitly supplied snapshot IDs are now validated to belong to the
+  requested dataset; previously IDs from another dataset silently produced a
+  cross-dataset "drift" comparison.
+* Rendered reports are moved from the render directory with a copy+delete
+  fallback when `file.rename()` fails across filesystems (e.g. a
+  network-share report directory); previously the move failed silently.
+* QC-10 (numeric bounds) now counts violating rows rather than distinct
+  values — a million rows of the same out-of-range value no longer reads as
+  "1 out-of-range value(s)".
+* QC-09 (allowed values) compares numerically when the YAML rule supplies
+  numbers, so a file value of `"2.10"` matches an allowed value of `2.1`.
+* `read_recent_snapshots()`'s empty-database fallback now has the same
+  columns as the live query (it was missing `comparison_mode`,
+  `render_status`, and `type_changed_cols_vs_previous`).
+
+## New features
+
+* New `report_file` column in the `snapshots` table stores the rendered
+  report's filename outright (auto-migrated into existing databases), so
+  consumers no longer need to reconstruct it from the run timestamp.
+  `read_recent_snapshots()` returns it; `NA` for pre-0.2.3 rows.
+
+## Documentation
+
+* `run_dq_check()` and `compare_snapshots()` now document that relative
+  `snapshot_db` / `report_output_dir` paths resolve against the working
+  directory, not `config_dir`.
+* `infer_col_type()` documents its date-format precedence, the
+  all-must-parse rule, and the all-8-digit-identifier caveat, with a pointer
+  to `column_types` overrides.
 
 ## Performance
 
@@ -41,6 +71,11 @@
   the column statistics, and five comparison checks re-ran full-column type
   inference (five date parses plus a numeric parse) independently — the
   dominant cost on large files.
+* `infer_col_type()` rejects non-matching date formats from a 100-value head
+  sample before scanning the full column (results are identical; only the
+  rejection path gets cheaper).
+* `compute_col_stats()` builds one data frame per column instead of one per
+  statistic row, cutting allocations on wide files.
 
 # dqcheckr 0.2.2
 
