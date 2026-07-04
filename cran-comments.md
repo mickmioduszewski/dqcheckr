@@ -12,6 +12,7 @@ This is a bug-fix update (v0.2.3) of a package currently on CRAN as v0.2.2.
   via `rcmdcheck::rcmdcheck(<pkg dir>, args = "--as-cran")` (local,
   2026-07-04): 0 errors | 0 warnings | 1 note
 * win-builder: R-devel (submitted 2026-07-04): results awaited
+* win-builder: R-release (submitted 2026-07-04): results awaited
 
 ## Notes
 
