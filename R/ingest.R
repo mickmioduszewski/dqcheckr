@@ -58,10 +58,81 @@ detect_files <- function(config) {
   )
 }
 
+# Formal aliases for plain ASCII. ASCII is a strict subset of UTF-8, so a file
+# declared as any of these always reads identically under UTF-8 -- but passed
+# to readr's locale verbatim, a delivery containing a byte above 127 aborts
+# iconv inside vroom and can take the whole R process down. Reading as UTF-8
+# instead is lossless and removes that failure mode entirely.
+.ascii_aliases <- c("ASCII", "US-ASCII", "ANSI_X3.4-1968", "ANSI_X3.4-1986",
+                    "ISO646-US", "646")
+
+normalise_encoding <- function(enc) {
+  if (toupper(trimws(enc)) %in% .ascii_aliases) "UTF-8" else enc
+}
+
+# Full-file UTF-8 validity scan, run before vroom ever sees the file. Only the
+# "is this valid UTF-8?" question has a deterministic answer; when the file is
+# not valid UTF-8, the specific legacy encoding can only be guessed
+# statistically, so the guess is reported but never trusted blindly.
+scan_file_encoding <- function(path) {
+  size <- suppressWarnings(file.size(path))
+  if (is.na(size) || size <= 0) return(list(valid = TRUE, guess = NULL))
+  raw <- readBin(path, what = "raw", n = size)
+  if (stringi::stri_enc_isutf8(raw)) return(list(valid = TRUE, guess = NULL))
+  list(valid = FALSE, guess = .guess_legacy_encoding(raw))
+}
+
+# Locate the first chunk containing non-ASCII bytes and run ICU's charset
+# detector on it. The detector must see the offending bytes: a head sample of
+# a file whose first accented character sits millions of rows in guesses
+# "ASCII" -- the exact trap this scan exists to avoid. Chunking is safe here
+# because "contains a byte above 127" is a per-byte property, unlike UTF-8
+# sequence validity.
+.guess_legacy_encoding <- function(raw) {
+  chunk_size <- 1e6
+  n     <- length(raw)
+  start <- 1
+  window <- NULL
+  while (start <= n) {
+    end   <- min(start + chunk_size - 1, n)
+    piece <- raw[start:end]
+    if (!stringi::stri_enc_isascii(piece)) {
+      window <- piece
+      break
+    }
+    start <- end + 1
+  }
+  if (is.null(window)) return(NULL)
+  det <- tryCatch(stringi::stri_enc_detect(window)[[1]], error = function(e) NULL)
+  if (is.null(det) || nrow(det) == 0) return(NULL)
+  # The file as a whole is not valid UTF-8, so drop Unicode candidates the
+  # detector may still offer for a locally-valid window.
+  cand <- det$Encoding[!grepl("^UTF", det$Encoding, ignore.case = TRUE)]
+  if (length(cand) == 0) NULL else cand[1]
+}
+
+# Encoding used to complete the run when the declared UTF-8 turned out to be
+# wrong. The guess is honoured only if it names a single-byte encoding, where
+# every byte sequence is valid by construction and iconv cannot abort;
+# anything else falls back to ISO-8859-1 for the same reason.
+.safe_fallback_encoding <- function(guess) {
+  if (!is.null(guess) &&
+      grepl("^(ISO-8859|windows-125)", guess, ignore.case = TRUE)) guess
+  else "ISO-8859-1"
+}
+
 #' Read a dataset file into a data frame
 #'
 #' Reads a CSV or fixed-width file, coercing all columns to character and
 #' trimming whitespace. Encoding and delimiter are taken from \code{config}.
+#' A declared encoding of ASCII (or a formal alias such as \code{US-ASCII})
+#' is read as UTF-8: ASCII is a strict subset of UTF-8, so this is lossless,
+#' and it protects against deliveries whose non-ASCII bytes appear beyond any
+#' sample a sniffer looked at. When the effective encoding is UTF-8 the whole
+#' file is validity-scanned before parsing; a delivery that is not valid
+#' UTF-8 is read using a single-byte fallback encoding instead, and the
+#' mismatch is surfaced by \code{\link{check_file_encoding}} (QC-16) as a
+#' FAIL result rather than crashing the run.
 #'
 #' @param path Character. Path to the file to read.
 #' @param config Named list. Merged configuration as returned by
@@ -84,7 +155,24 @@ detect_files <- function(config) {
 #' @export
 read_dataset <- function(path, config) {
   fmt <- tolower(config$format %||% "csv")
-  enc <- config$encoding %||% "UTF-8"
+  enc <- normalise_encoding(config$encoding %||% "UTF-8")
+
+  enc_info <- list(declared = config$encoding %||% "UTF-8", used = enc,
+                   scanned = FALSE, valid = TRUE, guess = NULL)
+  if (toupper(enc) %in% c("UTF-8", "UTF8")) {
+    # A scan failure must never block the read; readr raises its own typed
+    # error below if the file is genuinely unreadable.
+    scan <- tryCatch(scan_file_encoding(path), error = function(e) NULL)
+    if (!is.null(scan)) {
+      enc_info$scanned <- TRUE
+      if (!scan$valid) {
+        enc           <- .safe_fallback_encoding(scan$guess)
+        enc_info$valid <- FALSE
+        enc_info$guess <- scan$guess
+        enc_info$used  <- enc
+      }
+    }
+  }
 
   if (fmt == "csv") {
     delim <- config$delimiter %||% ","
@@ -131,5 +219,7 @@ read_dataset <- function(path, config) {
   for (col in names(df)) {
     df[[col]] <- trimws(df[[col]])
   }
+  # Consumed by check_file_encoding() (QC-16) in run_qc_checks().
+  attr(df, "dq_encoding") <- enc_info
   df
 }

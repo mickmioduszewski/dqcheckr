@@ -208,7 +208,8 @@ default_rules:
 dataset_name: "customer_accounts"
 folder: "data/incoming/customer_accounts/"
 format: csv                 # csv | fwf
-encoding: "UTF-8"
+encoding: "UTF-8"          # ASCII (a lossless UTF-8 subset) is read as UTF-8;
+                            #   UTF-8 files are validity-scanned per delivery (QC-16)
 delimiter: ","              # csv only
 quote_char: '"'             # csv only — quote character (default ")
 col_names: ~                # csv only — explicit column names (overrides the
@@ -317,6 +318,7 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
 | QC-14 | Row count bounds | Table | `row_count < min_row_count` (if > 0); `row_count > max_row_count` (if set); file size > `max_file_size_mb` (if set) | — |
 | QC-15 | Outlier detection | Numeric columns | Value exceeds Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) threshold | — (skipped if neither threshold is configured) |
+| QC-16 | File encoding | File | Delivery is not valid UTF-8 when the config declares UTF-8 (whole file scanned before parsing; read completes via a single-byte fallback and the likely actual encoding is reported). Declared ASCII is read as UTF-8 (lossless subset); declared single-byte encodings always PASS (no invalid byte sequences exist) | — |
 
 **Schema contract checks (SC series)** — only when `expected_columns` is configured
 

@@ -273,6 +273,7 @@ These run on the current file alone.
 | QC-13 | Pattern / regex | Values not matching `pattern` | FAIL |
 | QC-14 | Row count bounds | Row count below `min_row_count`; above `max_row_count`; file size above `max_file_size_mb` | FAIL |
 | QC-15 | Outlier detection | Numeric values outside Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) | FAIL |
+| QC-16 | File encoding | Delivery not valid UTF-8 as declared (whole file scanned; run completes via a single-byte fallback and reports the likely actual encoding) | FAIL |
 
 ### Schema contract checks (SC series)
 
@@ -415,6 +416,7 @@ check_key_uniqueness(df, cfg)     # QC-12
 check_pattern(df, cfg)            # QC-13
 check_min_row_count(df, cfg)      # QC-14
 check_outliers(df, cfg)           # QC-15
+check_file_encoding(df, cfg)      # QC-16
 check_schema_contract(df, cfg)    # SC-01 / SC-02
 
 # Inspect a result

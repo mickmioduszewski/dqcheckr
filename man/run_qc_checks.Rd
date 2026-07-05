@@ -24,7 +24,7 @@ types are resolved once here and shared by all type-dependent checks.}
 A list of \code{\link{dq_result}} objects.
 }
 \description{
-Runs the full QC check suite (QC-01 to QC-15, SC-01, SC-02) against a
+Runs the full QC check suite (QC-01 to QC-16, SC-01, SC-02) against a
 single data frame snapshot.
 }
 \examples{

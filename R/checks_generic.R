@@ -897,6 +897,83 @@ check_outliers <- function(df, config, types = NULL) {
   results
 }
 
+#' QC-16: File encoding sanity
+#'
+#' Verifies that the delivered file's bytes matched the encoding declared in
+#' the config. \code{\link{read_dataset}} scans the whole file for UTF-8
+#' validity before parsing (when the effective encoding is UTF-8) and records
+#' the outcome on the returned data frame; this check turns that outcome into
+#' a result:
+#' \itemize{
+#'   \item \strong{PASS} when the file was valid for the declared encoding,
+#'     or when a declared single-byte encoding (e.g. \code{ISO-8859-1},
+#'     \code{Windows-1252}) made a validity scan meaningless -- every byte
+#'     sequence is valid in those encodings by construction.
+#'   \item \strong{FAIL} when the file was not valid UTF-8 as declared. The
+#'     run still completes: the file is read using a single-byte fallback
+#'     encoding, and the message reports the detector's best guess at the
+#'     actual encoding so the config can be corrected.
+#' }
+#' A supplier can change their export encoding between deliveries, which is
+#' why this runs against every delivery rather than only at configuration
+#' time. Returns an empty list when \code{df} did not come from
+#' \code{\link{read_dataset}} (no scan outcome to report).
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}. Present for interface consistency; the scan
+#'   outcome travels with \code{df}.
+#'
+#' @return A list with one \code{\link{dq_result}} object, or an empty list
+#'   when no scan outcome is attached to \code{df}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_file_encoding(df, cfg)
+#'
+#' @export
+check_file_encoding <- function(df, config) {
+  info <- attr(df, "dq_encoding", exact = TRUE)
+  if (is.null(info)) return(list())
+
+  if (isTRUE(info$valid)) {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "PASS",
+      observed   = if (isTRUE(info$scanned))
+        sprintf("File is valid %s.", info$used)
+      else
+        sprintf("'%s' is a single-byte encoding; every byte is valid by construction.",
+                info$used),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = "File encoding matches the configuration."
+    )))
+  }
+
+  guess_txt <- if (!is.null(info$guess))
+    sprintf(" The bytes look like %s.", info$guess)
+  else
+    " The actual encoding could not be determined."
+  list(dq_result(
+    check_id   = "QC-16",
+    check_name = "File encoding",
+    status     = "FAIL",
+    observed   = sprintf("Not valid %s; read as %s for this run.%s",
+                         info$declared, info$used, guess_txt),
+    threshold  = sprintf("declared: %s", info$declared),
+    message    = sprintf(paste0(
+      "File is not valid %s as declared in the config.%s ",
+      "It was read as %s so this run could complete; verify the supplier's ",
+      "export encoding and update 'encoding' in the dataset config."),
+      info$declared, guess_txt, info$used)
+  ))
+}
+
 #' SC-01 / SC-02: Check columns against the expected schema contract
 #'
 #' Compares the columns present in \code{df} against
@@ -980,7 +1057,7 @@ check_schema_contract <- function(df, config) {
 
 #' Run all generic quality checks on a dataset
 #'
-#' Runs the full QC check suite (QC-01 to QC-15, SC-01, SC-02) against a
+#' Runs the full QC check suite (QC-01 to QC-16, SC-01, SC-02) against a
 #' single data frame snapshot.
 #'
 #' @param df A data frame with all columns as character vectors (as returned by
@@ -1006,6 +1083,7 @@ check_schema_contract <- function(df, config) {
 run_qc_checks <- function(df, config, file_path = NULL, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
   c(
+    check_file_encoding(df, config),
     check_missing_rate(df, config),
     check_empty_column(df, config),
     check_duplicate_rows(df, config),

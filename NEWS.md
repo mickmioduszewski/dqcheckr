@@ -1,3 +1,26 @@
+# dqcheckr 0.2.4
+
+## Bug fixes
+
+* A declared `encoding` of ASCII (or a formal alias such as `US-ASCII`) is now
+  read as UTF-8. ASCII is a strict subset of UTF-8, so this is lossless — and
+  it removes a hard R session crash ("Invalid multibyte sequence" inside
+  vroom/iconv, not a catchable R error) when a delivery declared ASCII
+  contains a byte above 127 beyond whatever sample an encoding sniffer
+  originally looked at.
+
+## New features
+
+* New QC-16 "File encoding" check. When the effective encoding is UTF-8,
+  `read_dataset()` now validity-scans the entire file before parsing. A
+  delivery that is not valid UTF-8 no longer risks crashing or silently
+  producing mojibake: it is read with a single-byte fallback encoding, the
+  run completes, and QC-16 reports a FAIL naming the detector's best guess at
+  the actual encoding (suppliers can change export encodings between
+  deliveries, so this is checked per delivery). Valid files and declared
+  single-byte encodings (which have no invalid byte sequences) report PASS.
+  New dependency: `stringi`.
+
 # dqcheckr 0.2.3
 
 ## Bug fixes
