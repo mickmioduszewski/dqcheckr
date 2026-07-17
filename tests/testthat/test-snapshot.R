@@ -79,6 +79,85 @@ test_that("init_snapshot_db() auto-migrates a 0.1.x database missing new columns
   expect_true("type_changed_cols_vs_previous" %in% cols)
 })
 
+test_that(".sqlite_connect() sets a busy timeout so a concurrent writer waits (B-09)", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  init_snapshot_db(db)
+  con <- dqcheckr:::.sqlite_connect(db)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  # Default RSQLite busy_timeout is 0 (fail instantly). We set 30s.
+  expect_equal(DBI::dbGetQuery(con, "PRAGMA busy_timeout")[[1]], 30000L)
+})
+
+test_that("init_snapshot_db() rejects a foreign 'snapshots' table (S-04)", {
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (foo TEXT, bar INTEGER)")
+  DBI::dbExecute(con, "INSERT INTO snapshots VALUES ('a', 1)")
+  DBI::dbDisconnect(con)
+
+  expect_error(init_snapshot_db(db), class = "dqcheckr_schema_error")
+  # The user's table (and its row) must be left exactly as it was.
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con2), add = TRUE)
+  expect_identical(
+    DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name,
+    c("foo", "bar"))
+  expect_equal(DBI::dbGetQuery(con2, "SELECT COUNT(*) AS n FROM snapshots")$n, 1L)
+})
+
+test_that("init_snapshot_db() migrates case-insensitively (S-04)", {
+  # SQLite column names are case-insensitive; a stored `Report_File` must not be
+  # re-added as `report_file` (SQLite would reject it as a duplicate column).
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL,
+      Report_File TEXT)")
+  DBI::dbDisconnect(con)
+  expect_no_error(init_snapshot_db(db))
+})
+
+test_that("concurrent first-run migrations do not collide (B-10)", {
+  skip_on_cran()
+  skip_on_os(c("windows", "solaris"))       # relies on fork()
+  skip_if_not_installed("parallel")
+
+  # A pre-0.2.3 database still missing all four newer columns.
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL)")
+  DBI::dbDisconnect(con)
+
+  # Two processes racing init_snapshot_db() on the shared DB. Before the fix one
+  # loser dies with 'duplicate column name'; with BEGIN IMMEDIATE both migrate.
+  run_one <- function(i) tryCatch({ dqcheckr:::init_snapshot_db(db); "ok" },
+                                  error = function(e) conditionMessage(e))
+  jobs    <- lapply(1:2, function(i) parallel::mcparallel(run_one(i)))
+  results <- parallel::mccollect(jobs)
+
+  expect_true(all(vapply(results, function(r) identical(r, "ok"), logical(1))),
+              info = paste(unlist(results), collapse = " | "))
+
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con2), add = TRUE)
+  cols <- DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name
+  expect_true(all(c("comparison_mode", "render_status",
+                    "type_changed_cols_vs_previous", "report_file") %in% cols))
+})
+
 test_that("FK enforcement is active on connections opened by .sqlite_connect", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))

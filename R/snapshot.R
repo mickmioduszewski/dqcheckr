@@ -2,6 +2,13 @@
 .sqlite_connect <- function(db_path) {
   con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
   DBI::dbExecute(con, "PRAGMA foreign_keys = ON")
+  # Deployments point several datasets at one shared snapshot DB (see
+  # RBB-sample/), so brief write contention between concurrent runs is normal.
+  # Without a busy timeout the loser fails instantly with 'database is locked'
+  # and its snapshot is swallowed into a warning; wait for the writer instead.
+  # WAL journalling is deliberately NOT enabled here: it needs shared memory and
+  # is unsafe on the network / OneDrive filesystems dqcheckr is deployed on.
+  DBI::dbExecute(con, "PRAGMA busy_timeout = 30000")
   con
 }
 
@@ -12,6 +19,19 @@ init_snapshot_db <- function(db_path) {
   dir.create(dirname(db_path), recursive = TRUE, showWarnings = FALSE)
   con <- .sqlite_connect(db_path)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  # Serialize create-and-migrate. The column check and the ALTERs must be atomic
+  # with respect to other processes: two first-runs after an upgrade, sharing
+  # one DB, would otherwise both read the pre-migration column list and both try
+  # to ADD the same column, and the loser dies with 'duplicate column name'
+  # (busy_timeout alone does not help -- the loser has already read the stale
+  # list before it waits). BEGIN IMMEDIATE takes the write lock up front, so the
+  # second process blocks here, then reads the already-migrated column list and
+  # skips the ALTERs.
+  DBI::dbExecute(con, "BEGIN IMMEDIATE")
+  committed <- FALSE
+  on.exit(if (!committed) try(DBI::dbExecute(con, "ROLLBACK"), silent = TRUE),
+          add = TRUE, after = FALSE)
 
   DBI::dbExecute(con, "
     CREATE TABLE IF NOT EXISTS snapshots (
@@ -49,9 +69,29 @@ init_snapshot_db <- function(db_path) {
     )
   ")
 
-  # Auto-migrate 0.1.x databases that are missing the new columns.
   existing_cols <- DBI::dbGetQuery(
     con, "SELECT name FROM pragma_table_info('snapshots')")$name
+
+  # Refuse to adopt a pre-existing `snapshots` table that is not ours. If the
+  # file already held a table of that name from another application, the CREATE
+  # above was a no-op and the ALTERs below would silently mutate the user's
+  # table. Every dqcheckr schema back to 0.1.x has these core columns; their
+  # absence means the table belongs to someone else. (SQLite column names are
+  # case-insensitive, so compare case-folded.)
+  required   <- c("dataset_name", "run_timestamp", "file_name",
+                  "row_count", "col_count", "overall_status")
+  have       <- tolower(existing_cols)
+  if (!all(required %in% have))
+    rlang::abort(
+      paste0("The database at '", db_path, "' already contains a 'snapshots' ",
+             "table that is not a dqcheckr snapshot table (missing: ",
+             paste(setdiff(required, have), collapse = ", "),
+             "). Refusing to modify it."),
+      class = c("dqcheckr_schema_error", "dqcheckr_error"))
+
+  # Auto-migrate 0.1.x databases that are missing the newer columns. Match
+  # case-insensitively so a column stored as e.g. `Report_File` is recognised
+  # and not re-added (which SQLite would reject as a duplicate).
   new_col_defs <- list(
     comparison_mode               = "TEXT NOT NULL DEFAULT 'comparison'",
     render_status                 = "TEXT NOT NULL DEFAULT 'success'",
@@ -59,11 +99,13 @@ init_snapshot_db <- function(db_path) {
     report_file                   = "TEXT"
   )
   for (col_name in names(new_col_defs)) {
-    if (!col_name %in% existing_cols)
+    if (!tolower(col_name) %in% have)
       DBI::dbExecute(con, sprintf("ALTER TABLE snapshots ADD COLUMN %s %s",
                                   col_name, new_col_defs[[col_name]]))
   }
 
+  DBI::dbExecute(con, "COMMIT")
+  committed <- TRUE
   invisible(db_path)
 }
 

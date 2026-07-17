@@ -2,6 +2,23 @@
 
 ## Bug fixes
 
+* Concurrent runs sharing one snapshot database no longer lose a snapshot or die
+  during migration. Connections now set `PRAGMA busy_timeout`, so a run that
+  meets a database another run is writing waits for the lock instead of failing
+  instantly (its snapshot was previously swallowed into a warning). Schema
+  creation and the auto-migration of older databases now run inside a single
+  `BEGIN IMMEDIATE` transaction, so two first-runs after an upgrade can no
+  longer both add the same column (the loser used to die with "duplicate column
+  name"). WAL journalling is intentionally not used, as it is unsafe on the
+  network file systems dqcheckr is deployed on.
+
+* `init_snapshot_db()` no longer modifies a `snapshots` table it did not create.
+  If the target database already contains an unrelated table of that name, it
+  now aborts with a typed `dqcheckr_schema_error` instead of altering the user's
+  table. Column-existence checks during migration are now case-insensitive,
+  matching SQLite, so a column stored as e.g. `Report_File` is recognised rather
+  than re-added.
+
 * The drift report now flags a missing-rate or non-numeric-rate change in the
   same direction as the corresponding comparison check. Both `.compute_drift()`
   columns used `abs()`, so a column that *improved* between deliveries (fewer
