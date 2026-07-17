@@ -64,7 +64,14 @@ render_report <- function(dataset_name, file_name, file_path, df,
   )
 
   rendered <- file.path(render_dir, fname)
-  if (file.exists(rendered)) .move_file(rendered, out)
+  if (!file.exists(rendered))
+    # Quarto returned without raising but left no file (e.g. a template that
+    # produced no output). Returning `out` here would name a report that does
+    # not exist and let run_dq_check() record the run as a success.
+    rlang::abort(
+      paste0("Quarto rendering produced no output file for '", fname, "'."),
+      class = c("dqcheckr_render_error", "dqcheckr_error"))
+  .move_file(rendered, out)
 
   if (open_report && interactive()) utils::browseURL(out)
 

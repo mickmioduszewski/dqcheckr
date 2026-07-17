@@ -163,6 +163,18 @@ test_that(".mark_render_failed() updates render_status to 'failed'", {
   expect_equal(rs, "failed")
 })
 
+test_that(".mark_render_failed() clears report_file so no phantom link survives", {
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  sid <- write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(),
+                        list(), list(), base_config(),
+                        report_file = "ds_20260101_000000.html")
+  dqcheckr:::.mark_render_failed(db, sid)
+  snaps <- read_recent_snapshots(db, "ds")
+  expect_equal(snaps$render_status[1], "failed")
+  expect_true(is.na(snaps$report_file[1]))   # optimistic filename removed
+})
+
 test_that("write_snapshot() stores UTC timestamp in ISO-8601 format", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))

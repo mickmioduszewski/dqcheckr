@@ -465,7 +465,7 @@ Console output:
 | `custom_checks()` not defined | Stop with message |
 | `custom_checks()` runtime error | Stop with R error detail |
 | SQLite write fails | Warning emitted; HTML report still written |
-| Report render fails | Warning emitted; snapshot marked `render_status = "failed"` |
+| Report render fails or is skipped (no Quarto CLI) | Warning emitted; snapshot marked `render_status = "failed"` and its `report_file` cleared, so no consumer links a report that was never written |
 | `snapshot_db` path missing | Created automatically by `init_snapshot_db()` |
 
 ### C.11 Dependencies

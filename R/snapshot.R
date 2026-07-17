@@ -68,6 +68,12 @@ init_snapshot_db <- function(db_path) {
 }
 
 #' Mark a snapshot's render_status as failed
+#'
+#' Also clears report_file: when no report was written, the column must not keep
+#' the optimistic filename write_snapshot() stored on INSERT, or read_recent_
+#' snapshots() (and the GUI history link) would advertise a report that does not
+#' exist. render_status = 'failed' is the guard consumers key on; report_file is
+#' cleared so the two stay consistent.
 #' @keywords internal
 #' @noRd
 .mark_render_failed <- function(db_path, snapshot_id) {
@@ -75,9 +81,14 @@ init_snapshot_db <- function(db_path) {
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     DBI::dbExecute(con,
-      "UPDATE snapshots SET render_status = 'failed' WHERE id = ?",
+      "UPDATE snapshots SET render_status = 'failed', report_file = NULL WHERE id = ?",
       list(snapshot_id))
-  }, error = function(e) invisible(NULL))
+  }, error = function(e)
+    # A silent failure here is the bug this guard exists to prevent: the row
+    # would keep render_status = 'success' for a report that was never written.
+    warning("Could not mark snapshot ", snapshot_id, " as render-failed; its ",
+            "render_status may still read 'success': ", conditionMessage(e),
+            call. = FALSE))
 }
 
 #' Compute per-column statistics for snapshot storage

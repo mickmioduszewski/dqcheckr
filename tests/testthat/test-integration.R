@@ -111,6 +111,49 @@ test_that("run_dq_check() completes with FAIL for an empty (header-only) deliver
   expect_false(is.null(result$snapshot_id))              # snapshot was written
 })
 
+# -- Render-failure path is reconciled into the snapshot (B-05/06/12/28/34) -------
+# When no report is written, the snapshot must not keep render_status='success'
+# and an optimistic report_file naming a file that does not exist -- consumers
+# (read_recent_snapshots, the GUI history link) would advertise a dead report.
+
+test_that("run_dq_check() marks the snapshot render-failed when Quarto is absent", {
+  skip_on_cran()
+  # Force the Quarto-unavailable branch regardless of the host, so this runs
+  # everywhere and does not depend on Quarto being uninstalled.
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) FALSE, .package = "quarto")
+
+  cfg_dir <- setup_integration_env()
+  expect_warning(
+    result <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE),
+    regexp = "Quarto"
+  )
+
+  # The run still completes and records a snapshot -- only the report is absent.
+  expect_null(result$report_path)
+  expect_false(is.null(result$snapshot_id))
+
+  snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
+                                 "integ_ds", n = 1)
+  expect_equal(snaps$render_status[1], "failed")     # guard fires
+  expect_true(is.na(snaps$report_file[1]))           # no phantom filename
+})
+
+test_that("run_dq_check() records report_file only for a report that exists", {
+  skip_on_cran()
+  skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
+  cfg_dir <- setup_integration_env()
+  result  <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+
+  snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
+                                 "integ_ds", n = 1)
+  expect_equal(snaps$render_status[1], "success")
+  expect_false(is.na(snaps$report_file[1]))
+  # report_file names the file that was actually written.
+  expect_true(file.exists(file.path(cfg_dir, "reports", snaps$report_file[1])))
+  expect_equal(basename(result$report_path), snaps$report_file[1])
+})
+
 # -- Report filename slug matches the snapshot run_timestamp (0.2.3, B-04) --------
 
 test_that("report filename slug matches the snapshot run_timestamp", {

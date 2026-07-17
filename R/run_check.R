@@ -114,13 +114,21 @@ run_dq_check <- function(dataset_name,
       run_time         = run_time
     ),
     error = function(e) {
-      if (!is.null(snapshot_id)) .mark_render_failed(db_path, snapshot_id)
-      warning(paste0("Report rendering failed (snapshot_id = ", snapshot_id,
-                     " marked as failed). Original error: ", conditionMessage(e)),
+      warning("Report rendering failed. Original error: ", conditionMessage(e),
               call. = FALSE)
       invisible(NULL)
     }
   )
+
+  # The report is the run's second artefact. render_report() returns NULL both
+  # when it threw (handled above) and when it was skipped because the Quarto CLI
+  # is absent -- in either case no file was written, so the snapshot must not
+  # keep the INSERT-time render_status = 'success' and its optimistic
+  # report_file. Reconcile against what actually happened rather than only on
+  # the error path. (When snapshot_id is NULL the write itself failed and there
+  # is no row to mark -- the earlier warning already covers that.)
+  if (is.null(report_path) && !is.null(snapshot_id))
+    .mark_render_failed(db_path, snapshot_id)
 
   status <- overall_status(c(qc_results, cp_results, custom_results))
   all_r  <- c(qc_results, cp_results, custom_results)

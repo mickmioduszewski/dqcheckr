@@ -2,6 +2,16 @@
 
 ## Bug fixes
 
+* A run whose HTML report is not produced no longer records a successful-looking
+  snapshot. When the Quarto CLI is absent the report is skipped with a warning,
+  but the snapshot row previously kept `render_status = "success"` and a
+  `report_file` naming a report that was never written, so history readers (and
+  the GUI's "Open report" link) pointed at a file that 404s. The snapshot is now
+  reconciled against what actually happened: if no report file exists the row is
+  marked `render_status = "failed"` and its `report_file` is cleared. Rendering
+  that returns without producing a file now raises instead of reporting success,
+  and `report_file` is guaranteed to name a report that exists.
+
 * Column type inference no longer misclassifies a value whose *prefix* happens
   to be a date. `as.Date()` matches a prefix and silently ignores trailing
   characters, so `"2024-01-15x"` and the 9-digit id `"202401159"` (whose first
