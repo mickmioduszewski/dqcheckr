@@ -70,16 +70,79 @@ normalise_encoding <- function(enc) {
   if (toupper(trimws(enc)) %in% .ascii_aliases) "UTF-8" else enc
 }
 
-# Full-file UTF-8 validity scan, run before vroom ever sees the file. Only the
-# "is this valid UTF-8?" question has a deterministic answer; when the file is
-# not valid UTF-8, the specific legacy encoding can only be guessed
-# statistically, so the guess is reported but never trusted blindly.
-scan_file_encoding <- function(path) {
+# Classify an *effective* (post-normalise) encoding into how it can be verified:
+#   "utf8"        -- validity is scannable (scan_file_encoding()).
+#   "single_byte" -- ISO-8859-x / Windows-125x / Latin-n: every byte sequence is
+#                    valid by construction, so a scan is meaningless and PASS is
+#                    legitimate.
+#   "other"       -- multi-byte or unknown (UTF-16/32, Shift-JIS, GB18030, ...):
+#                    NOT validity-checked. QC-16 must WARN rather than claim the
+#                    file is "single-byte, valid by construction".
+.encoding_class <- function(enc) {
+  u <- toupper(trimws(enc))
+  if (u %in% c("UTF-8", "UTF8")) return("utf8")
+  if (grepl("^(ISO[- ]?8859|LATIN[- ]?[0-9]|WINDOWS[- ]?125[0-9]|CP125[0-9])", u))
+    return("single_byte")
+  "other"
+}
+
+# Number of trailing bytes of `buf` that begin a UTF-8 multi-byte sequence which
+# may continue in the next chunk, and so must be held back rather than validated
+# at a chunk boundary. Returns 0 unless the buffer ends with a genuinely
+# incomplete sequence (a valid lead byte followed by fewer continuation bytes
+# than its length requires); ASCII, complete sequences, and malformed bytes all
+# return 0 -- malformed-ness is local, so the validator will catch it in-chunk.
+.utf8_incomplete_tail <- function(buf) {
+  n <- length(buf)
+  if (n == 0L) return(0L)
+  i    <- n
+  cont <- 0L
+  while (i >= 1L && cont < 3L && bitwAnd(as.integer(buf[i]), 0xC0L) == 0x80L) {
+    cont <- cont + 1L                    # walk back over continuation bytes
+    i    <- i - 1L
+  }
+  if (i < 1L) return(0L)                 # only continuation bytes: malformed
+  lead <- as.integer(buf[i])
+  need <- if (bitwAnd(lead, 0x80L) == 0x00L) 1L
+          else if (bitwAnd(lead, 0xE0L) == 0xC0L) 2L
+          else if (bitwAnd(lead, 0xF0L) == 0xE0L) 3L
+          else if (bitwAnd(lead, 0xF8L) == 0xF0L) 4L
+          else 1L                        # stray continuation / invalid lead
+  have <- cont + 1L                      # continuations seen plus the lead byte
+  if (need > 1L && have < need) have else 0L
+}
+
+# UTF-8 validity scan, run before vroom ever sees the file. Streamed in bounded
+# chunks so a multi-GB delivery is verified in flat memory instead of being read
+# into one raw vector (which exhausts memory on the network-share hosts dqcheckr
+# deploys to). Only the "is this valid UTF-8?" question has a deterministic
+# answer; when the file is not valid UTF-8, the specific legacy encoding can only
+# be guessed statistically, so the guess is reported but never trusted blindly.
+scan_file_encoding <- function(path, chunk_size = 64L * 1024L * 1024L) {
   size <- suppressWarnings(file.size(path))
   if (is.na(size) || size <= 0) return(list(valid = TRUE, guess = NULL))
-  raw <- readBin(path, what = "raw", n = size)
-  if (stringi::stri_enc_isutf8(raw)) return(list(valid = TRUE, guess = NULL))
-  list(valid = FALSE, guess = .guess_legacy_encoding(raw))
+
+  con <- file(path, open = "rb")
+  on.exit(close(con), add = TRUE)
+
+  carry <- raw(0)   # trailing bytes of a possibly-incomplete sequence
+  repeat {
+    chunk <- readBin(con, what = "raw", n = chunk_size)
+    if (length(chunk) == 0L) break
+    buf <- if (length(carry) > 0L) c(carry, chunk) else chunk
+
+    tail_n <- .utf8_incomplete_tail(buf)
+    head_n <- length(buf) - tail_n
+    head_bytes <- if (head_n > 0L) buf[seq_len(head_n)] else raw(0)
+    carry      <- if (tail_n > 0L) buf[seq.int(head_n + 1L, length(buf))] else raw(0)
+
+    if (length(head_bytes) > 0L && !stringi::stri_enc_isutf8(head_bytes))
+      return(list(valid = FALSE, guess = .guess_legacy_encoding(head_bytes)))
+  }
+  # Bytes still held at EOF are a multi-byte sequence truncated by the file end.
+  if (length(carry) > 0L && !stringi::stri_enc_isutf8(carry))
+    return(list(valid = FALSE, guess = .guess_legacy_encoding(carry)))
+  list(valid = TRUE, guess = NULL)
 }
 
 # Locate the first chunk containing non-ASCII bytes and run ICU's charset
@@ -157,9 +220,11 @@ read_dataset <- function(path, config) {
   fmt <- tolower(config$format %||% "csv")
   enc <- normalise_encoding(config$encoding %||% "UTF-8")
 
+  enc_class <- .encoding_class(enc)
   enc_info <- list(declared = config$encoding %||% "UTF-8", used = enc,
-                   scanned = FALSE, valid = TRUE, guess = NULL, scan_error = NULL)
-  if (toupper(enc) %in% c("UTF-8", "UTF8")) {
+                   scanned = FALSE, valid = TRUE, guess = NULL, scan_error = NULL,
+                   enc_class = enc_class)
+  if (enc_class == "utf8") {
     # A scan failure must never block the read; readr raises its own typed error
     # below if the file is genuinely unreadable. But it must not be swallowed
     # into a confident PASS either (e.g. an out-of-memory readBin on a huge

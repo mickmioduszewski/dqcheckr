@@ -273,7 +273,7 @@ These run on the current file alone.
 | QC-13 | Pattern / regex | Values not matching `pattern` | FAIL |
 | QC-14 | Row count bounds | Row count below `min_row_count`; above `max_row_count`; file size above `max_file_size_mb` | FAIL |
 | QC-15 | Outlier detection | Numeric values outside Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) | FAIL |
-| QC-16 | File encoding | Delivery not valid UTF-8 as declared (whole file scanned; run completes via a single-byte fallback and reports the likely actual encoding) | FAIL |
+| QC-16 | File encoding | Delivery not valid UTF-8 as declared (file scanned in chunks; run completes via a single-byte fallback and reports the likely actual encoding). WARN when the encoding is multi-byte/unknown (e.g. UTF-16, Shift-JIS) and so not validity-checked, or when the scan itself could not complete | FAIL / WARN |
 
 ### Schema contract checks (SC series)
 

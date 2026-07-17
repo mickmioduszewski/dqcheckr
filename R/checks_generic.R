@@ -907,14 +907,21 @@ check_outliers <- function(df, config, types = NULL) {
 #' the outcome on the returned data frame; this check turns that outcome into
 #' a result:
 #' \itemize{
-#'   \item \strong{PASS} when the file was valid for the declared encoding,
-#'     or when a declared single-byte encoding (e.g. \code{ISO-8859-1},
+#'   \item \strong{PASS} when the file was valid UTF-8 as declared, or when a
+#'     declared single-byte encoding (e.g. \code{ISO-8859-1},
 #'     \code{Windows-1252}) made a validity scan meaningless -- every byte
 #'     sequence is valid in those encodings by construction.
 #'   \item \strong{FAIL} when the file was not valid UTF-8 as declared. The
 #'     run still completes: the file is read using a single-byte fallback
 #'     encoding, and the message reports the detector's best guess at the
 #'     actual encoding so the config can be corrected.
+#'   \item \strong{WARN} when the declared encoding is multi-byte or unknown
+#'     (e.g. \code{UTF-16LE}, \code{Shift-JIS}): dqcheckr scans only UTF-8, so
+#'     such a file is read as declared but its validity is not verified -- it is
+#'     never reported as "valid by construction".
+#'   \item \strong{WARN} when the UTF-8 scan itself could not complete (for
+#'     example out of memory on a very large delivery): validity is unknown, so
+#'     it is neither a clean PASS nor a definitive FAIL.
 #' }
 #' A supplier can change their export encoding between deliveries, which is
 #' why this runs against every delivery rather than only at configuration
@@ -941,17 +948,56 @@ check_outliers <- function(df, config, types = NULL) {
 check_file_encoding <- function(df, config) {
   info <- attr(df, "dq_encoding", exact = TRUE)
   if (is.null(info)) return(list())
+  enc_class <- info$enc_class %||% "utf8"
+
+  # Definitive failure first: the file was not valid UTF-8 as declared.
+  if (isFALSE(info$valid)) {
+    guess_txt <- if (!is.null(info$guess))
+      sprintf(" The bytes look like %s.", info$guess)
+    else
+      " The actual encoding could not be determined."
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "FAIL",
+      observed   = sprintf("Not valid %s; read as %s for this run.%s",
+                           info$declared, info$used, guess_txt),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = sprintf(paste0(
+        "File is not valid %s as declared in the config.%s ",
+        "It was read as %s so this run could complete; verify the supplier's ",
+        "export encoding and update 'encoding' in the dataset config."),
+        info$declared, guess_txt, info$used)
+    )))
+  }
+
+  # A declared multi-byte or unknown encoding (UTF-16/32, Shift-JIS, ...) is not
+  # validity-checked -- dqcheckr only scans UTF-8. Do not claim it is "valid by
+  # construction"; WARN that it was read as declared without verification.
+  if (enc_class == "other") {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "WARN",
+      observed   = sprintf(paste0("'%s' is a multi-byte or unknown encoding that ",
+                                  "dqcheckr does not validity-check."), info$used),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = paste0("File encoding was not verified: only UTF-8 and ",
+                          "single-byte encodings are checked. The file was read ",
+                          "as declared. Prefer a UTF-8 export where possible.")
+    )))
+  }
 
   if (isTRUE(info$valid)) {
     return(list(dq_result(
       check_id   = "QC-16",
       check_name = "File encoding",
       status     = "PASS",
-      observed   = if (isTRUE(info$scanned))
-        sprintf("File is valid %s.", info$used)
+      observed   = if (enc_class == "single_byte")
+        sprintf("'%s' is a single-byte encoding; every byte sequence is valid by construction.",
+                info$used)
       else
-        sprintf("'%s' is a single-byte encoding; every byte is valid by construction.",
-                info$used),
+        sprintf("File is valid %s.", info$used),
       threshold  = sprintf("declared: %s", info$declared),
       message    = "File encoding matches the configuration."
     )))
@@ -973,23 +1019,7 @@ check_file_encoding <- function(df, config) {
     )))
   }
 
-  guess_txt <- if (!is.null(info$guess))
-    sprintf(" The bytes look like %s.", info$guess)
-  else
-    " The actual encoding could not be determined."
-  list(dq_result(
-    check_id   = "QC-16",
-    check_name = "File encoding",
-    status     = "FAIL",
-    observed   = sprintf("Not valid %s; read as %s for this run.%s",
-                         info$declared, info$used, guess_txt),
-    threshold  = sprintf("declared: %s", info$declared),
-    message    = sprintf(paste0(
-      "File is not valid %s as declared in the config.%s ",
-      "It was read as %s so this run could complete; verify the supplier's ",
-      "export encoding and update 'encoding' in the dataset config."),
-      info$declared, guess_txt, info$used)
-  ))
+  list()   # unreachable: valid is TRUE/FALSE/NA, all handled above
 }
 
 #' SC-01 / SC-02: Check columns against the expected schema contract

@@ -25,14 +25,21 @@ validity before parsing (when the effective encoding is UTF-8) and records
 the outcome on the returned data frame; this check turns that outcome into
 a result:
 \itemize{
-  \item \strong{PASS} when the file was valid for the declared encoding,
-    or when a declared single-byte encoding (e.g. \code{ISO-8859-1},
+  \item \strong{PASS} when the file was valid UTF-8 as declared, or when a
+    declared single-byte encoding (e.g. \code{ISO-8859-1},
     \code{Windows-1252}) made a validity scan meaningless -- every byte
     sequence is valid in those encodings by construction.
   \item \strong{FAIL} when the file was not valid UTF-8 as declared. The
     run still completes: the file is read using a single-byte fallback
     encoding, and the message reports the detector's best guess at the
     actual encoding so the config can be corrected.
+  \item \strong{WARN} when the declared encoding is multi-byte or unknown
+    (e.g. \code{UTF-16LE}, \code{Shift-JIS}): dqcheckr scans only UTF-8, so
+    such a file is read as declared but its validity is not verified -- it is
+    never reported as "valid by construction".
+  \item \strong{WARN} when the UTF-8 scan itself could not complete (for
+    example out of memory on a very large delivery): validity is unknown, so
+    it is neither a clean PASS nor a definitive FAIL.
 }
 A supplier can change their export encoding between deliveries, which is
 why this runs against every delivery rather than only at configuration

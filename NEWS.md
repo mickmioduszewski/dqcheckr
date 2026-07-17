@@ -2,6 +2,20 @@
 
 ## Bug fixes
 
+* QC-16 no longer reports a spurious clean pass for a delivery whose encoding it
+  did not actually verify. A declared multi-byte or unknown encoding
+  (`UTF-16LE`, `UTF-32`, `Shift-JIS`, `GB18030`, ...) used to be reported as
+  "a single-byte encoding; every byte is valid by construction" -- which is
+  false, and which also silently disabled the crash guard that scanning gives
+  UTF-8 deliveries. Such an encoding is now read as declared but reported as a
+  WARN stating it was not validity-checked. Genuine single-byte encodings
+  (ISO-8859-x, Windows-125x) still PASS.
+
+* The UTF-8 validity scan now streams the file in bounded chunks instead of
+  reading it into one in-memory vector, so an arbitrarily large delivery is
+  verified in flat memory rather than exhausting it on the network-share hosts
+  dqcheckr deploys to.
+
 * Non-finite values in a numeric column (`Inf`/`-Inf`, e.g. from a corrupted
   upstream delivery whose CSV contains the literal text "Inf") are no longer
   mishandled. `compute_col_stats()` excludes them from the mean, standard

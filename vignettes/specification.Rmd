@@ -318,7 +318,7 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
 | QC-14 | Row count bounds | Table | `row_count < min_row_count` (if > 0); `row_count > max_row_count` (if set); file size > `max_file_size_mb` (if set) | — |
 | QC-15 | Outlier detection | Numeric columns | Value exceeds Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) threshold | — (skipped if neither threshold is configured) |
-| QC-16 | File encoding | File | Delivery is not valid UTF-8 when the config declares UTF-8 (whole file scanned before parsing; read completes via a single-byte fallback and the likely actual encoding is reported). Declared ASCII is read as UTF-8 (lossless subset); declared single-byte encodings always PASS (no invalid byte sequences exist) | — |
+| QC-16 | File encoding | File | Delivery is not valid UTF-8 when the config declares UTF-8 (file scanned in bounded chunks before parsing, so arbitrarily large files are verified in flat memory; read completes via a single-byte fallback and the likely actual encoding is reported). Declared ASCII is read as UTF-8 (lossless subset); declared single-byte encodings (ISO-8859-x, Windows-125x) always PASS (no invalid byte sequences exist). A declared multi-byte or unknown encoding (UTF-16/32, Shift-JIS, …) is read as declared but not validity-checked, so it WARNs rather than claiming a spurious PASS; a scan that cannot complete also WARNs | — |
 
 **Schema contract checks (SC series)** — only when `expected_columns` is configured
 
