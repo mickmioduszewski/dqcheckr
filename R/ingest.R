@@ -158,12 +158,18 @@ read_dataset <- function(path, config) {
   enc <- normalise_encoding(config$encoding %||% "UTF-8")
 
   enc_info <- list(declared = config$encoding %||% "UTF-8", used = enc,
-                   scanned = FALSE, valid = TRUE, guess = NULL)
+                   scanned = FALSE, valid = TRUE, guess = NULL, scan_error = NULL)
   if (toupper(enc) %in% c("UTF-8", "UTF8")) {
-    # A scan failure must never block the read; readr raises its own typed
-    # error below if the file is genuinely unreadable.
-    scan <- tryCatch(scan_file_encoding(path), error = function(e) NULL)
-    if (!is.null(scan)) {
+    # A scan failure must never block the read; readr raises its own typed error
+    # below if the file is genuinely unreadable. But it must not be swallowed
+    # into a confident PASS either (e.g. an out-of-memory readBin on a huge
+    # delivery): record the failure so validity reads as *unknown* (NA), and
+    # QC-16 turns that into a WARN rather than a green "valid by construction".
+    scan <- tryCatch(scan_file_encoding(path), error = function(e) e)
+    if (inherits(scan, "condition")) {
+      enc_info$valid      <- NA
+      enc_info$scan_error <- conditionMessage(scan)
+    } else {
       enc_info$scanned <- TRUE
       if (!scan$valid) {
         enc           <- .safe_fallback_encoding(scan$guess)

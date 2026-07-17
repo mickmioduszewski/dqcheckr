@@ -25,7 +25,10 @@ A data frame with one row per run and columns including
   \code{report_file} (the rendered report's filename, \code{NA} for
   snapshots written before dqcheckr 0.2.3).
   Returns an empty data frame with the same columns if the database does
-  not exist or contains no records for the dataset.
+  not exist or contains no records for the dataset. If the database exists
+  but cannot be read (corrupt file, permissions, an unresolved lock), it
+  emits a warning naming the cause and returns the same empty data frame, so
+  a read failure is visible rather than masquerading as an empty history.
 }
 \description{
 Retrieves the \code{n} most recent run records for a given dataset from the

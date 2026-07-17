@@ -51,7 +51,14 @@ list_snapshots <- function(dataset_name = NULL,
         list(dataset_name))
     }
   },
-  error = function(e) invisible(empty))
+  error = function(e) {
+    # A read failure is not the same as "no snapshots": warn with the cause
+    # before returning the empty frame, rather than reporting a corrupt/locked/
+    # unreadable database as an empty history.
+    warning("Could not read snapshots from '", db_path, "': ",
+            conditionMessage(e), call. = FALSE)
+    invisible(empty)
+  })
 }
 
 #' Compare two snapshots from the SQLite database

@@ -140,6 +140,28 @@ test_that("QC-16 is silent for a data frame not from read_dataset()", {
   expect_length(check_file_encoding(df, cfg), 0)
 })
 
+test_that("QC-16 WARNs (not PASS) when the UTF-8 scan itself fails (B-15)", {
+  # A scan error (e.g. OOM on a huge file) must not become a confident PASS with
+  # a bogus "valid by construction" rationale. read_dataset() records the scan
+  # failure and reads the file as declared; QC-16 reports it as unverified.
+  utf8 <- write_utf8_csv(tempfile(fileext = ".csv"))
+  on.exit(unlink(utf8))
+  cfg  <- list(format = "csv", encoding = "UTF-8", delimiter = ",")
+
+  testthat::local_mocked_bindings(
+    scan_file_encoding = function(...) stop("simulated scan failure (out of memory)"))
+  df  <- read_dataset(utf8, cfg)          # must still read, not abort
+  expect_s3_class(df, "data.frame")
+
+  res <- check_file_encoding(df, cfg)
+  expect_length(res, 1)
+  expect_equal(res[[1]]$status, "WARN")
+  expect_match(res[[1]]$observed, "Could not verify")
+  expect_match(res[[1]]$observed, "out of memory")
+  # It must NOT reuse the single-byte "valid by construction" wording.
+  expect_no_match(res[[1]]$observed, "by construction")
+})
+
 test_that("run_qc_checks() includes exactly one QC-16 result for a read df", {
   utf8 <- write_utf8_csv(tempfile(fileext = ".csv"))
   cfg  <- list(format = "csv", encoding = "UTF-8", delimiter = ",")

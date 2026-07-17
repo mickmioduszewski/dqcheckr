@@ -136,8 +136,12 @@ run_dq_check <- function(dataset_name,
   n_fail <- sum(vapply(all_r, \(r) r$status == "FAIL", logical(1)))
 
   report_label <- if (!is.null(report_path)) report_path else "(renderer not available)"
-  message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s",
-                  dataset_name, status, n_warn, n_fail, report_label))
+  # write_snapshot() is non-fatal: on failure it warns and returns NULL. Say so
+  # on the result line rather than printing an unqualified success, or the run
+  # reads as fully recorded when its history row was actually lost.
+  snapshot_note <- if (is.null(snapshot_id)) " [snapshot NOT recorded]" else ""
+  message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s%s",
+                  dataset_name, status, n_warn, n_fail, report_label, snapshot_note))
 
   invisible(list(
     status      = status,

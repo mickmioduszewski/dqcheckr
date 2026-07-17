@@ -111,7 +111,38 @@ test_that("run_dq_check() completes with FAIL for an empty (header-only) deliver
   expect_false(is.null(result$snapshot_id))              # snapshot was written
 })
 
-# -- Render-failure path is reconciled into the snapshot (B-05/06/12/28/34) -------
+# -- A lost snapshot is surfaced, not announced as success (B-08) -----------------
+
+test_that("run_dq_check() flags a lost snapshot on its result line (B-08)", {
+  skip_on_cran()
+  cfg_dir <- setup_integration_env()
+
+  # Force the snapshot write to fail: point snapshot_db under a path whose parent
+  # is a regular file, so the database cannot be created.
+  fake <- tempfile()
+  file.create(fake)
+  on.exit(unlink(fake))
+  impossible <- file.path(fake, "nope.sqlite")
+
+  writeLines(c(
+    "dataset_name: 'integ_ds'",
+    sprintf("current_file: '%s'",
+            testthat::test_path("fixtures", "valid_accounts_current.csv")),
+    sprintf("previous_file: '%s'",
+            testthat::test_path("fixtures", "valid_accounts_previous.csv")),
+    "format: csv", "encoding: UTF-8",
+    sprintf("snapshot_db: '%s'", impossible),
+    sprintf("report_output_dir: '%s'", file.path(cfg_dir, "reports"))
+  ), file.path(cfg_dir, "integ_ds.yml"))
+
+  expect_message(
+    suppressWarnings(
+      run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)),
+    regexp = "snapshot NOT recorded"
+  )
+})
+
+# -- Render-failure path is reconciled into the snapshot (B-05/06/28/12/34) -------
 # When no report is written, the snapshot must not keep render_status='success'
 # and an optimistic report_file naming a file that does not exist -- consumers
 # (read_recent_snapshots, the GUI history link) would advertise a dead report.

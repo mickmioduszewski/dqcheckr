@@ -308,7 +308,12 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     })
   },
   error = function(e) {
-    warning("SQLite write failed: ", conditionMessage(e))
+    # Non-fatal by design: the run continues without a snapshot. The message is
+    # cause-neutral because this block also covers init/migration and status
+    # computation, not only the INSERT -- run_dq_check() surfaces the resulting
+    # NULL snapshot_id in its final line so the loss is not silent.
+    warning("Snapshot not recorded (SQLite write failed): ", conditionMessage(e),
+            call. = FALSE)
     NULL
   })
 }
@@ -333,7 +338,10 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   \code{report_file} (the rendered report's filename, \code{NA} for
 #'   snapshots written before dqcheckr 0.2.3).
 #'   Returns an empty data frame with the same columns if the database does
-#'   not exist or contains no records for the dataset.
+#'   not exist or contains no records for the dataset. If the database exists
+#'   but cannot be read (corrupt file, permissions, an unresolved lock), it
+#'   emits a warning naming the cause and returns the same empty data frame, so
+#'   a read failure is visible rather than masquerading as an empty history.
 #'
 #' @examples
 #' history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
@@ -384,5 +392,13 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
     }
     res[, names(empty), drop = FALSE]  # pin column order to the schema
   },
-  error = function(e) empty)
+  error = function(e) {
+    # A read failure (corrupt file, permissions, a lock that outlasted the busy
+    # timeout) is NOT the same as "no history yet". Returning empty silently
+    # would tell the caller there are no runs when the truth is the read failed,
+    # so surface it as a warning before falling back to the empty frame.
+    warning("Could not read snapshot history from '", db_path, "': ",
+            conditionMessage(e), call. = FALSE)
+    empty
+  })
 }

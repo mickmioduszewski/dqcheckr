@@ -955,6 +955,22 @@ check_file_encoding <- function(df, config) {
     )))
   }
 
+  # Validity is unknown: the UTF-8 scan itself failed (e.g. out of memory on a
+  # very large delivery). Not a clean PASS -- the file was read as declared with
+  # no verification -- and not a definitive FAIL either, so WARN.
+  if (is.na(info$valid)) {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "WARN",
+      observed   = sprintf("Could not verify %s: %s", info$used,
+                           info$scan_error %||% "the encoding scan did not complete"),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = paste0("File encoding could not be verified; the file was ",
+                          "read as declared without a validity scan.")
+    )))
+  }
+
   guess_txt <- if (!is.null(info$guess))
     sprintf(" The bytes look like %s.", info$guess)
   else

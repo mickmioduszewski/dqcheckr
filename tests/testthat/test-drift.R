@@ -1,6 +1,21 @@
 
 # -- list_snapshots() ----------------------------------------------------------
 
+test_that("list_snapshots() warns instead of silently emptying on a read error (B-07)", {
+  # Valid DB, but the `snapshots` table cannot satisfy the query -- must surface
+  # the failure, not report it as an empty history.
+  bad <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(bad))
+  con <- DBI::dbConnect(RSQLite::SQLite(), bad)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (wrong_col TEXT)")
+  DBI::dbDisconnect(con)
+
+  expect_warning(res <- list_snapshots("ds", db_path = bad),
+                 regexp = "Could not read snapshots")
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 0L)
+})
+
 test_that("list_snapshots returns empty df for non-existent db", {
   result <- list_snapshots(db_path = tempfile(fileext = ".sqlite"))
   expect_s3_class(result, "data.frame")

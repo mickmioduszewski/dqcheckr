@@ -2,6 +2,21 @@
 
 ## Bug fixes
 
+* Failures that were previously swallowed into silent, benign-looking results
+  are now surfaced.
+  - `read_recent_snapshots()` and `list_snapshots()` no longer report a
+    corrupt, locked, or unreadable database as an empty history. They emit a
+    warning naming the cause before returning the empty frame, so "the read
+    failed" is distinguishable from "no runs yet".
+  - When the snapshot write fails, `run_dq_check()` now appends
+    "[snapshot NOT recorded]" to its result line instead of printing an
+    unqualified success while the history row was lost.
+  - QC-16 no longer reports a confident PASS when the UTF-8 validity scan itself
+    fails (for example, out of memory on a very large delivery). It reports a
+    WARN stating the encoding could not be verified, rather than a PASS whose
+    rationale wrongly called UTF-8 "a single-byte encoding, valid by
+    construction".
+
 * Concurrent runs sharing one snapshot database no longer lose a snapshot or die
   during migration. Connections now set `PRAGMA busy_timeout`, so a run that
   meets a database another run is writing waits for the lock instead of failing

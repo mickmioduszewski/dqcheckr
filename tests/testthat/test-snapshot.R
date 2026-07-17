@@ -337,6 +337,21 @@ test_that("read_recent_snapshots() returns empty data frame when db does not exi
   expect_equal(nrow(res), 0L)
 })
 
+test_that("read_recent_snapshots() warns instead of silently emptying on a read error (B-16)", {
+  # A valid DB whose `snapshots` table cannot satisfy the query (schema mismatch,
+  # like a corrupt/foreign file would produce) must not read as 'no history'.
+  bad <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(bad))
+  con <- DBI::dbConnect(RSQLite::SQLite(), bad)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (wrong_col TEXT)")
+  DBI::dbDisconnect(con)
+
+  expect_warning(res <- read_recent_snapshots(bad, "ds"),
+                 regexp = "Could not read snapshot history")
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 0L)
+})
+
 test_that("read_recent_snapshots() returns only rows for the requested dataset", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
