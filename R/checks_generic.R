@@ -355,13 +355,19 @@ check_allowed_values <- function(df, config) {
     allowed <- col_rules[[col]]$allowed_values
     if (is.null(allowed) || !col %in% names(df)) next
     allowed_vec <- unlist(allowed, use.names = FALSE)
+    # The numerically-typed subset of the allowed list, kept separate from the
+    # character form. A mixed YAML list like [2.1, 3.5, "N/A"] unlists to an
+    # all-character vector, so gating on is.numeric(allowed_vec) would skip the
+    # numeric comparison entirely and FAIL a file value of "2.10" (B-22). Only
+    # genuinely-numeric entries are compared numerically, so a *string* "007"
+    # still does not accept a file value of "7".
+    num_allowed <- unlist(allowed[vapply(allowed, is.numeric, logical(1))],
+                          use.names = FALSE)
     vals <- df[[col]][!.missing_vals(df[[col]])]
     bad  <- setdiff(unique(vals), as.character(allowed_vec))
-    # When YAML supplied numbers, compare numerically too: as.character(2.1)
-    # is "2.1", so a file value of "2.10" would otherwise FAIL spuriously.
-    if (length(bad) > 0 && is.numeric(allowed_vec)) {
+    if (length(bad) > 0 && length(num_allowed) > 0) {
       bad_num <- suppressWarnings(as.numeric(bad))
-      bad <- bad[is.na(bad_num) | !bad_num %in% allowed_vec]
+      bad <- bad[is.na(bad_num) | !bad_num %in% num_allowed]
     }
     status <- if (length(bad) > 0) "FAIL" else "PASS"
     results <- c(results, list(dq_result(

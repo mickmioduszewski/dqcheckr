@@ -51,7 +51,11 @@ detect_files <- function(config) {
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
   }
 
-  files <- files[order(file.mtime(files), basename(files), decreasing = TRUE)]
+  # method = "radix" collates the basename tie-break in C byte order; the
+  # default is locale-dependent (LC_COLLATE), so two files with identical mtimes
+  # could otherwise swap current/previous between deployment environments (B-19).
+  files <- files[order(file.mtime(files), basename(files),
+                       decreasing = TRUE, method = "radix")]
   list(
     current  = files[1],
     previous = if (length(files) >= 2) files[2] else NULL

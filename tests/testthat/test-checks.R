@@ -134,6 +134,31 @@ test_that("check_allowed_values() returns empty list when no column_rules", {
   expect_equal(length(res), 0)
 })
 
+test_that("check_allowed_values() compares numerics in a mixed number/string list (B-22)", {
+  # A YAML list [2.1, 3.5, "N/A"] unlists to all-character, which previously
+  # disabled the numeric comparison so "2.10" FAILed against 2.1.
+  df  <- data.frame(amt = c("2.10", "3.5", "N/A", "9.9"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(column_rules = list(
+    amt = list(allowed_values = list(2.1, 3.5, "N/A"))
+  )))
+  res <- Filter(\(r) r$column == "amt", check_allowed_values(df, cfg))[[1]]
+  expect_equal(res$status, "FAIL")             # only 9.9 is disallowed
+  expect_match(res$observed, "9.9")
+  expect_false(grepl("2.10", res$observed))    # accepted as == 2.1
+})
+
+test_that("check_allowed_values() does not accept a numeric match against a STRING allowed value (B-22)", {
+  # "007" is a string in the allowed list; a file value of "7" must NOT match it
+  # (the fix compares only genuinely-numeric allowed entries numerically).
+  df  <- data.frame(code = c("007", "7"), stringsAsFactors = FALSE)
+  cfg <- base_config(list(column_rules = list(
+    code = list(allowed_values = list("007", "008"))
+  )))
+  res <- Filter(\(r) r$column == "code", check_allowed_values(df, cfg))[[1]]
+  expect_equal(res$status, "FAIL")
+  expect_match(res$observed, "7")
+})
+
 # -- QC-10 Numeric bounds ------------------------------------------------------
 
 test_that("check_numeric_bounds() returns PASS when all values within range", {
