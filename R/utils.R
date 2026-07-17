@@ -139,13 +139,16 @@ load_config <- function(dataset_name, config_dir) {
 #' Date formats are tried in this fixed precedence order:
 #' \code{"\%Y-\%m-\%d"}, \code{"\%d/\%m/\%Y"}, \code{"\%m/\%d/\%Y"},
 #' \code{"\%Y\%m\%d"}, \code{"\%d-\%m-\%Y"}. A column is classified as
-#' \code{"date"} only when \emph{every} non-empty value parses under one
-#' format; a single malformed date therefore flips the whole column to
-#' \code{"numeric"} or \code{"character"} (such flips between deliveries are
-#' surfaced by check CP-02c). Two caveats follow from the precedence rules:
+#' \code{"date"} only when \emph{every} non-empty value both matches that
+#' format's exact character shape and parses as a valid calendar date; a single
+#' malformed date therefore flips the whole column to \code{"numeric"} or
+#' \code{"character"} (such flips between deliveries are surfaced by check
+#' CP-02c). The shape is anchored, so a value with trailing characters
+#' (\code{"2024-01-15x"}) or extra digits (the 9-digit \code{"202401159"}) is
+#' \emph{not} treated as a date. Two caveats follow from the precedence rules:
 #' ambiguous day/month values resolve day-first (\code{"\%d/\%m/\%Y"} is
 #' tried before \code{"\%m/\%d/\%Y"}), and all-8-digit identifier columns
-#' whose values happen to parse under \code{"\%Y\%m\%d"} classify as dates.
+#' whose values happen to be valid \code{"\%Y\%m\%d"} dates classify as dates.
 #' Pin the type with an entry in the \code{column_types} config map when the
 #' heuristic gets a column wrong.
 #'
@@ -162,14 +165,30 @@ infer_col_type <- function(x, threshold = 0.90) {
 
   if (length(non_empty) == 0) return("unknown")
 
-  # Cheap rejection: a format that fails anywhere in the first 100 values
-  # cannot pass the all-must-parse rule, so skip the full-column parse for
-  # it. Results are identical; only non-matching formats get cheaper.
+  # Each format is paired with an anchored shape regex. as.Date() delegates to
+  # strptime(), which matches a *prefix* and silently ignores trailing
+  # characters — so "2024-01-15xyz" and the 9-digit id "202401159" (its first 8
+  # chars parse under %Y%m%d) would both be accepted as dates. Requiring the
+  # whole string to match the format's shape first closes that. The %Y%m%d shape
+  # is exactly 8 digits, so a genuine 8-digit identifier that also happens to be
+  # a valid calendar date still classifies as "date" (documented caveat below),
+  # while a 9-digit id is now correctly rejected.
+  #
+  # Cheap rejection: a format whose shape or parse fails anywhere in the first
+  # 100 values cannot pass the all-must-match rule, so skip the full-column pass
+  # for it. Results are identical; only non-matching formats get cheaper.
   head_sample  <- non_empty[seq_len(min(100L, length(non_empty)))]
   date_formats <- c("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y%m%d", "%d-%m-%Y")
-  for (fmt in date_formats) {
+  date_shapes  <- c("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "^[0-9]{2}/[0-9]{2}/[0-9]{4}$",
+                    "^[0-9]{2}/[0-9]{2}/[0-9]{4}$", "^[0-9]{8}$",
+                    "^[0-9]{2}-[0-9]{2}-[0-9]{4}$")
+  for (i in seq_along(date_formats)) {
+    fmt   <- date_formats[[i]]
+    shape <- date_shapes[[i]]
+    if (!all(grepl(shape, head_sample))) next
     parsed_head <- suppressWarnings(as.Date(head_sample, format = fmt))
     if (any(is.na(parsed_head))) next
+    if (!all(grepl(shape, non_empty))) next
     parsed <- suppressWarnings(as.Date(non_empty, format = fmt))
     if (!any(is.na(parsed))) return("date")
   }

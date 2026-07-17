@@ -308,12 +308,28 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
-    DBI::dbGetQuery(con,
+    res <- DBI::dbGetQuery(con,
       "SELECT * FROM snapshots
        WHERE dataset_name = ?
        ORDER BY id DESC
        LIMIT ?",
       list(dataset_name, as.integer(n)))
+
+    # Backfill columns a pre-0.2.3 database predates. SELECT * returns only the
+    # columns that physically exist, so an un-migrated DB yields a frame that is
+    # *missing* these columns outright — consumers branching on report_file (or
+    # the 0.1.x-era columns) would error rather than see NA. We do NOT ALTER the
+    # table here: a read must not mutate the file (read-only shares, the NSW
+    # OneDrive deployment) nor race a concurrent write. Instead fill each absent
+    # column with exactly the value ALTER TABLE ... DEFAULT would have written,
+    # so the same database reads identically before and after its first 0.2.3+
+    # write. rep(..., nrow(res)) keeps a zero-row result correctly typed.
+    defaults <- list(comparison_mode = "comparison", render_status = "success")
+    for (col in setdiff(names(empty), names(res))) {
+      fill <- defaults[[col]] %||% empty[[col]][NA_integer_]  # typed NA otherwise
+      res[[col]] <- rep(fill, nrow(res))
+    }
+    res[, names(empty), drop = FALSE]  # pin column order to the schema
   },
   error = function(e) empty)
 }

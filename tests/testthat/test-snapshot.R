@@ -348,3 +348,107 @@ test_that("report_filename() produces the documented slug", {
   rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
   expect_equal(report_filename("mydata", rt), "mydata_20260704_101112.html")
 })
+
+# -- read_recent_snapshots() backfill on un-migrated databases (B-01) ------------
+# The tests above all reach the DB through write_snapshot(), which calls
+# init_snapshot_db() and migrates first, so a read against a genuinely old,
+# never-written database is never exercised there. These build the old schema by
+# hand and INSERT directly, so the row is read back WITHOUT any ALTER.
+
+test_that("read_recent_snapshots() backfills columns absent from a 0.1.x database", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL
+    )")
+  DBI::dbExecute(con,
+    "INSERT INTO snapshots
+       (dataset_name, run_timestamp, file_name, row_count, col_count, overall_status)
+     VALUES ('old_ds', '2025-01-01T00:00:00Z', 'f.csv', 10, 3, 'PASS')")
+  DBI::dbDisconnect(con)
+
+  # A read must not have mutated the file on disk (read-only shares).
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  before <- DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name
+  DBI::dbDisconnect(con2)
+
+  res <- read_recent_snapshots(db, "old_ds")
+
+  con3 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con3), add = TRUE)
+  after <- DBI::dbGetQuery(con3, "SELECT name FROM pragma_table_info('snapshots')")$name
+  expect_setequal(before, after)  # read did NOT ALTER the table
+
+  # Frame carries the full 0.2.3 schema, in schema order.
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_equal(nrow(res), 1L)
+
+  # Backfilled values match what ALTER TABLE ... DEFAULT would have written.
+  expect_equal(res$comparison_mode, "comparison")
+  expect_equal(res$render_status, "success")
+  expect_true(is.na(res$report_file))
+  expect_true(is.na(res$type_changed_cols_vs_previous))
+  expect_true(is.na(res$check_pass_count))
+  # Real columns survive untouched.
+  expect_equal(res$dataset_name, "old_ds")
+  expect_equal(res$row_count, 10L)
+})
+
+test_that("read_recent_snapshots() backfills report_file on a 0.2.2 database", {
+  # 0.2.2 (current CRAN) has every column except report_file: 18 vs 19.
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL, col_count INTEGER NOT NULL,
+      check_pass_count INTEGER, check_warn_count INTEGER, check_fail_count INTEGER,
+      check_info_count INTEGER, overall_status TEXT NOT NULL,
+      new_cols_vs_previous TEXT, missing_cols_vs_previous TEXT,
+      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT,
+      comparison_mode TEXT NOT NULL DEFAULT 'comparison',
+      render_status TEXT NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT
+    )")
+  DBI::dbExecute(con,
+    "INSERT INTO snapshots
+       (dataset_name, run_timestamp, file_name, row_count, col_count, overall_status)
+     VALUES ('v022_ds', '2026-01-01T00:00:00Z', 'f.csv', 7, 2, 'WARN')")
+  DBI::dbDisconnect(con)
+
+  res <- read_recent_snapshots(db, "v022_ds")
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_true("report_file" %in% names(res))
+  expect_true(is.na(res$report_file))
+  expect_equal(res$comparison_mode, "comparison")  # real stored value, still correct
+})
+
+test_that("read_recent_snapshots() backfill keeps a zero-row result correctly typed", {
+  # No matching dataset in an un-migrated DB: the SELECT returns zero rows but
+  # still only the old columns. The backfill must add the rest without erroring.
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL
+    )")
+  DBI::dbDisconnect(con)
+
+  res <- read_recent_snapshots(db, "absent_ds")
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_equal(nrow(res), 0L)
+})
