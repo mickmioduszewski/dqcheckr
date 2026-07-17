@@ -25,10 +25,35 @@ test_that("dq_result() stops when status is not one of PASS/WARN/FAIL/INFO", {
 })
 
 test_that("dq_result() stops on NULL status", {
+  # Assert the typed class, not any error -- a bare expect_error() would pass on
+  # an unrelated failure and never reach the status guard (B-35/B-53).
   expect_error(
     dq_result("QC-01", "Missing rate", status = NULL,
-              observed = "x", message = "x")
+              observed = "x", message = "x"),
+    class = "dqcheckr_invalid_argument"
   )
+})
+
+test_that(".move_file() aborts with a typed error when the move fails (B-29)", {
+  from <- tempfile(fileext = ".html")
+  writeLines("<html></html>", from)
+  on.exit(unlink(from))
+  # Target's parent directory does not exist, so both rename and copy fail.
+  # file.copy() emits its own "cannot create file" warning first; the point of
+  # the test is the typed error, not that noise.
+  to <- file.path(tempfile(), "nested", "report.html")
+  suppressWarnings(
+    expect_error(dqcheckr:::.move_file(from, to), class = "dqcheckr_write_error"))
+})
+
+test_that(".move_file() moves a file within a filesystem and returns TRUE (B-29)", {
+  from <- tempfile(fileext = ".html")
+  writeLines("x", from)
+  to   <- tempfile(fileext = ".html")
+  expect_true(dqcheckr:::.move_file(from, to))
+  expect_true(file.exists(to))
+  expect_false(file.exists(from))
+  unlink(to)
 })
 
 test_that("dq_result() accepts all four valid status values", {

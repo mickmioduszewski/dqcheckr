@@ -170,6 +170,27 @@ test_that("run_dq_check() marks the snapshot render-failed when Quarto is absent
   expect_true(is.na(snaps$report_file[1]))           # no phantom filename
 })
 
+test_that("run_dq_check() warns and reconciles when render_report() throws (B-28)", {
+  skip_on_cran()
+  # The Quarto-absent (skipped) path is covered above; this exercises the other
+  # NULL-report branch -- render_report() actually raising an error.
+  testthat::local_mocked_bindings(
+    render_report = function(...) stop("simulated render explosion"))
+
+  cfg_dir <- setup_integration_env()
+  expect_warning(
+    result <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE),
+    regexp = "Report rendering failed"
+  )
+  expect_null(result$report_path)
+  expect_false(is.null(result$snapshot_id))
+
+  snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
+                                 "integ_ds", n = 1)
+  expect_equal(snaps$render_status[1], "failed")   # reconciled, not left success
+  expect_true(is.na(snaps$report_file[1]))
+})
+
 test_that("run_dq_check() records report_file only for a report that exists", {
   skip_on_cran()
   skip_if_not(quarto::quarto_available(), "Quarto CLI not available")

@@ -1,4 +1,8 @@
 
+test_that("list_snapshots() requires an explicit db_path (B-32)", {
+  expect_error(list_snapshots("test_ds"), class = "dqcheckr_invalid_argument")
+})
+
 # -- utc_to_local_display() / drift timestamp (B-43) ---------------------------
 
 test_that("utc_to_local_display() converts stored UTC-ISO to local time (B-43)", {
