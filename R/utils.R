@@ -243,6 +243,22 @@ report_filename <- function(dataset_name, run_time) {
           format(run_time, "%Y%m%d_%H%M%S", tz = "UTC"))
 }
 
+#' Convert a stored UTC-ISO snapshot timestamp to a local-time display string
+#'
+#' Single source of truth for turning the \code{run_timestamp} stored in the
+#' snapshot DB (UTC ISO, e.g. \code{"2026-07-17T10:11:12Z"}) into the local-time
+#' string users see. The QC report renders local time from the live run_time
+#' (\code{report.R}, same \code{"\%Y-\%m-\%d \%H:\%M:\%S"} / \code{tz = ""}
+#' format) and the GUI history converts too; the drift report goes through here
+#' so all three surfaces agree for one instant (B-43). A value that does not
+#' parse is returned unchanged rather than shown as \code{NA}.
+#' @keywords internal
+#' @noRd
+utc_to_local_display <- function(ts) {
+  parsed <- as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  ifelse(is.na(parsed), ts, format(parsed, "%Y-%m-%d %H:%M:%S", tz = ""))
+}
+
 #' Move a file, falling back to copy+delete across filesystems
 #'
 #' \code{file.rename()} fails (returning FALSE, no error) when source and

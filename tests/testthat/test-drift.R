@@ -1,4 +1,25 @@
 
+# -- utc_to_local_display() / drift timestamp (B-43) ---------------------------
+
+test_that("utc_to_local_display() converts stored UTC-ISO to local time (B-43)", {
+  withr::local_envvar(TZ = "Etc/GMT-10")     # fixed UTC+10, no DST
+  expect_equal(dqcheckr:::utc_to_local_display("2026-07-17T10:11:12Z"),
+               "2026-07-17 20:11:12")
+  # A value that does not parse is returned unchanged, never as NA.
+  expect_equal(dqcheckr:::utc_to_local_display("not-a-timestamp"), "not-a-timestamp")
+})
+
+test_that("compare_snapshots() carries a local-time timestamp for the drift report (B-43)", {
+  withr::local_envvar(TZ = "Etc/GMT-10")
+  db      <- make_drift_db(2)                # timestamps stored as ...T09:00:00Z
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("test_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+  expect_equal(drift$snap_prev$run_timestamp_local, "2025-01-01 19:00:00")
+  # The raw UTC field is still present but is not what the template renders.
+  expect_match(drift$snap_prev$run_timestamp, "Z$")
+})
+
 # -- list_snapshots() ----------------------------------------------------------
 
 test_that("list_snapshots() warns instead of silently emptying on a read error (B-07)", {

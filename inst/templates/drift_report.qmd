@@ -22,7 +22,7 @@ drift <- .p$drift
 | | Previous | Current |
 |---|---|---|
 | **Snapshot** | #`r drift$snap_prev$id` | #`r drift$snap_curr$id` |
-| **Timestamp** | `r drift$snap_prev$run_timestamp` | `r drift$snap_curr$run_timestamp` |
+| **Timestamp** | `r drift$snap_prev$run_timestamp_local` | `r drift$snap_curr$run_timestamp_local` |
 | **File** | `r drift$snap_prev$file_name` | `r drift$snap_curr$file_name` |
 
 ---

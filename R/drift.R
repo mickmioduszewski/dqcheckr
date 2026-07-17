@@ -289,6 +289,12 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(sprintf("Snapshot ID %d not found.", id_curr),
                  class = c("dqcheckr_not_found", "dqcheckr_error"))
 
+  # Local-time display of the stored UTC-ISO timestamp, matching the QC report
+  # and GUI history so the drift report does not show a different time for the
+  # same snapshot (B-43).
+  snap_prev$run_timestamp_local <- utc_to_local_display(snap_prev$run_timestamp)
+  snap_curr$run_timestamp_local <- utc_to_local_display(snap_curr$run_timestamp)
+
   stats_prev <- .get_col_stats(con, id_prev)
   stats_curr <- .get_col_stats(con, id_curr)
 
