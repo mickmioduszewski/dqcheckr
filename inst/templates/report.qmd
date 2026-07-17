@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       fig.path = file.path(tempdir(), "dqcheckr_figs", ""))
 library(kableExtra)
 library(ggplot2)
-library(dplyr)
 
 p <- readRDS(params$rds_path)
 

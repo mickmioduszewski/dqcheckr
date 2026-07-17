@@ -17,7 +17,7 @@ check_min_row_count(df, config, file_path = NULL)
 disk, required for the optional file-size sub-check.}
 }
 \value{
-A list of \code{\link{dq_result}} objects (one to three entries
+A list of \code{\link{dq_result}} objects (one to four entries
   depending on which sub-checks are active).
 }
 \description{

@@ -61,9 +61,10 @@ devtools::install("path/to/dqr/dqcheckr")
 library(dqcheckr)
 ```
 
-All dependencies are on CRAN: `readr`, `DBI`, `RSQLite`, `rmarkdown`,
-`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `dplyr`, `tidyr`,
-`rlang`.
+All dependencies are on CRAN: `readr`, `stringi`, `DBI`, `RSQLite`, `quarto`,
+`knitr`, `kableExtra`, `ggplot2`, `gridExtra`, `yaml`, `tidyr`, `rlang`.
+Report rendering additionally needs the Quarto CLI installed separately (see
+<https://quarto.org>).
 
 ---
 
@@ -180,12 +181,15 @@ column_rules:
 
 ### What is required vs optional
 
-The only fields the package requires to run are the file location (`folder`
-or `current_file`) and the `format`. Every other config key is optional —
-the corresponding checks are simply skipped when the key is absent.
+The fields the package requires to run are the file location (`folder`
+or `current_file`), the `format`, and — for `format: fwf` — `fwf_widths`.
+Every other config key is optional — the corresponding checks are simply
+skipped when the key is absent.
 
 | Config key | Skipped / default when absent |
 |---|---|
+| `fwf_widths` | **Required** for `format: fwf`; the run aborts with `dqcheckr_invalid_config` if absent. Ignored for CSV |
+| `column_types` | Column types are inferred (see C.5) instead of pinned; each value must be `character`, `numeric`, or `date` |
 | `key_columns` | QC-12 (key uniqueness) skipped |
 | `expected_columns` | SC-01 and SC-02 (schema contract) skipped |
 | `column_rules.allowed_values` | QC-09 (allowed values) skipped |

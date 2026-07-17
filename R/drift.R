@@ -73,8 +73,10 @@ list_snapshots <- function(dataset_name = NULL,
 #' @param snapshot_id_curr Integer or \code{NULL}. ID of the later snapshot.
 #'   If \code{NULL}, defaults to the most-recent snapshot by ID.
 #' @param db_path Character or \code{NULL}. Path to the SQLite snapshot
-#'   database. If \code{NULL} (the default), the path is read from
-#'   \code{snapshot_db} in \code{dqcheckr.yml}.
+#'   database. If \code{NULL} (the default), the path is resolved from
+#'   \code{snapshot_db} the same way \code{\link{run_dq_check}} resolves it:
+#'   from \code{<dataset_name>.yml} if set there, otherwise \code{dqcheckr.yml},
+#'   otherwise the built-in default \code{"data/snapshots.sqlite"}.
 #' @param config_dir Character. Path to the directory containing
 #'   \code{dqcheckr.yml}. Used to read thresholds, \code{report_output_dir},
 #'   and (when \code{db_path} is \code{NULL}) \code{snapshot_db}.

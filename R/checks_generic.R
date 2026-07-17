@@ -700,7 +700,7 @@ check_pattern <- function(df, config) {
 #' @param file_path Character or \code{NULL}. Absolute path to the file on
 #'   disk, required for the optional file-size sub-check.
 #'
-#' @return A list of \code{\link{dq_result}} objects (one to three entries
+#' @return A list of \code{\link{dq_result}} objects (one to four entries
 #'   depending on which sub-checks are active).
 #'
 #' @examples
