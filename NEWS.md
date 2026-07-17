@@ -1,3 +1,36 @@
+# dqcheckr (development version)
+
+## Bug fixes
+
+* Column type inference no longer misclassifies a value whose *prefix* happens
+  to be a date. `as.Date()` matches a prefix and silently ignores trailing
+  characters, so `"2024-01-15x"` and the 9-digit id `"202401159"` (whose first
+  eight digits parse under `%Y%m%d`) were both classified as `"date"` — which
+  made corrupt dates pass QC-06 and stripped the numeric checks (QC-07/08/11)
+  from id columns of eight or more digits. Each date format is now gated on an
+  anchored shape before calendar validation. The documented caveat is
+  unchanged: a genuine eight-digit value that is also a valid `%Y%m%d` date
+  still classifies as a date; a nine-digit id now correctly classifies as
+  numeric.
+* `read_recent_snapshots()` now returns the full set of columns even for a
+  snapshot database created before 0.2.3. Previously it ran `SELECT *` without
+  migrating, so an older database returned rows with the newer columns (such as
+  `report_file`) *absent* rather than `NA`, and callers relying on those
+  columns errored instead of degrading. The missing columns are now filled in
+  after the read with the same defaults a migration would apply; the database
+  file itself is not modified, so reads remain safe on read-only or
+  network-shared databases.
+
+## Packaging
+
+* The bundled `starwars_csv` demonstration data (`inst/demonstrations/data/`)
+  is now shipped. An unanchored `.gitignore` rule had excluded it, so a fresh
+  clone was missing the file that 27 example blocks and two tests depend on,
+  and `R CMD check` failed on a clean checkout.
+* The fixed-width demonstration (`starwars_fwf`) now has its data file. A new
+  `inst/demonstrations/makedata.R` derives `starwars.fwf` from the CSV, so the
+  FWF half of `demo.R` runs end-to-end instead of aborting on a missing file.
+
 # dqcheckr 0.2.4
 
 ## Bug fixes
