@@ -83,11 +83,68 @@ test_that("compare_snapshots errors if same ID passed twice", {
 test_that("compare_snapshots() errors when prev ID is greater than curr ID", {
   db      <- make_drift_db(2)
   cfg_dir <- make_drift_config()
+  # Assert the specific ordering-guard class, not the umbrella dqcheckr_error
+  # that three earlier abort sites on this call path also carry (B-49).
   expect_error(
     compare_snapshots("test_ds", snapshot_id_prev = 2L, snapshot_id_curr = 1L,
                       db_path = db, config_dir = cfg_dir, report = FALSE),
-    class = "dqcheckr_error"
+    class = "dqcheckr_invalid_argument", regexp = "older than"
   )
+})
+
+test_that("compare_snapshots() rejects a non-numeric snapshot ID (B-21)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  # A character ID would sort as a string ("10" > "9" is FALSE) past the
+  # ordering guard and then abort untyped inside sprintf("%d", .).
+  expect_error(
+    compare_snapshots("test_ds", snapshot_id_prev = "10", snapshot_id_curr = "9",
+                      db_path = db, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument"
+  )
+  expect_error(
+    compare_snapshots("test_ds", snapshot_id_prev = 1.5, snapshot_id_curr = 2L,
+                      db_path = db, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument"
+  )
+})
+
+test_that("compare_snapshots() raises a typed error for a bad database (B-30)", {
+  cfg_dir <- make_drift_config()
+
+  non_db <- tempfile(fileext = ".sqlite")
+  writeLines("this is not a database", non_db)
+  # RSQLite emits a "couldn't set synchronous mode" warning at connect for a
+  # non-database file; the point of the test is the typed error, not that noise.
+  suppressWarnings(expect_error(
+    compare_snapshots("test_ds", db_path = non_db,
+                      config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_db_error"
+  ))
+
+  no_table <- tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), no_table)
+  DBI::dbExecute(con, "CREATE TABLE other (x TEXT)")
+  DBI::dbDisconnect(con)
+  expect_error(
+    compare_snapshots("test_ds", db_path = no_table,
+                      config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_schema_error"
+  )
+})
+
+test_that("drift between two zero-row snapshots renders no NA in Exceeds (B-44/B-47)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "UPDATE snapshots SET row_count = 0")   # two empty deliveries
+  DBI::dbDisconnect(con)
+
+  drift <- compare_snapshots("test_ds", db_path = db,
+                             config_dir = cfg_dir, report = FALSE)
+  row_row <- drift$table_drift[drift$table_drift$Metric == "Row count", ]
+  expect_equal(row_row$Exceeds, "")          # 0 -> 0 is no change, not NA
+  expect_false(is.na(row_row$Exceeds))
 })
 
 # -- compare_snapshots() default ID selection ----------------------------------

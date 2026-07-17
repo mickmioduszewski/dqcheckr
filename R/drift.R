@@ -28,12 +28,12 @@ list_snapshots <- function(dataset_name = NULL,
     run_timestamp = character(), row_count = integer(),
     overall_status = character(), stringsAsFactors = FALSE
   )
-  if (!file.exists(db_path)) return(invisible(empty))
+  if (!file.exists(db_path)) return(empty)
 
   tryCatch({
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
-    if (!"snapshots" %in% DBI::dbListTables(con)) return(invisible(empty))
+    if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
 
     if (is.null(dataset_name)) {
       DBI::dbGetQuery(con,
@@ -57,7 +57,7 @@ list_snapshots <- function(dataset_name = NULL,
     # unreadable database as an empty history.
     warning("Could not read snapshots from '", db_path, "': ",
             conditionMessage(e), call. = FALSE)
-    invisible(empty)
+    empty
   })
 }
 
@@ -149,9 +149,23 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(paste0("Snapshot database not found: ", db_path),
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
+  # A corrupt / non-SQLite file or one without a snapshots table must raise a
+  # typed dqcheckr condition, not leak a raw RSQLite simpleError (B-30). SQLite
+  # opens lazily, so an invalid file only errors when its schema is first read
+  # (dbListTables), which is why that call -- not the connect -- is wrapped.
   con <- .sqlite_connect(db_path)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
 
+  tables <- tryCatch(DBI::dbListTables(con), error = function(e)
+    rlang::abort(paste0("Could not read snapshot database '", db_path, "': ",
+                        conditionMessage(e)),
+                 class = c("dqcheckr_db_error", "dqcheckr_error")))
+  if (!"snapshots" %in% tables)
+    rlang::abort(paste0("Database has no 'snapshots' table: ", db_path),
+                 class = c("dqcheckr_schema_error", "dqcheckr_error"))
+
+  # SELECT * — .compute_drift() and the drift template read named columns off
+  # these rows; a new column referenced there must exist in the snapshots schema.
   snaps <- DBI::dbGetQuery(con,
     "SELECT * FROM snapshots WHERE dataset_name = ? ORDER BY id",
     list(dataset_name))
@@ -162,8 +176,13 @@ compare_snapshots <- function(dataset_name,
       dataset_name, nrow(snaps)
     ), class = c("dqcheckr_not_found", "dqcheckr_error"))
 
-  id_prev <- snapshot_id_prev %||% snaps$id[nrow(snaps) - 1]
-  id_curr <- snapshot_id_curr %||% snaps$id[nrow(snaps)]
+  # Coerce explicit IDs to integer before the guards below: a character ID
+  # (e.g. "10") would make the `%in%`, `==` and `>` checks compare as strings
+  # ("10" > "9" is FALSE) and then abort untyped inside sprintf("%d", .). B-21.
+  id_prev <- .as_snapshot_id(snapshot_id_prev, "snapshot_id_prev") %||%
+             snaps$id[nrow(snaps) - 1]
+  id_curr <- .as_snapshot_id(snapshot_id_curr, "snapshot_id_curr") %||%
+             snaps$id[nrow(snaps)]
 
   # Explicit IDs must belong to this dataset — .compute_drift() queries by ID
   # only, so an unchecked ID from another dataset would silently produce a
@@ -213,6 +232,20 @@ compare_snapshots <- function(dataset_name,
 
 # --- Internal helpers ----------------------------------------------------------
 
+# Validate an explicit snapshot ID argument. Returns NULL for NULL (so the
+# caller's `%||% default` applies), an integer for a valid whole number, and
+# aborts (typed) for anything else -- a character or fractional ID would slip
+# past the ordering guards and abort untyped downstream. B-21.
+.as_snapshot_id <- function(x, arg) {
+  if (is.null(x)) return(NULL)
+  if (length(x) != 1L || is.na(x) || !is.numeric(x) ||
+      x != as.integer(x) || x < 1L)
+    rlang::abort(
+      sprintf("`%s` must be a single positive whole number (snapshot ID).", arg),
+      class = c("dqcheckr_invalid_argument", "dqcheckr_error"))
+  as.integer(x)
+}
+
 .load_drift_thresholds <- function(config_dir = ".") {
   cfg_file <- file.path(config_dir, "dqcheckr.yml")
   if (!file.exists(cfg_file))
@@ -259,8 +292,12 @@ compare_snapshots <- function(dataset_name,
   stats_prev <- .get_col_stats(con, id_prev)
   stats_curr <- .get_col_stats(con, id_curr)
 
-  row_change_pct <- (snap_curr$row_count - snap_prev$row_count) /
-                    snap_prev$row_count
+  # A zero previous row count (e.g. two consecutive empty deliveries) makes the
+  # change 0/0 = NaN; guard it so the Row-count Exceeds cell renders "" (0->0 is
+  # no change) rather than a literal "NA" in the drift report. B-44/B-47.
+  row_change_pct <- if (snap_prev$row_count == 0) NA_real_
+                    else (snap_curr$row_count - snap_prev$row_count) /
+                         snap_prev$row_count
 
   table_drift <- data.frame(
     Metric   = c("Row count", "Column count",
@@ -283,7 +320,8 @@ compare_snapshots <- function(dataset_name,
   )
   table_drift$Exceeds    <- ""
   table_drift$Exceeds[1] <- ifelse(
-    abs(row_change_pct) > thresholds$max_row_count_change_pct, "***", ""
+    !is.na(row_change_pct) &
+      abs(row_change_pct) > thresholds$max_row_count_change_pct, "***", ""
   )
 
   types_prev <- stats_prev[stats_prev$dq_check == "inferred_type",
