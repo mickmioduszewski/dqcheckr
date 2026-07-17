@@ -350,7 +350,7 @@ check_distinct_counts <- function(df, config, types = NULL) {
 #' @export
 check_allowed_values <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     allowed <- col_rules[[col]]$allowed_values
     if (is.null(allowed) || !col %in% names(df)) next
@@ -411,7 +411,7 @@ check_allowed_values <- function(df, config) {
 #' @export
 check_numeric_bounds <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     min_val <- col_rules[[col]]$min_value
     max_val <- col_rules[[col]]$max_value
@@ -539,7 +539,7 @@ check_non_numeric <- function(df, config, types = NULL) {
 #'
 #' @export
 check_key_uniqueness <- function(df, config) {
-  keys <- config$key_columns
+  keys <- config[["key_columns"]]
   if (is.null(keys) || length(keys) == 0) return(list())
 
   if (length(keys) == 1) {
@@ -626,7 +626,7 @@ check_key_uniqueness <- function(df, config) {
 #' @export
 check_pattern <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     pattern <- col_rules[[col]]$pattern
     if (is.null(pattern) || !col %in% names(df)) next
@@ -1053,7 +1053,7 @@ check_file_encoding <- function(df, config) {
 #'
 #' @export
 check_schema_contract <- function(df, config) {
-  expected <- config$expected_columns
+  expected <- config[["expected_columns"]]
   if (is.null(expected)) return(list())
 
   results <- list()

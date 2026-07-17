@@ -2,6 +2,14 @@
 
 ## Bug fixes
 
+* Configuration lookups no longer partial-match. R's `$` operator falls back to
+  a prefix match when the exact element is absent, so a config with no
+  `column_rules:` key but a parked or mistyped one (`column_rules_disabled`,
+  `column_rules_old`, ...) had that section silently drive per-column
+  thresholds -- producing wrong PASS/FAIL verdicts from a section the config
+  did not contain. Every config-key access now uses exact `[[ ]]` indexing, so
+  a parked or renamed section is correctly treated as absent.
+
 * QC-16 no longer reports a spurious clean pass for a delivery whose encoding it
   did not actually verify. A declared multi-byte or unknown encoding
   (`UTF-16LE`, `UTF-32`, `Shift-JIS`, `GB18030`, ...) used to be reported as

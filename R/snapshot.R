@@ -248,7 +248,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     type_chg_str       <- if (length(type_chg_cols) > 0)
       paste(type_chg_cols,  collapse = ",") else NA_character_
 
-    expected <- config$expected_columns
+    expected <- config[["expected_columns"]]
     if (!is.null(expected)) {
       sc01_fail <- Filter(\(r) r$check_id == "SC-01" && r$status == "FAIL",
                           qc_results)

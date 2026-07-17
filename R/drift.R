@@ -130,12 +130,12 @@ compare_snapshots <- function(dataset_name,
   thresholds <- if (file.exists(ds_yml)) {
     cfg <- load_config(dataset_name, config_dir)
     list(
-      snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.sqlite",
-      report_output_dir              = cfg$report_output_dir %||% "reports/",
-      max_missing_rate_change_pp     = cfg$rules$max_missing_rate_change_pp     %||% 2.0,
-      max_numeric_mean_shift_pct     = cfg$rules$max_numeric_mean_shift_pct     %||% 0.20,
-      max_non_numeric_rate_change_pp = cfg$rules$max_non_numeric_rate_change_pp %||% 1.0,
-      max_row_count_change_pct       = cfg$rules$max_row_count_change_pct       %||% 0.10
+      snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
+      report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+      max_missing_rate_change_pp     = cfg[["rules"]][["max_missing_rate_change_pp"]]     %||% 2.0,
+      max_numeric_mean_shift_pct     = cfg[["rules"]][["max_numeric_mean_shift_pct"]]     %||% 0.20,
+      max_non_numeric_rate_change_pp = cfg[["rules"]][["max_non_numeric_rate_change_pp"]] %||% 1.0,
+      max_row_count_change_pct       = cfg[["rules"]][["max_row_count_change_pct"]]       %||% 0.10
     )
   } else {
     .load_drift_thresholds(config_dir)
@@ -220,15 +220,15 @@ compare_snapshots <- function(dataset_name,
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   cfg <- yaml::read_yaml(cfg_file)
-  dr  <- cfg$default_rules %||% list()
+  dr  <- cfg[["default_rules"]] %||% list()
 
   list(
-    snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.sqlite",
-    report_output_dir              = cfg$report_output_dir %||% "reports/",
-    max_missing_rate_change_pp     = dr$max_missing_rate_change_pp     %||% 2.0,
-    max_numeric_mean_shift_pct     = dr$max_numeric_mean_shift_pct     %||% 0.20,
-    max_non_numeric_rate_change_pp = dr$max_non_numeric_rate_change_pp %||% 1.0,
-    max_row_count_change_pct       = dr$max_row_count_change_pct       %||% 0.10
+    snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
+    report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+    max_missing_rate_change_pp     = dr[["max_missing_rate_change_pp"]]     %||% 2.0,
+    max_numeric_mean_shift_pct     = dr[["max_numeric_mean_shift_pct"]]     %||% 0.20,
+    max_non_numeric_rate_change_pp = dr[["max_non_numeric_rate_change_pp"]] %||% 1.0,
+    max_row_count_change_pct       = dr[["max_row_count_change_pct"]]       %||% 0.10
   )
 }
 

@@ -90,14 +90,14 @@ load_config <- function(dataset_name, config_dir) {
       dataset_cfg[[key]] <- global_cfg[[key]]
   }
 
-  rules <- global_cfg$default_rules %||% list()
-  if (!is.null(dataset_cfg$rule_overrides)) {
-    for (key in names(dataset_cfg$rule_overrides))
-      rules[[key]] <- dataset_cfg$rule_overrides[[key]]
+  rules <- global_cfg[["default_rules"]] %||% list()
+  if (!is.null(dataset_cfg[["rule_overrides"]])) {
+    for (key in names(dataset_cfg[["rule_overrides"]]))
+      rules[[key]] <- dataset_cfg[["rule_overrides"]][[key]]
   }
-  dataset_cfg$rules <- rules
+  dataset_cfg[["rules"]] <- rules
 
-  ct <- dataset_cfg$column_types %||% list()
+  ct <- dataset_cfg[["column_types"]] %||% list()
   if (length(ct) > 0) {
     valid_types <- c("character", "numeric", "date")
     bad <- setdiff(unlist(ct, use.names = FALSE), valid_types)
@@ -110,7 +110,7 @@ load_config <- function(dataset_name, config_dir) {
 
   # column_order_severity flows straight into a dq_result status (CP-08), so
   # a typo like "error" would otherwise abort the run mid-check.
-  sev <- dataset_cfg$rules$column_order_severity
+  sev <- dataset_cfg[["rules"]][["column_order_severity"]]
   if (!is.null(sev) &&
       !(length(sev) == 1 && tolower(sev) %in% c("pass", "warn", "fail", "info")))
     rlang::abort(sprintf(
@@ -222,9 +222,9 @@ infer_col_type <- function(x, threshold = 0.90) {
 #'
 #' @export
 resolve_col_type <- function(col, x, config) {
-  override <- (config$column_types %||% list())[[col]]
+  override <- (config[["column_types"]] %||% list())[[col]]
   if (!is.null(override)) return(override)
-  infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+  infer_col_type(x, config[["rules"]][["type_inference_threshold"]] %||% 0.90)
 }
 
 #' Canonical report filename for a run
@@ -291,9 +291,9 @@ resolve_col_types <- function(df, config) {
 #' @keywords internal
 #' @noRd
 col_threshold <- function(config, col, key, default = NULL) {
-  col_val <- (config$column_rules %||% list())[[col]][[key]]
+  col_val <- (config[["column_rules"]] %||% list())[[col]][[key]]
   if (!is.null(col_val)) return(col_val)
-  rule_val <- config$rules[[key]]
+  rule_val <- config[["rules"]][[key]]
   if (!is.null(rule_val)) return(rule_val)
   default
 }
@@ -308,7 +308,7 @@ col_threshold <- function(config, col, key, default = NULL) {
 #' @keywords internal
 #' @noRd
 table_threshold <- function(config, key, default = NULL) {
-  val <- config$rules[[key]]
+  val <- config[["rules"]][[key]]
   if (!is.null(val)) return(val)
   default
 }

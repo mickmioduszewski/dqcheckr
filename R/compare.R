@@ -13,7 +13,7 @@
 #' @keywords internal
 #' @noRd
 compare_row_count <- function(df_current, df_previous, config) {
-  threshold  <- config$rules$max_row_count_change_pct %||% 0.10
+  threshold  <- config[["rules"]][["max_row_count_change_pct"]] %||% 0.10
   n_curr     <- nrow(df_current)
   n_prev     <- nrow(df_previous)
 
@@ -58,9 +58,9 @@ compare_schema <- function(df_current, df_previous, config,
                            types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  flag_new   <- isTRUE(config$rules$flag_new_columns     %||% TRUE)
-  flag_drop  <- isTRUE(config$rules$flag_dropped_columns %||% TRUE)
-  flag_type  <- isTRUE(config$rules$flag_type_changes    %||% TRUE)
+  flag_new   <- isTRUE(config[["rules"]][["flag_new_columns"]]     %||% TRUE)
+  flag_drop  <- isTRUE(config[["rules"]][["flag_dropped_columns"]] %||% TRUE)
+  flag_type  <- isTRUE(config[["rules"]][["flag_type_changes"]]    %||% TRUE)
 
   new_cols     <- setdiff(names(df_current),  names(df_previous))
   dropped_cols <- setdiff(names(df_previous), names(df_current))
@@ -140,8 +140,8 @@ compare_schema <- function(df_current, df_previous, config,
 #' @keywords internal
 #' @noRd
 compare_missing_rate <- function(df_current, df_previous, config) {
-  max_change_pp <- config$rules$max_missing_rate_change_pp %||% 2.0
-  severity      <- tolower(config$rules$missing_rate_change_severity %||% "warn")
+  max_change_pp <- config[["rules"]][["max_missing_rate_change_pp"]] %||% 2.0
+  severity      <- tolower(config[["rules"]][["missing_rate_change_severity"]] %||% "warn")
   breach_status <- if (severity == "fail") "FAIL" else "WARN"
   common_cols   <- intersect(names(df_current), names(df_previous))
   lapply(common_cols, function(col) {
@@ -172,7 +172,7 @@ compare_numeric_mean <- function(df_current, df_previous, config,
                                  types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  threshold   <- config$rules$max_numeric_mean_shift_pct %||% 0.20
+  threshold   <- config[["rules"]][["max_numeric_mean_shift_pct"]] %||% 0.20
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
@@ -288,7 +288,7 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
                                      types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  threshold   <- config$rules$max_non_numeric_rate_change_pp %||% 1.0
+  threshold   <- config[["rules"]][["max_non_numeric_rate_change_pp"]] %||% 1.0
   common_cols <- intersect(names(df_current), names(df_previous))
   results     <- list()
   for (col in common_cols) {
@@ -329,14 +329,14 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
 #' @keywords internal
 #' @noRd
 compare_column_order <- function(df_current, df_previous, config) {
-  if (!isTRUE(config$rules$flag_column_order_change %||% TRUE)) return(list())
-  fmt        <- tolower(config$format %||% "csv")
+  if (!isTRUE(config[["rules"]][["flag_column_order_change"]] %||% TRUE)) return(list())
+  fmt        <- tolower(config[["format"]] %||% "csv")
   curr_names <- names(df_current)
   prev_names <- names(df_previous)
 
   if (!identical(curr_names, prev_names)) {
     # C-02: column_order_severity overrides the format-based default
-    sev_cfg <- tolower(config$rules$column_order_severity %||% "")
+    sev_cfg <- tolower(config[["rules"]][["column_order_severity"]] %||% "")
     status  <- if (nzchar(sev_cfg)) toupper(sev_cfg) else
                  if (fmt == "fwf") "FAIL" else "WARN"
     return(list(dq_result(

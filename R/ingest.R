@@ -20,23 +20,23 @@
 #'
 #' @export
 detect_files <- function(config) {
-  if (!is.null(config$current_file)) {
-    if (!file.exists(config$current_file)) {
-      rlang::abort(paste0("current_file not found: ", config$current_file),
+  if (!is.null(config[["current_file"]])) {
+    if (!file.exists(config[["current_file"]])) {
+      rlang::abort(paste0("current_file not found: ", config[["current_file"]]),
                    class = c("dqcheckr_missing_file", "dqcheckr_error"))
     }
     previous <- NULL
-    if (!is.null(config$previous_file)) {
-      if (!file.exists(config$previous_file)) {
-        rlang::abort(paste0("previous_file not found: ", config$previous_file),
+    if (!is.null(config[["previous_file"]])) {
+      if (!file.exists(config[["previous_file"]])) {
+        rlang::abort(paste0("previous_file not found: ", config[["previous_file"]]),
                      class = c("dqcheckr_missing_file", "dqcheckr_error"))
       }
-      previous <- config$previous_file
+      previous <- config[["previous_file"]]
     }
-    return(list(current = config$current_file, previous = previous))
+    return(list(current = config[["current_file"]], previous = previous))
   }
 
-  folder <- config$folder
+  folder <- config[["folder"]]
   if (is.null(folder) || !dir.exists(folder)) {
     rlang::abort(paste0("Folder not found: ", folder %||% "(NULL)"),
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
@@ -217,11 +217,11 @@ scan_file_encoding <- function(path, chunk_size = 64L * 1024L * 1024L) {
 #'
 #' @export
 read_dataset <- function(path, config) {
-  fmt <- tolower(config$format %||% "csv")
-  enc <- normalise_encoding(config$encoding %||% "UTF-8")
+  fmt <- tolower(config[["format"]] %||% "csv")
+  enc <- normalise_encoding(config[["encoding"]] %||% "UTF-8")
 
   enc_class <- .encoding_class(enc)
-  enc_info <- list(declared = config$encoding %||% "UTF-8", used = enc,
+  enc_info <- list(declared = config[["encoding"]] %||% "UTF-8", used = enc,
                    scanned = FALSE, valid = TRUE, guess = NULL, scan_error = NULL,
                    enc_class = enc_class)
   if (enc_class == "utf8") {
@@ -246,14 +246,14 @@ read_dataset <- function(path, config) {
   }
 
   if (fmt == "csv") {
-    delim <- config$delimiter %||% ","
+    delim <- config[["delimiter"]] %||% ","
     df <- tryCatch(
       readr::read_delim(
         path,
         delim      = delim,
-        col_names  = config$col_names  %||% TRUE,
-        skip       = config$csv_skip   %||% 0L,
-        quote      = config$quote_char %||% '"',
+        col_names  = config[["col_names"]]  %||% TRUE,
+        skip       = config[["csv_skip"]]   %||% 0L,
+        quote      = config[["quote_char"]] %||% '"',
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),
         show_col_types = FALSE
@@ -262,7 +262,7 @@ read_dataset <- function(path, config) {
                                        class = c("dqcheckr_parse_error", "dqcheckr_error"))
     )
   } else if (fmt == "fwf") {
-    if (is.null(config$fwf_widths)) {
+    if (is.null(config[["fwf_widths"]])) {
       rlang::abort("fwf_widths must be set in config for fixed-width files",
                    class = c("dqcheckr_invalid_config", "dqcheckr_error"))
     }
@@ -270,19 +270,19 @@ read_dataset <- function(path, config) {
       readr::read_fwf(
         path,
         col_positions = readr::fwf_widths(
-          config$fwf_widths,
-          col_names = config$fwf_col_names
+          config[["fwf_widths"]],
+          col_names = config[["fwf_col_names"]]
         ),
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),
-        skip       = config$fwf_skip %||% 0L,
+        skip       = config[["fwf_skip"]] %||% 0L,
         show_col_types = FALSE
       ),
       error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)),
                                        class = c("dqcheckr_parse_error", "dqcheckr_error"))
     )
   } else {
-    rlang::abort(paste0("Unsupported format: '", config$format, "'. Must be 'csv' or 'fwf'."),
+    rlang::abort(paste0("Unsupported format: '", config[["format"]], "'. Must be 'csv' or 'fwf'."),
                  class = c("dqcheckr_invalid_config", "dqcheckr_error"))
   }
 

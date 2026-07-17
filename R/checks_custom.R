@@ -30,7 +30,7 @@
 #'
 #' @export
 run_custom_checks <- function(df, config) {
-  path <- config$custom_checks_file
+  path <- config[["custom_checks_file"]]
   if (is.null(path)) return(list())
 
   if (!file.exists(path)) {
