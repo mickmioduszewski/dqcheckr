@@ -2,6 +2,19 @@
 
 ## Bug fixes
 
+* Non-finite values in a numeric column (`Inf`/`-Inf`, e.g. from a corrupted
+  upstream delivery whose CSV contains the literal text "Inf") are no longer
+  mishandled. `compute_col_stats()` excludes them from the mean, standard
+  deviation, minimum, and maximum, so the snapshot database can no longer store
+  the literal string "NaN"/"Inf" and poison later drift comparisons; the finite
+  mean shift a contaminated delivery causes is still reported as drift.
+  `check_outliers()` (QC-15), which previously aborted with an uninformative
+  "missing value where TRUE/FALSE needed" on such a column, now runs cleanly.
+
+* A zero-column delivery (for example an empty file) is now recorded. Previously
+  `compute_col_stats()` returned `NULL`, and the snapshot write then failed and
+  lost the entire run; the run is now snapshotted with a column count of zero.
+
 * Failures that were previously swallowed into silent, benign-looking results
   are now surfaced.
   - `read_recent_snapshots()` and `list_snapshots()` no longer report a

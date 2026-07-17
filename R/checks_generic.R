@@ -840,7 +840,9 @@ check_outliers <- function(df, config, types = NULL) {
     }
 
     vals <- suppressWarnings(as.numeric(df[[col]]))
-    nn   <- vals[!is.na(vals)]
+    # Drop non-finite parses (Inf/-Inf): they make sd() return NaN, and the
+    # downstream `if (sdev > 0)` / comparison then aborts on a missing value.
+    nn   <- vals[is.finite(vals)]
     if (length(nn) < 4) {
       results <- c(results, list(dq_result(
         check_id   = "QC-15",

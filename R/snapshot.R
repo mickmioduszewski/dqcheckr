@@ -162,7 +162,11 @@ compute_col_stats <- function(df, config, types = NULL) {
 
     if (col_type == "numeric") {
       vals <- suppressWarnings(as.numeric(x))
-      nn   <- vals[!is.na(vals)]
+      # Non-finite parses (Inf/-Inf from a corrupted delivery -- write.csv emits
+      # the literal "Inf") are excluded from the aggregates: mean/sd of a vector
+      # containing them is NaN, which would be stored as the literal string
+      # "NaN" and poison drift arithmetic downstream.
+      nn   <- vals[is.finite(vals)]
       nn_count <- sum(!is.na(non_empty) &
                       is.na(suppressWarnings(as.numeric(non_empty))))
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
@@ -192,6 +196,16 @@ compute_col_stats <- function(df, config, types = NULL) {
                stringsAsFactors = FALSE)
   })
 
+  # A zero-column delivery (e.g. an empty file) yields no per-column frames;
+  # do.call(rbind, list()) is NULL, which would make write_snapshot() fail on
+  # col_stats$snapshot_id<- and lose the whole snapshot row. Return an empty
+  # frame with the expected schema so the run is still recorded.
+  if (length(col_frames) == 0) {
+    return(data.frame(
+      column_name = character(0), dq_check = character(0),
+      value = character(0), threshold = character(0),
+      severity_on_breach = character(0), stringsAsFactors = FALSE))
+  }
   do.call(rbind, col_frames)
 }
 
@@ -283,11 +297,15 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
       snapshot_id <- DBI::dbGetQuery(con,
         "SELECT last_insert_rowid() AS id")$id[[1]]
 
-      col_stats$snapshot_id <- snapshot_id
-
-      DBI::dbAppendTable(con, "column_snapshots",
-        col_stats[, c("snapshot_id", "column_name", "dq_check",
-                      "value", "threshold", "severity_on_breach")])
+      # A zero-column delivery yields no per-column stats; assigning a scalar
+      # snapshot_id to a 0-row frame errors, so skip the append entirely and
+      # still record the snapshots row.
+      if (nrow(col_stats) > 0) {
+        col_stats$snapshot_id <- snapshot_id
+        DBI::dbAppendTable(con, "column_snapshots",
+          col_stats[, c("snapshot_id", "column_name", "dq_check",
+                        "value", "threshold", "severity_on_breach")])
+      }
 
       custom_col <- Filter(function(r) !is.na(r$column), custom_results)
       if (length(custom_col) > 0) {
