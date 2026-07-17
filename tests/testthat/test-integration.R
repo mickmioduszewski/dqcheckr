@@ -206,9 +206,9 @@ test_that("run_dq_check() records report_file only for a report that exists", {
   expect_equal(basename(result$report_path), snaps$report_file[1])
 })
 
-# -- Report filename slug matches the snapshot run_timestamp (0.2.3, B-04) --------
+# -- Report filename: timestamp slug + snapshot id (0.2.3 B-04; 0.2.5 B-42) --------
 
-test_that("report filename slug matches the snapshot run_timestamp", {
+test_that("report filename is the run_timestamp slug plus the snapshot id", {
   skip_on_cran()   # renders via Quarto when available — keep CRAN wall time bounded
   cfg_dir <- setup_integration_env()
   result  <- suppressWarnings(
@@ -218,10 +218,38 @@ test_that("report filename slug matches the snapshot run_timestamp", {
 
   snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
                                  "integ_ds", n = 1)
-  # Reconstruct the slug from the stored timestamp exactly the way the GUI's
-  # make_report_filename() does.
+  # slug = the UTC timestamp, then the snapshot id (B-42 uniqueness).
   ts_raw <- gsub("[^0-9]", "", substr(snaps$run_timestamp[1], 1, 19))
   slug   <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
   expect_equal(basename(result$report_path),
-               sprintf("integ_ds_%s.html", slug))
+               sprintf("integ_ds_%s_%d.html", slug, snaps$id[1]))
+  # The stored report_file matches the file actually written.
+  expect_equal(snaps$report_file[1], basename(result$report_path))
+})
+
+test_that("two same-second runs get distinct report files, neither overwritten (B-42)", {
+  skip_on_cran()
+  skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
+  cfg_dir <- setup_integration_env()
+
+  # Freeze the clock so both runs stamp the identical wall-clock second; only the
+  # snapshot id distinguishes them.
+  fixed <- as.POSIXct("2026-07-18 01:02:03", tz = "UTC")
+  testthat::local_mocked_bindings(Sys.time = function() fixed, .package = "base")
+
+  r1 <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+  r2 <- run_dq_check("integ_ds", config_dir = cfg_dir, open_report = FALSE)
+
+  expect_false(is.null(r1$report_path))
+  expect_false(is.null(r2$report_path))
+  # Distinct filenames -> run 1's report was not clobbered by run 2.
+  expect_false(basename(r1$report_path) == basename(r2$report_path))
+  expect_true(file.exists(r1$report_path))
+  expect_true(file.exists(r2$report_path))
+
+  # Each snapshot row links to its own report.
+  snaps <- read_recent_snapshots(file.path(cfg_dir, "snapshots.sqlite"),
+                                 "integ_ds", n = 2)
+  expect_equal(nrow(snaps), 2L)
+  expect_equal(length(unique(snaps$report_file)), 2L)
 })

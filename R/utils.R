@@ -235,12 +235,17 @@ resolve_col_type <- function(col, x, config) {
 #'
 #' @param dataset_name Character. Dataset name.
 #' @param run_time POSIXct. The run's single timestamp.
-#' @return Character filename, e.g. \code{"mydata_20260704_101112.html"}.
+#' @param snapshot_id Integer or \code{NULL}. When supplied, appended to the
+#'   slug so two runs of one dataset that start in the same wall-clock second
+#'   cannot collide on one filename (the snapshot id is the unique run key).
+#' @return Character filename, e.g. \code{"mydata_20260704_101112_47.html"}
+#'   (or without the trailing id when \code{snapshot_id} is \code{NULL}).
 #' @keywords internal
 #' @noRd
-report_filename <- function(dataset_name, run_time) {
-  sprintf("%s_%s.html", dataset_name,
-          format(run_time, "%Y%m%d_%H%M%S", tz = "UTC"))
+report_filename <- function(dataset_name, run_time, snapshot_id = NULL) {
+  slug <- format(run_time, "%Y%m%d_%H%M%S", tz = "UTC")
+  if (!is.null(snapshot_id)) slug <- paste0(slug, "_", snapshot_id)
+  sprintf("%s_%s.html", dataset_name, slug)
 }
 
 #' Convert a stored UTC-ISO snapshot timestamp to a local-time display string

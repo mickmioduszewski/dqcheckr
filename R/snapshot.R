@@ -111,11 +111,11 @@ init_snapshot_db <- function(db_path) {
 
 #' Mark a snapshot's render_status as failed
 #'
-#' Also clears report_file: when no report was written, the column must not keep
-#' the optimistic filename write_snapshot() stored on INSERT, or read_recent_
-#' snapshots() (and the GUI history link) would advertise a report that does not
-#' exist. render_status = 'failed' is the guard consumers key on; report_file is
-#' cleared so the two stay consistent.
+#' Also clears report_file so a row can never name a report that was not written:
+#' render_status = 'failed' is the guard consumers key on, and report_file is
+#' NULLed to stay consistent with it. report_file is only ever set (by
+#' \code{.set_report_file}) after a report is confirmed written, so on this path
+#' it is already NULL -- the clear is belt-and-braces.
 #' @keywords internal
 #' @noRd
 .mark_render_failed <- function(db_path, snapshot_id) {
@@ -130,6 +130,26 @@ init_snapshot_db <- function(db_path) {
     # would keep render_status = 'success' for a report that was never written.
     warning("Could not mark snapshot ", snapshot_id, " as render-failed; its ",
             "render_status may still read 'success': ", conditionMessage(e),
+            call. = FALSE))
+}
+
+#' Record the rendered report's filename on its snapshot row
+#'
+#' Written by a post-render UPDATE (not at INSERT time) so the filename can carry
+#' the snapshot id -- which is only known after the row exists -- and so the
+#' column never names a file that was not actually written. B-42.
+#' @keywords internal
+#' @noRd
+.set_report_file <- function(db_path, snapshot_id, report_file) {
+  tryCatch({
+    con <- .sqlite_connect(db_path)
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    DBI::dbExecute(con,
+      "UPDATE snapshots SET report_file = ? WHERE id = ?",
+      list(report_file, snapshot_id))
+  }, error = function(e)
+    warning("Could not record report filename for snapshot ", snapshot_id,
+            "; the history link may be missing: ", conditionMessage(e),
             call. = FALSE))
 }
 

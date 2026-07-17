@@ -452,7 +452,10 @@ test_that("read_recent_snapshots() empty fallback matches the live schema", {
 
 test_that("report_filename() produces the documented slug", {
   rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
+  # id-less form (default) is the pre-0.2.5 pattern.
   expect_equal(report_filename("mydata", rt), "mydata_20260704_101112.html")
+  # With a snapshot id, it is appended for uniqueness (B-42).
+  expect_equal(report_filename("mydata", rt, 47L), "mydata_20260704_101112_47.html")
 })
 
 # -- read_recent_snapshots() backfill on un-migrated databases (B-01) ------------

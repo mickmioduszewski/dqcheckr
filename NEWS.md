@@ -2,6 +2,15 @@
 
 ## Bug fixes
 
+* Report filenames now include the snapshot id
+  (`dataset_20260718_010203_47.html`), so two runs of one dataset that start in
+  the same wall-clock second no longer collide on a single filename. Previously
+  the second run silently overwrote the first run's report while the first run's
+  snapshot kept pointing at it. The filename is now written to the snapshot's
+  `report_file` column by an update after the report is confirmed rendered,
+  rather than optimistically at insert time, so the column can never name a
+  report that was not written.
+
 * Configuration lookups no longer partial-match. R's `$` operator falls back to
   a prefix match when the exact element is absent, so a config with no
   `column_rules:` key but a parked or mistyped one (`column_rules_disabled`,
