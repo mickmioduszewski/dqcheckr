@@ -204,6 +204,89 @@ test_that("distinct_changes filtered to changed columns only", {
   expect_false("status" %in% drift$distinct_changes$Column)
 })
 
+# -- B-44: drift breach direction matches the CP-03/CP-07 checks ---------------
+# Only an *increase* in missing rate (CP-03) or non-numeric rate (CP-07) is a
+# breach; a column that improved must not be flagged. Before the fix drift used
+# abs(), so a large decrease -- an improvement -- read as "Exceeds YES" while
+# the run report passed the same column against the same threshold.
+
+# Two snapshots for one numeric column, with caller-supplied rates.
+make_rate_drift_db <- function(mr_prev, mr_curr, nn_prev, nn_curr) {
+  db  <- tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "PRAGMA foreign_keys = ON")
+  on.exit(DBI::dbDisconnect(con))
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT, run_timestamp TEXT, file_name TEXT,
+      row_count INTEGER, col_count INTEGER,
+      check_pass_count INTEGER, check_warn_count INTEGER,
+      check_fail_count INTEGER, check_info_count INTEGER, overall_status TEXT,
+      new_cols_vs_previous TEXT, missing_cols_vs_previous TEXT,
+      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT,
+      comparison_mode TEXT NOT NULL DEFAULT 'comparison',
+      render_status TEXT NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT)")
+  DBI::dbExecute(con, "
+    CREATE TABLE column_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_id INTEGER NOT NULL REFERENCES snapshots(id),
+      column_name TEXT NOT NULL, dq_check TEXT NOT NULL,
+      value TEXT, threshold TEXT, severity_on_breach TEXT)")
+  rows <- list(c(mr_prev, nn_prev), c(mr_curr, nn_curr))
+  for (i in 1:2) {
+    DBI::dbExecute(con,
+      "INSERT INTO snapshots (dataset_name, run_timestamp, file_name,
+         row_count, col_count, check_pass_count, check_warn_count,
+         check_fail_count, check_info_count, overall_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      list("rate_ds", sprintf("2025-0%d-01T09:00:00Z", i),
+           sprintf("d0%d.csv", i), 1000L, 1L, 1L, 0L, 0L, 0L, "PASS"))
+    sid <- DBI::dbGetQuery(con, "SELECT last_insert_rowid() AS id")$id
+    DBI::dbAppendTable(con, "column_snapshots", data.frame(
+      snapshot_id = sid, column_name = "amt",
+      dq_check = c("inferred_type", "missing_rate", "non_numeric_rate"),
+      value    = c("numeric", as.character(rows[[i]][1]), as.character(rows[[i]][2])),
+      threshold = NA_character_, severity_on_breach = NA_character_,
+      stringsAsFactors = FALSE))
+  }
+  db
+}
+
+test_that("a large decrease in missing / non-numeric rate does not breach (B-44)", {
+  # -9 pp missing, -4.5 pp non-numeric: improvements, well past the thresholds.
+  db      <- make_rate_drift_db(mr_prev = 0.10, mr_curr = 0.01,
+                                nn_prev = 0.05, nn_curr = 0.005)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("rate_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+
+  mr <- drift$missing_rate_changes[drift$missing_rate_changes$Column == "amt", ]
+  expect_lt(mr$missing_rate_change_pp, 0)     # it decreased
+  expect_false(mr$missing_rate_exceeds)       # ...so it must not be flagged
+
+  nn <- drift$non_numeric_changes[drift$non_numeric_changes$Column == "amt", ]
+  expect_lt(nn$non_numeric_rate_change_pp, 0)
+  expect_false(nn$non_numeric_rate_exceeds)
+})
+
+test_that("a large increase in missing / non-numeric rate still breaches (B-44)", {
+  db      <- make_rate_drift_db(mr_prev = 0.01, mr_curr = 0.10,
+                                nn_prev = 0.005, nn_curr = 0.05)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("rate_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+
+  mr <- drift$missing_rate_changes[drift$missing_rate_changes$Column == "amt", ]
+  expect_gt(mr$missing_rate_change_pp, 0)
+  expect_true(mr$missing_rate_exceeds)
+
+  nn <- drift$non_numeric_changes[drift$non_numeric_changes$Column == "amt", ]
+  expect_gt(nn$non_numeric_rate_change_pp, 0)
+  expect_true(nn$non_numeric_rate_exceeds)
+})
+
 # -- G-05/G-06: dataset-level threshold override -------------------------------
 
 test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)", {

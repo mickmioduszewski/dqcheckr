@@ -2,6 +2,15 @@
 
 ## Bug fixes
 
+* The drift report now flags a missing-rate or non-numeric-rate change in the
+  same direction as the corresponding comparison check. Both `.compute_drift()`
+  columns used `abs()`, so a column that *improved* between deliveries (fewer
+  missing values, or less non-numeric junk) was flagged as breaching, while the
+  CP-03 and CP-07 checks -- reading the same `max_missing_rate_change_pp` /
+  `max_non_numeric_rate_change_pp` thresholds -- passed it. Drift now breaches
+  only on an increase, matching the checks. (The numeric-mean-shift drift keeps
+  its two-directional test, matching the two-directional CP-04 check.)
+
 * A run whose HTML report is not produced no longer records a successful-looking
   snapshot. When the Quarto CLI is absent the report is skipped with a warning,
   but the snapshot row previously kept `render_status = "success"` and a

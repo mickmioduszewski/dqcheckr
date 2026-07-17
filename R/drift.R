@@ -321,15 +321,23 @@ compare_snapshots <- function(dataset_name,
   dd$missing_rate_prev      <- .col(col_drift, "missing_rate_prev")
   dd$missing_rate_curr      <- .col(col_drift, "missing_rate_curr")
   dd$missing_rate_change_pp <- (dd$missing_rate_curr - dd$missing_rate_prev) * 100
-  dd$missing_rate_exceeds   <- abs(dd$missing_rate_change_pp) >
-                               thresholds$max_missing_rate_change_pp
+  # One-directional, matching the CP-03 check (compare.R): only an *increase* in
+  # missing rate breaches. A column that improved (fewer missing values) is not
+  # a breach. The threshold key is shared with CP-03, so both surfaces must read
+  # it the same way -- an abs() here would flag improvements the run report
+  # passes.
+  dd$missing_rate_exceeds   <- !is.na(dd$missing_rate_change_pp) &
+    dd$missing_rate_change_pp > thresholds$max_missing_rate_change_pp
 
   dd$non_numeric_rate_prev      <- .col(col_drift, "non_numeric_rate_prev")
   dd$non_numeric_rate_curr      <- .col(col_drift, "non_numeric_rate_curr")
   dd$non_numeric_rate_change_pp <- (dd$non_numeric_rate_curr -
                                     dd$non_numeric_rate_prev) * 100
+  # One-directional, matching the CP-07 check (compare.R): only an *increase* in
+  # the non-numeric rate breaches (more junk in a numeric column). See the
+  # missing-rate note above -- same shared-threshold reasoning.
   dd$non_numeric_rate_exceeds   <- !is.na(dd$non_numeric_rate_change_pp) &
-    abs(dd$non_numeric_rate_change_pp) > thresholds$max_non_numeric_rate_change_pp
+    dd$non_numeric_rate_change_pp > thresholds$max_non_numeric_rate_change_pp
 
   dd$numeric_mean_prev      <- .col(col_drift, "numeric_parseable_mean_prev")
   dd$numeric_mean_curr      <- .col(col_drift, "numeric_parseable_mean_curr")
