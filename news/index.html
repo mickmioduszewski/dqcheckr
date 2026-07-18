@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,9 +38,9 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.2.5" id="dqcheckr-025">dqcheckr 0.2.5<a class="anchor" aria-label="anchor" href="#dqcheckr-025"></a></h2>
+<h2 class="pkg-version" data-toc-text="development version" id="dqcheckr-development-version">dqcheckr (development version)<a class="anchor" aria-label="anchor" href="#dqcheckr-development-version"></a></h2>
 <div class="section level3">
-<h3 id="bug-fixes-0-2-5">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-5"></a></h3>
+<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
 <ul><li><p>Report filenames now include the snapshot id (<code>dataset_20260718_010203_47.html</code>), so two runs of one dataset that start in the same wall-clock second no longer collide on a single filename. Previously the second run silently overwrote the first run’s report while the first run’s snapshot kept pointing at it. The filename is now written to the snapshot’s <code>report_file</code> column by an update after the report is confirmed rendered, rather than optimistically at insert time, so the column can never name a report that was not written.</p></li>
 <li><p>Configuration lookups no longer partial-match. R’s <code>$</code> operator falls back to a prefix match when the exact element is absent, so a config with no <code>column_rules:</code> key but a parked or mistyped one (<code>column_rules_disabled</code>, <code>column_rules_old</code>, …) had that section silently drive per-column thresholds – producing wrong PASS/FAIL verdicts from a section the config did not contain. Every config-key access now uses exact <code>[[ ]]</code> indexing, so a parked or renamed section is correctly treated as absent.</p></li>
 <li><p>QC-16 no longer reports a spurious clean pass for a delivery whose encoding it did not actually verify. A declared multi-byte or unknown encoding (<code>UTF-16LE</code>, <code>UTF-32</code>, <code>Shift-JIS</code>, <code>GB18030</code>, …) used to be reported as “a single-byte encoding; every byte is valid by construction” – which is false, and which also silently disabled the crash guard that scanning gives UTF-8 deliveries. Such an encoding is now read as declared but reported as a WARN stating it was not validity-checked. Genuine single-byte encodings (ISO-8859-x, Windows-125x) still PASS.</p></li>
@@ -62,7 +62,7 @@
 <li><p><code><a href="../reference/read_recent_snapshots.html">read_recent_snapshots()</a></code> now returns the full set of columns even for a snapshot database created before 0.2.3. Previously it ran <code>SELECT *</code> without migrating, so an older database returned rows with the newer columns (such as <code>report_file</code>) <em>absent</em> rather than <code>NA</code>, and callers relying on those columns errored instead of degrading. The missing columns are now filled in after the read with the same defaults a migration would apply; the database file itself is not modified, so reads remain safe on read-only or network-shared databases.</p></li>
 </ul></div>
 <div class="section level3">
-<h3 id="packaging-0-2-5">Packaging<a class="anchor" aria-label="anchor" href="#packaging-0-2-5"></a></h3>
+<h3 id="packaging-development-version">Packaging<a class="anchor" aria-label="anchor" href="#packaging-development-version"></a></h3>
 <ul><li>The bundled <code>starwars_csv</code> demonstration data (<code>inst/demonstrations/data/</code>) is now shipped. An unanchored <code>.gitignore</code> rule had excluded it, so a fresh clone was missing the file that 27 example blocks and two tests depend on, and <code>R CMD check</code> failed on a clean checkout.</li>
 <li>The fixed-width demonstration (<code>starwars_fwf</code>) now has its data file. A new <code>inst/demonstrations/makedata.R</code> derives <code>starwars.fwf</code> from the CSV, so the FWF half of <code>demo.R</code> runs end-to-end instead of aborting on a missing file.</li>
 </ul></div>

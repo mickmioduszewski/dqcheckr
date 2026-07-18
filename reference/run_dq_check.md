@@ -75,7 +75,7 @@ writeLines(c(
   'delimiter: ","'
 ), file.path(tmp, "starwars_csv.yml"))
 result <- run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005213_3.html
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpZlIN7w/starwars_csv_20260718_005326_3.html
 result$status
 #> [1] "FAIL"
 # }

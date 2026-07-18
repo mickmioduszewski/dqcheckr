@@ -1,6 +1,7 @@
 # dqcheckr — Software Specification
 
-**Version**: 0.2.5 **Author**: Mick Mioduszewski **Date**: 2026-07-18
+**Version**: 0.2.4.9000 **Author**: Mick Mioduszewski **Date**:
+2026-07-18
 
 ------------------------------------------------------------------------
 
