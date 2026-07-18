@@ -212,12 +212,24 @@ compare_snapshots <- function(dataset_name,
 
   if (report) {
     ts        <- format(Sys.time(), "%Y%m%d_%H%M%S", tz = "UTC")
-    base_name <- sprintf("drift_%s_%s", dataset_name, ts)
+    # Include both snapshot ids: two comparisons of the same dataset started in
+    # the same wall-clock second (a loop over id pairs, or two GUI users) would
+    # otherwise compute one filename and silently overwrite each other -- the
+    # way report_filename() already appends the snapshot id for the main report.
+    # B-03.
+    base_name <- sprintf("drift_%s_%s_%d_%d", dataset_name, ts, id_prev, id_curr)
     dir.create(report_dir, showWarnings = FALSE, recursive = TRUE)
     html_path <- file.path(report_dir, paste0(base_name, ".html"))
-    # NULL when Quarto is unavailable — the message and browseURL below must
-    # not reference a report that was never written.
-    html_path <- .write_drift_html_report(drift, html_path)
+    # html_path becomes NULL when Quarto is unavailable OR the render produced no
+    # file (B-02): the message and browseURL below must not name a report that
+    # was never written. A render failure is non-fatal here -- the computed drift
+    # is the primary result and is still returned.
+    html_path <- tryCatch(
+      .write_drift_html_report(drift, html_path),
+      dqcheckr_render_error = function(e) {
+        warning(conditionMessage(e), call. = FALSE)
+        NULL
+      })
   }
 
   message(sprintf(
@@ -479,6 +491,17 @@ compare_snapshots <- function(dataset_name,
   )
 
   rendered <- file.path(render_dir, basename(outfile))
-  if (file.exists(rendered)) .move_file(rendered, outfile)
+  if (!file.exists(rendered))
+    # Quarto returned without raising but left no file (e.g. a template that
+    # produced no output). Raise -- mirroring render_report() in report.R -- so
+    # compare_snapshots() cannot name or open a report that does not exist; the
+    # caller downgrades this to a warning and a NULL path (the drift still
+    # returns). Previously this fell through to invisible(outfile), handing back
+    # a phantom path. B-02.
+    rlang::abort(
+      paste0("Quarto rendering produced no output file for drift report '",
+             basename(outfile), "'."),
+      class = c("dqcheckr_render_error", "dqcheckr_error"))
+  .move_file(rendered, outfile)
   invisible(outfile)
 }

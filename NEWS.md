@@ -2,6 +2,19 @@
 
 ## Bug fixes
 
+* The drift report no longer silently reports a report that was never written.
+  When Quarto returned without error but produced no output file,
+  `compare_snapshots()` still announced (and, with `open_report = TRUE`, tried to
+  open) the intended path. The drift writer now raises the same typed error the
+  main report already did, and `compare_snapshots()` downgrades it to a warning
+  with no report link -- the computed drift is still returned.
+
+* Drift report filenames now include both compared snapshot ids
+  (`drift_dataset_20260718_010203_1_2.html`), so two comparisons of one dataset
+  started in the same wall-clock second (a loop over id pairs, two GUI users) no
+  longer collide on a single filename and silently overwrite each other -- the
+  same protection `report_filename()` already gives the main report.
+
 * Column statistics can no longer store a non-finite value even when the
   aggregate itself overflows. An earlier fix excluded non-finite *inputs*
   (`Inf`/`-Inf` from a corrupted delivery), but `sd()` of finite-but-very-large

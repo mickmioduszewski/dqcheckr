@@ -172,6 +172,62 @@ test_that("drift between two zero-row snapshots renders no NA in Exceeds (B-44/B
   expect_false(is.na(row_row$Exceeds))
 })
 
+# -- drift report render + filename (B-02 / B-03) ------------------------------
+
+test_that(".write_drift_html_report() errors when Quarto writes no file (B-02)", {
+  # Quarto 'available' but its render leaves no output file -- the exact case
+  # report.R guards. The drift writer must raise, not return a phantom path.
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) TRUE,
+    quarto_render    = function(...) invisible(NULL),
+    .package = "quarto")
+  out <- file.path(withr::local_tempdir(), "drift_x.html")
+  expect_error(
+    dqcheckr:::.write_drift_html_report(list(dataset_name = "x"), out),
+    class = "dqcheckr_render_error")
+})
+
+test_that("compare_snapshots() downgrades a drift render failure and still returns the drift (B-02)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) TRUE,
+    quarto_render    = function(...) invisible(NULL),   # renders nothing
+    .package = "quarto")
+  expect_warning(
+    drift <- compare_snapshots("test_ds", db_path = db, config_dir = cfg_dir,
+                               report = TRUE, open_report = FALSE),
+    regexp = "no output file")
+  # The computed drift is the primary result and survives the render failure.
+  expect_type(drift, "list")
+  expect_true("table_drift" %in% names(drift))
+})
+
+test_that("drift filenames carry both snapshot ids and don't collide same-second (B-03)", {
+  db      <- make_drift_db(3)
+  out_dir <- withr::local_tempdir()
+  cfg_dir <- make_drift_config(out_dir)     # report_output_dir = out_dir
+
+  fixed <- as.POSIXct("2026-07-18 01:02:03", tz = "UTC")
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) TRUE,
+    # Write the expected output file so the render 'succeeds' deterministically.
+    quarto_render = function(input, output_file, ...)
+      writeLines("<html>drift</html>", file.path(dirname(input), output_file)),
+    .package = "quarto")
+  testthat::local_mocked_bindings(Sys.time = function() fixed, .package = "base")
+
+  compare_snapshots("test_ds", snapshot_id_prev = 1, snapshot_id_curr = 2,
+                    db_path = db, config_dir = cfg_dir, report = TRUE, open_report = FALSE)
+  compare_snapshots("test_ds", snapshot_id_prev = 1, snapshot_id_curr = 3,
+                    db_path = db, config_dir = cfg_dir, report = TRUE, open_report = FALSE)
+
+  files <- list.files(out_dir, pattern = "^drift_test_ds_.*\\.html$")
+  expect_length(files, 2)                    # neither overwrote the other
+  expect_true(any(grepl("_1_2\\.html$", files)))
+  expect_true(any(grepl("_1_3\\.html$", files)))
+})
+
 # -- compare_snapshots() default ID selection ----------------------------------
 
 test_that("compare_snapshots defaults to second-latest vs latest", {
