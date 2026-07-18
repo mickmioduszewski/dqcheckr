@@ -58,6 +58,27 @@ test_that("render_report() writes output only to output_dir, not CWD", {
                          normalizePath(env$tmp)))
 })
 
+test_that("render_report() errors when Quarto writes no output file (B-09)", {
+  # Quarto 'available' but its render leaves no file behind -- the guard that
+  # stops render_report() naming a report that does not exist (and letting
+  # run_dq_check() record the run as a success). Mirrors the drift writer's
+  # equivalent guard test.
+  env <- make_render_env()
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) TRUE,
+    quarto_render    = function(...) invisible(NULL),
+    .package = "quarto")
+  expect_error(
+    render_report(
+      dataset_name = "test", file_name = "f.csv", file_path = tempfile(),
+      df = env$df, qc_results = list(), cp_results = list(),
+      custom_results = list(), snapshot_history = NULL,
+      config = env$cfg, output_dir = env$tmp, open_report = FALSE
+    ),
+    class = "dqcheckr_render_error"
+  )
+})
+
 test_that("render_report() output filename contains dataset_name", {
   skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
   env    <- make_render_env()

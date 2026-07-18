@@ -6,14 +6,15 @@
 #' @noRd
 .missing_rate_vec <- function(x) {
   if (length(x) == 0) return(0)
-  mean(is.na(x) | x == "")
+  mean(.missing_vals(x))
 }
 
 #' CP-01: Compare row count between deliveries
 #' @keywords internal
 #' @noRd
 compare_row_count <- function(df_current, df_previous, config) {
-  threshold  <- config[["rules"]][["max_row_count_change_pct"]] %||% 0.10
+  threshold  <- config[["rules"]][["max_row_count_change_pct"]] %||%
+    .default_comparison_rules$max_row_count_change_pct
   n_curr     <- nrow(df_current)
   n_prev     <- nrow(df_previous)
 
@@ -140,7 +141,8 @@ compare_schema <- function(df_current, df_previous, config,
 #' @keywords internal
 #' @noRd
 compare_missing_rate <- function(df_current, df_previous, config) {
-  max_change_pp <- config[["rules"]][["max_missing_rate_change_pp"]] %||% 2.0
+  max_change_pp <- config[["rules"]][["max_missing_rate_change_pp"]] %||%
+    .default_comparison_rules$max_missing_rate_change_pp
   severity      <- tolower(config[["rules"]][["missing_rate_change_severity"]] %||% "warn")
   breach_status <- if (severity == "fail") "FAIL" else "WARN"
   common_cols   <- intersect(names(df_current), names(df_previous))
@@ -172,20 +174,20 @@ compare_numeric_mean <- function(df_current, df_previous, config,
                                  types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  threshold   <- config[["rules"]][["max_numeric_mean_shift_pct"]] %||% 0.20
+  threshold   <- config[["rules"]][["max_numeric_mean_shift_pct"]] %||%
+    .default_comparison_rules$max_numeric_mean_shift_pct
   common_cols <- intersect(names(df_current), names(df_previous))
-  results     <- list()
-  for (col in common_cols) {
-    if (types_current[[col]]  != "numeric") next
-    if (types_previous[[col]] != "numeric") next
+  .compact(lapply(common_cols, function(col) {
+    if (types_current[[col]]  != "numeric") return(NULL)
+    if (types_previous[[col]] != "numeric") return(NULL)
     mean_curr <- mean(suppressWarnings(as.numeric(df_current[[col]])),  na.rm = TRUE)
     mean_prev <- mean(suppressWarnings(as.numeric(df_previous[[col]])), na.rm = TRUE)
-    if (is.nan(mean_prev) || mean_prev == 0) next
+    if (is.nan(mean_prev) || mean_prev == 0) return(NULL)
     # mean(numeric(0)) is NaN: the current delivery has no parseable numeric
     # values in a column that resolves as numeric. That is drift worth
     # reporting, not a reason to crash the threshold comparison.
     if (is.nan(mean_curr)) {
-      results <- c(results, list(dq_result(
+      return(dq_result(
         check_id   = "CP-04",
         check_name = "Numeric mean shift",
         column     = col,
@@ -195,12 +197,11 @@ compare_numeric_mean <- function(df_current, df_previous, config,
         message    = sprintf(paste0("Column '%s' has no parseable numeric values ",
                                     "in the current delivery; mean shift cannot ",
                                     "be computed."), col)
-      )))
-      next
+      ))
     }
     shift_pct <- abs((mean_curr - mean_prev) / mean_prev)
     status    <- if (shift_pct > threshold) "WARN" else "PASS"
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "CP-04",
       check_name = "Numeric mean shift",
       column     = col,
@@ -214,9 +215,8 @@ compare_numeric_mean <- function(df_current, df_previous, config,
                 col, shift_pct * 100)
       else
         sprintf("Column '%s' mean shift is within threshold.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' CP-05: Detect new distinct values in character columns
@@ -226,15 +226,12 @@ compare_new_values <- function(df_current, df_previous, config,
                                types_current = NULL) {
   types_current <- types_current %||% resolve_col_types(df_current, config)
   common_cols <- intersect(names(df_current), names(df_previous))
-  results     <- list()
-  for (col in common_cols) {
-    if (types_current[[col]] != "character") next
-    curr_vals <- unique(df_current[[col]][!is.na(df_current[[col]]) &
-                                          df_current[[col]] != ""])
-    prev_vals <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
-                                           df_previous[[col]] != ""])
+  .compact(lapply(common_cols, function(col) {
+    if (types_current[[col]] != "character") return(NULL)
+    curr_vals <- unique(df_current[[col]][!.missing_vals(df_current[[col]])])
+    prev_vals <- unique(df_previous[[col]][!.missing_vals(df_previous[[col]])])
     new_vals  <- setdiff(curr_vals, prev_vals)
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "CP-05",
       check_name = "New distinct values",
       column     = col,
@@ -245,9 +242,8 @@ compare_new_values <- function(df_current, df_previous, config,
         "No new values.",
       message    = sprintf("Column '%s': %d new distinct value(s) vs previous.",
                            col, length(new_vals))
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' CP-06: Detect dropped distinct values in character columns
@@ -257,15 +253,12 @@ compare_dropped_values <- function(df_current, df_previous, config,
                                    types_current = NULL) {
   types_current <- types_current %||% resolve_col_types(df_current, config)
   common_cols <- intersect(names(df_current), names(df_previous))
-  results     <- list()
-  for (col in common_cols) {
-    if (types_current[[col]] != "character") next
-    curr_vals    <- unique(df_current[[col]][!is.na(df_current[[col]]) &
-                                             df_current[[col]] != ""])
-    prev_vals    <- unique(df_previous[[col]][!is.na(df_previous[[col]]) &
-                                              df_previous[[col]] != ""])
+  .compact(lapply(common_cols, function(col) {
+    if (types_current[[col]] != "character") return(NULL)
+    curr_vals    <- unique(df_current[[col]][!.missing_vals(df_current[[col]])])
+    prev_vals    <- unique(df_previous[[col]][!.missing_vals(df_previous[[col]])])
     dropped_vals <- setdiff(prev_vals, curr_vals)
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "CP-06",
       check_name = "Dropped distinct values",
       column     = col,
@@ -276,9 +269,8 @@ compare_dropped_values <- function(df_current, df_previous, config,
         "No dropped values.",
       message    = sprintf("Column '%s': %d value(s) from previous not in current.",
                            col, length(dropped_vals))
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' CP-07: Compare non-numeric rate in numeric columns between deliveries
@@ -288,19 +280,20 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
                                      types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  threshold   <- config[["rules"]][["max_non_numeric_rate_change_pp"]] %||% 1.0
+  threshold   <- config[["rules"]][["max_non_numeric_rate_change_pp"]] %||%
+    .default_comparison_rules$max_non_numeric_rate_change_pp
   common_cols <- intersect(names(df_current), names(df_previous))
-  results     <- list()
-  for (col in common_cols) {
+
+  .nn_rate <- function(x) {
+    ne <- x[!.missing_vals(x)]
+    if (length(ne) == 0) return(0)
+    length(ne[is.na(suppressWarnings(as.numeric(ne)))]) / length(ne)
+  }
+
+  .compact(lapply(common_cols, function(col) {
     t_curr <- types_current[[col]]
     t_prev <- types_previous[[col]]
-    if (t_curr != "numeric" || t_prev != "numeric") next
-
-    .nn_rate <- function(x) {
-      ne <- x[!is.na(x) & x != ""]
-      if (length(ne) == 0) return(0)
-      length(ne[is.na(suppressWarnings(as.numeric(ne)))]) / length(ne)
-    }
+    if (t_curr != "numeric" || t_prev != "numeric") return(NULL)
 
     rate_curr <- .nn_rate(df_current[[col]])
     rate_prev <- .nn_rate(df_previous[[col]])
@@ -308,7 +301,7 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
 
     # G-02: always emit a result (PASS when no increase)
     status <- if (change_pp > threshold) "WARN" else "PASS"
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "CP-07",
       check_name = "Non-numeric rate change",
       column     = col,
@@ -320,9 +313,8 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
         sprintf("Column '%s' non-numeric rate increased by %.2f pp.", col, change_pp)
       else
         sprintf("Column '%s' non-numeric rate change is within threshold.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' CP-08: Check column order consistency between deliveries

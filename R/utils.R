@@ -3,6 +3,42 @@
 #' @noRd
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
+#' Test for missing or empty values
+#'
+#' The single source of the missingness predicate: a value is "missing" when it
+#' is \code{NA} or the empty string \code{""}. Shared by the QC checks
+#' (\code{checks_generic.R}), the comparison checks (\code{compare.R}), and the
+#' snapshot writer (\code{snapshot.R}) so "missing" cannot drift between them.
+#' @keywords internal
+#' @noRd
+.missing_vals <- function(x) is.na(x) | x == ""
+
+#' Drop NULL elements from a list
+#'
+#' The per-column check loops build their results with \code{lapply()} returning
+#' \code{NULL} for skipped columns (numeric-only checks, rule-configured columns,
+#' ...), then compact. This keeps accumulation O(n) instead of the O(n^2) that
+#' repeated \code{c(results, list(...))} inside a \code{for} loop incurs on wide
+#' (100+ column) deliveries.
+#' @keywords internal
+#' @noRd
+.compact <- function(x) x[!vapply(x, is.null, logical(1))]
+
+#' Default thresholds for the version-comparison (CP) checks
+#'
+#' Single source of the four comparison defaults, read via \code{%||%} by both
+#' the CP checks (\code{compare.R}) and the drift report
+#' (\code{drift.R}). Keeping them in one place stops the QC/comparison report and
+#' the drift report from silently applying different thresholds to the same rule.
+#' @keywords internal
+#' @noRd
+.default_comparison_rules <- list(
+  max_row_count_change_pct       = 0.10,
+  max_missing_rate_change_pp     = 2.0,
+  max_numeric_mean_shift_pct     = 0.20,
+  max_non_numeric_rate_change_pp = 1.0
+)
+
 #' Construct a data quality result object
 #'
 #' Creates the atomic result unit returned by every check function.

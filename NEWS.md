@@ -1,5 +1,29 @@
 # dqcheckr (development version)
 
+## Internal
+
+* The per-column check loops (QC-07/08/09/10/11/13/15, SC-01/02, and the
+  comparison checks CP-04/05/06/07) no longer grow their result list with
+  `c(results, list(...))` inside a `for` loop, which reallocated the whole list
+  on every column and made a run O(columns^2). They now build results with
+  `lapply()` and compact once, so wide deliveries (100+ columns) build their
+  results in linear time. Check output is unchanged.
+
+* The missing/empty predicate (`is.na(x) | x == ""`) and the four
+  comparison-check default thresholds are each now defined once and shared by
+  the QC checks, the comparison checks, the drift report, and the snapshot
+  writer, instead of being reimplemented at each call site. This removes the
+  risk of, for example, the QC report and the drift report applying different
+  default thresholds to the same rule after only one copy was edited.
+
+## Testing
+
+* Added coverage for two previously-untested error paths: an FWF config that
+  omits `fwf_widths` (must abort with `dqcheckr_invalid_config`), and
+  `render_report()` when Quarto returns without writing an output file (must
+  abort with `dqcheckr_render_error` rather than name a report that does not
+  exist).
+
 ## Bug fixes
 
 * `compare_snapshots()` now returns the rendered drift report's path as a

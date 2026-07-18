@@ -103,6 +103,17 @@ test_that("read_dataset() reads FWF file correctly", {
   expect_equal(nrow(df), 10)
 })
 
+test_that("read_dataset() aborts when an FWF config omits fwf_widths (B-05)", {
+  # fwf_widths is mandatory for fixed-width files; the guard must raise a typed
+  # dqcheckr_invalid_config rather than let readr::fwf_widths(NULL) fail with an
+  # opaque error.
+  cfg <- list(format = "fwf", encoding = "UTF-8")
+  expect_error(
+    read_dataset(fix("accounts_fwf_current.txt"), cfg),
+    class = "dqcheckr_invalid_config"
+  )
+})
+
 # -- detect_files() ------------------------------------------------------------
 
 test_that("detect_files() uses current_file when set; previous NULL when absent (D-01)", {

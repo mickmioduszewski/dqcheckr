@@ -181,8 +181,8 @@ compute_col_stats <- function(df, config, types = NULL) {
   col_frames <- lapply(names(df), function(col) {
     x          <- df[[col]]
     col_type   <- types[[col]]
-    non_empty  <- x[!is.na(x) & x != ""]
-    miss_count <- sum(is.na(x) | x == "")
+    non_empty  <- x[!.missing_vals(x)]
+    miss_count <- sum(.missing_vals(x))
     # Defined as 0 for a zero-row frame; 0/0 would store literal "NaN" in the
     # snapshot DB and poison drift arithmetic.
     miss_rate  <- if (nrow(df) > 0) miss_count / nrow(df) else 0

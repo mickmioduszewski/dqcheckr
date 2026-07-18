@@ -1,9 +1,6 @@
-#' Test for missing or empty values
-#' @keywords internal
-#' @noRd
-.missing_vals <- function(x) is.na(x) | x == ""
-
 # QC functions -----------------------------------------------------------------
+# `.missing_vals()` (the missing/empty predicate) lives in utils.R so the QC,
+# comparison, and snapshot code share one definition.
 
 #' QC-01: Check missing rate per column
 #'
@@ -259,13 +256,12 @@ check_inferred_types <- function(df, config, types = NULL) {
 #' @export
 check_numeric_stats <- function(df, config, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
-  results <- list()
-  for (col in names(df)) {
-    if (types[[col]] != "numeric") next
+  .compact(lapply(names(df), function(col) {
+    if (types[[col]] != "numeric") return(NULL)
     vals <- suppressWarnings(as.numeric(df[[col]]))
     vals <- vals[!is.na(vals)]
-    if (length(vals) == 0) next
-    results <- c(results, list(dq_result(
+    if (length(vals) == 0) return(NULL)
+    dq_result(
       check_id   = "QC-07",
       check_name = "Numeric stats",
       column     = col,
@@ -274,9 +270,8 @@ check_numeric_stats <- function(df, config, types = NULL) {
                            min(vals), max(vals), mean(vals),
                            if (length(vals) > 1) sd(vals) else NA_real_),
       message    = sprintf("Summary statistics for numeric column '%s'.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-08: Report distinct value counts for character columns
@@ -306,11 +301,10 @@ check_numeric_stats <- function(df, config, types = NULL) {
 #' @export
 check_distinct_counts <- function(df, config, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
-  results <- list()
-  for (col in names(df)) {
-    if (types[[col]] != "character") next
+  .compact(lapply(names(df), function(col) {
+    if (types[[col]] != "character") return(NULL)
     n_distinct <- length(unique(df[[col]][!.missing_vals(df[[col]])]))
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-08",
       check_name = "Distinct value count",
       column     = col,
@@ -318,9 +312,8 @@ check_distinct_counts <- function(df, config, types = NULL) {
       observed   = as.character(n_distinct),
       message    = sprintf("Column '%s' has %d distinct non-empty value(s).",
                            col, n_distinct)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-09: Check for values outside the allowed set
@@ -349,11 +342,10 @@ check_distinct_counts <- function(df, config, types = NULL) {
 #'
 #' @export
 check_allowed_values <- function(df, config) {
-  results   <- list()
   col_rules <- config[["column_rules"]] %||% list()
-  for (col in names(col_rules)) {
+  .compact(lapply(names(col_rules), function(col) {
     allowed <- col_rules[[col]]$allowed_values
-    if (is.null(allowed) || !col %in% names(df)) next
+    if (is.null(allowed) || !col %in% names(df)) return(NULL)
     allowed_vec <- unlist(allowed, use.names = FALSE)
     # The numerically-typed subset of the allowed list, kept separate from the
     # character form. A mixed YAML list like [2.1, 3.5, "N/A"] unlists to an
@@ -370,7 +362,7 @@ check_allowed_values <- function(df, config) {
       bad <- bad[is.na(bad_num) | !bad_num %in% num_allowed]
     }
     status <- if (length(bad) > 0) "FAIL" else "PASS"
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-09",
       check_name = "Allowed values",
       column     = col,
@@ -385,9 +377,8 @@ check_allowed_values <- function(df, config) {
                 col, length(bad), .cap_values(bad))
       else
         sprintf("Column '%s' contains only allowed values.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-10: Check for out-of-range numeric values
@@ -416,13 +407,12 @@ check_allowed_values <- function(df, config) {
 #' @importFrom utils head
 #' @export
 check_numeric_bounds <- function(df, config) {
-  results   <- list()
   col_rules <- config[["column_rules"]] %||% list()
-  for (col in names(col_rules)) {
+  .compact(lapply(names(col_rules), function(col) {
     min_val <- col_rules[[col]]$min_value
     max_val <- col_rules[[col]]$max_value
-    if (is.null(min_val) && is.null(max_val)) next
-    if (!col %in% names(df)) next
+    if (is.null(min_val) && is.null(max_val)) return(NULL)
+    if (!col %in% names(df)) return(NULL)
     vals <- suppressWarnings(as.numeric(df[[col]]))
     # Count violating ROWS; a million rows of the same bad value must not
     # read as "1 out-of-range value". Unique values are kept for display.
@@ -436,7 +426,7 @@ check_numeric_bounds <- function(df, config) {
       if (!is.null(min_val)) paste("min:", min_val),
       if (!is.null(max_val)) paste("max:", max_val)
     )
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-10",
       check_name = "Numeric bounds",
       column     = col,
@@ -451,9 +441,8 @@ check_numeric_bounds <- function(df, config) {
                 col, n_rows, length(examples))
       else
         sprintf("Column '%s' values are all within bounds.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-11: Check non-numeric rate in numeric columns
@@ -485,11 +474,10 @@ check_numeric_bounds <- function(df, config) {
 #' @export
 check_non_numeric <- function(df, config, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
-  results <- list()
-  for (col in names(df)) {
-    if (types[[col]] != "numeric") next
+  .compact(lapply(names(df), function(col) {
+    if (types[[col]] != "numeric") return(NULL)
     non_empty <- df[[col]][!.missing_vals(df[[col]])]
-    if (length(non_empty) == 0) next
+    if (length(non_empty) == 0) return(NULL)
     bad  <- non_empty[is.na(suppressWarnings(as.numeric(non_empty)))]
     rate <- length(bad) / length(non_empty)
 
@@ -498,7 +486,7 @@ check_non_numeric <- function(df, config, types = NULL) {
 
     status <- if (rate > fail_threshold) "FAIL" else if (rate > warn_threshold) "WARN" else "PASS"
 
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-11",
       check_name = "Non-numeric values",
       column     = col,
@@ -514,9 +502,8 @@ check_non_numeric <- function(df, config, types = NULL) {
                        col, length(bad)),
         PASS = sprintf("Column '%s' has no non-numeric values.", col)
       )
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-12: Check uniqueness of key column(s)
@@ -631,11 +618,10 @@ check_key_uniqueness <- function(df, config) {
 #'
 #' @export
 check_pattern <- function(df, config) {
-  results   <- list()
   col_rules <- config[["column_rules"]] %||% list()
-  for (col in names(col_rules)) {
+  .compact(lapply(names(col_rules), function(col) {
     pattern <- col_rules[[col]]$pattern
-    if (is.null(pattern) || !col %in% names(df)) next
+    if (is.null(pattern) || !col %in% names(df)) return(NULL)
     non_empty  <- df[[col]][!.missing_vals(df[[col]])]
     # An invalid regex in hand-edited YAML must fail this check, not abort
     # the whole run with a raw grepl() error (PCRE also emits a compilation
@@ -645,7 +631,7 @@ check_pattern <- function(df, config) {
       suppressWarnings(sum(!grepl(pattern, non_empty, perl = TRUE))),
       error = function(e) e)
     if (inherits(bad_count, "error")) {
-      results <- c(results, list(dq_result(
+      return(dq_result(
         check_id   = "QC-13",
         check_name = "Pattern / regex",
         column     = col,
@@ -654,11 +640,10 @@ check_pattern <- function(df, config) {
         threshold  = pattern,
         message    = sprintf("Column '%s': invalid regex pattern '%s' (%s).",
                              col, pattern, conditionMessage(bad_count))
-      )))
-      next
+      ))
     }
     status     <- if (bad_count > 0) "FAIL" else "PASS"
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-13",
       check_name = "Pattern / regex",
       column     = col,
@@ -670,9 +655,8 @@ check_pattern <- function(df, config) {
                 col, bad_count, pattern)
       else
         sprintf("Column '%s': all values match pattern '%s'.", col, pattern)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-14: Check row count bounds and optional file size
@@ -826,23 +810,21 @@ check_min_row_count <- function(df, config, file_path = NULL) {
 #' @export
 check_outliers <- function(df, config, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
-  results <- list()
-  for (col in names(df)) {
-    if (types[[col]] != "numeric") next
+  .compact(lapply(names(df), function(col) {
+    if (types[[col]] != "numeric") return(NULL)
 
     max_z  <- col_threshold(config, col, "max_z_score")
     iqr_k  <- col_threshold(config, col, "iqr_fence_multiplier")
 
     if (is.null(max_z) && is.null(iqr_k)) {
-      results <- c(results, list(dq_result(
+      return(dq_result(
         check_id   = "QC-15",
         check_name = "Outlier detection",
         column     = col,
         status     = "PASS",
         observed   = "No outlier threshold configured.",
         message    = sprintf("Column '%s': outlier check skipped (no threshold).", col)
-      )))
-      next
+      ))
     }
 
     vals <- suppressWarnings(as.numeric(df[[col]]))
@@ -850,15 +832,14 @@ check_outliers <- function(df, config, types = NULL) {
     # downstream `if (sdev > 0)` / comparison then aborts on a missing value.
     nn   <- vals[is.finite(vals)]
     if (length(nn) < 4) {
-      results <- c(results, list(dq_result(
+      return(dq_result(
         check_id   = "QC-15",
         check_name = "Outlier detection",
         column     = col,
         status     = "PASS",
         observed   = sprintf("%d parseable values -- too few to test.", length(nn)),
         message    = sprintf("Column '%s': outlier check skipped (fewer than 4 values).", col)
-      )))
-      next
+      ))
     }
 
     outlier_idx <- logical(length(nn))
@@ -883,7 +864,7 @@ check_outliers <- function(df, config, types = NULL) {
       if (!is.null(max_z))  sprintf("max z-score: %.1f", max_z),
       if (!is.null(iqr_k)) sprintf("IQR multiplier: %.1f", iqr_k)
     )
-    results <- c(results, list(dq_result(
+    dq_result(
       check_id   = "QC-15",
       check_name = "Outlier detection",
       column     = col,
@@ -900,9 +881,8 @@ check_outliers <- function(df, config, types = NULL) {
                 n_out / length(nn) * 100)
       else
         sprintf("Column '%s': no outliers detected.", col)
-    )))
-  }
-  results
+    )
+  }))
 }
 
 #' QC-16: File encoding sanity
@@ -1066,15 +1046,14 @@ check_schema_contract <- function(df, config) {
 
   extra <- setdiff(names(df), expected)
   if (length(extra) > 0) {
-    for (col in extra)
-      results <- c(results, list(dq_result(
-        check_id   = "SC-01",
-        check_name = "Unexpected column",
-        column     = col,
-        status     = "FAIL",
-        observed   = sprintf("Column '%s' is not in the expected schema.", col),
-        message    = sprintf("Column '%s' is present in the file but not in expected_columns.", col)
-      )))
+    results <- c(results, lapply(extra, function(col) dq_result(
+      check_id   = "SC-01",
+      check_name = "Unexpected column",
+      column     = col,
+      status     = "FAIL",
+      observed   = sprintf("Column '%s' is not in the expected schema.", col),
+      message    = sprintf("Column '%s' is present in the file but not in expected_columns.", col)
+    )))
   } else {
     results <- c(results, list(dq_result(
       check_id   = "SC-01",
@@ -1087,15 +1066,14 @@ check_schema_contract <- function(df, config) {
 
   missing_cols <- setdiff(expected, names(df))
   if (length(missing_cols) > 0) {
-    for (col in missing_cols)
-      results <- c(results, list(dq_result(
-        check_id   = "SC-02",
-        check_name = "Missing expected column",
-        column     = col,
-        status     = "FAIL",
-        observed   = sprintf("Expected column '%s' is absent.", col),
-        message    = sprintf("Column '%s' is in expected_columns but absent from the file.", col)
-      )))
+    results <- c(results, lapply(missing_cols, function(col) dq_result(
+      check_id   = "SC-02",
+      check_name = "Missing expected column",
+      column     = col,
+      status     = "FAIL",
+      observed   = sprintf("Expected column '%s' is absent.", col),
+      message    = sprintf("Column '%s' is in expected_columns but absent from the file.", col)
+    )))
   } else {
     results <- c(results, list(dq_result(
       check_id   = "SC-02",
