@@ -1,6 +1,6 @@
 # dqcheckr — Software Specification
 
-**Version**: 0.2.1 **Author**: Mick Mioduszewski **Date**: 2026-06-08
+**Version**: 0.2.5 **Author**: Mick Mioduszewski **Date**: 2026-07-18
 
 ------------------------------------------------------------------------
 
@@ -241,7 +241,8 @@ default_rules:
 dataset_name: "customer_accounts"
 folder: "data/incoming/customer_accounts/"
 format: csv                 # csv | fwf
-encoding: "UTF-8"
+encoding: "UTF-8"          # ASCII (a lossless UTF-8 subset) is read as UTF-8;
+                            #   UTF-8 files are validity-scanned per delivery (QC-16)
 delimiter: ","              # csv only
 quote_char: '"'             # csv only — quote character (default ")
 col_names: ~                # csv only — explicit column names (overrides the
@@ -269,6 +270,13 @@ expected_columns:
 # Optional: key columns that must be unique
 key_columns:
   - id
+
+# Optional: pin a column's logical type instead of inferring it (see C.5).
+# Each value must be one of character, numeric, date (any other aborts with
+# dqcheckr_invalid_config).
+column_types:
+  account_id: character
+  opened_on: date
 
 # Optional rule overrides (merged over global defaults)
 rule_overrides:
@@ -327,16 +335,19 @@ order:
 | Priority | Condition | Inferred type |
 |----|----|----|
 | 1 | All non-null/non-empty values parse as a known date format | `date` |
-| 2 | ≥ 90% of non-null/non-empty values coerce to numeric | `numeric` |
+| 2 | ≥ `type_inference_threshold` of non-null/non-empty values coerce to numeric | `numeric` |
 | 3 | Otherwise | `character` |
 | — | All values null or empty | `unknown` |
 
 Known date formats tested: `%Y-%m-%d`, `%d/%m/%Y`, `%m/%d/%Y`, `%Y%m%d`,
 `%d-%m-%Y`.
 
-The 90% threshold means a column with up to 10% bad (non-numeric) values
-is still classified as numeric, making those bad values visible to
-QC-11.
+`type_inference_threshold` defaults to `0.90` and is configurable in
+`default_rules` (or per-dataset `rule_overrides`). At the default, a
+column with up to 10% bad (non-numeric) values is still classified as
+numeric, making those bad values visible to QC-11. A column’s type may
+also be pinned explicitly with `column_types` (see C.2), which bypasses
+inference entirely.
 
 ### C.6 Quality checks
 
@@ -367,6 +378,7 @@ dq_result(check_id, check_name, column = NA, status, observed, threshold = NA, m
 | QC-13 | Pattern / regex | Configured columns | Any value not matching `pattern` | — |
 | QC-14 | Row count bounds | Table | `row_count < min_row_count` (if \> 0); `row_count > max_row_count` (if set); file size \> `max_file_size_mb` (if set) | — |
 | QC-15 | Outlier detection | Numeric columns | Value exceeds Z-score (`max_z_score`) or IQR fence (`iqr_fence_multiplier`) threshold | — (skipped if neither threshold is configured) |
+| QC-16 | File encoding | File | Delivery is not valid UTF-8 when the config declares UTF-8 (file scanned in bounded chunks before parsing, so arbitrarily large files are verified in flat memory; read completes via a single-byte fallback and the likely actual encoding is reported). Declared ASCII is read as UTF-8 (lossless subset); declared single-byte encodings (ISO-8859-x, Windows-125x) always PASS (no invalid byte sequences exist). A declared multi-byte or unknown encoding (UTF-16/32, Shift-JIS, …) is read as declared but not validity-checked, so it WARNs rather than claiming a spurious PASS; a scan that cannot complete also WARNs | — |
 
 **Schema contract checks (SC series)** — only when `expected_columns` is
 configured
@@ -395,8 +407,10 @@ configured
 > each type of schema change can be independently read in the report and
 > suppressed via config. The `new_cols_vs_previous` and
 > `missing_cols_vs_previous` columns in the `snapshots` table are
-> derived directly from the CP-02a/b results — they are not computed
-> separately.
+> computed independently from the unfiltered schema diff (not from the
+> CP-02 results), so they continue to record what changed even when
+> `flag_new_columns` / `flag_dropped_columns` suppress the corresponding
+> CP-02 report entries.
 
 ### C.7 Custom checks
 
@@ -443,6 +457,7 @@ Database and tables created automatically on first run via
 | `comparison_mode` | TEXT | `"comparison"` or `"single"` (single-file runs have no previous) |
 | `render_status` | TEXT | `"success"` or `"failed"` (updated if Quarto render fails) |
 | `type_changed_cols_vs_previous` | TEXT | Comma-separated `col (prev->curr)` pairs; NULL if none |
+| `report_file` | TEXT | Filename of the rendered HTML report (added 0.2.3); NULL/NA for older rows and for runs where no report was written |
 
 **Table: `column_snapshots`**
 
@@ -530,7 +545,7 @@ Console output:
 | `custom_checks()` not defined | Stop with message |
 | `custom_checks()` runtime error | Stop with R error detail |
 | SQLite write fails | Warning emitted; HTML report still written |
-| Report render fails | Warning emitted; snapshot marked `render_status = "failed"` |
+| Report render fails or is skipped (no Quarto CLI) | Warning emitted; snapshot marked `render_status = "failed"` and its `report_file` cleared, so no consumer links a report that was never written |
 | `snapshot_db` path missing | Created automatically by `init_snapshot_db()` |
 
 ### C.11 Dependencies
@@ -538,13 +553,13 @@ Console output:
 | Package | Role |
 |----|----|
 | `readr` | CSV / FWF ingestion |
+| `stringi` | Encoding validation and detection during ingestion |
 | `DBI` + `RSQLite` | Snapshot store |
 | `quarto` | Report rendering (Quarto CLI required separately) |
 | `knitr` | Template execution during Quarto render |
 | `kableExtra` | Styled HTML tables in report templates |
 | `ggplot2` + `gridExtra` | Trend charts in report templates |
 | `yaml` | Config parsing |
-| `dplyr` | Pipe operator (`%>%`) used in report templates |
 | `tidyr` | Data reshaping for trend charts in report templates |
 | `rlang` | Structured error conditions |
 
@@ -585,4 +600,4 @@ rendering.
 | L-01 | ~~Type inference uses a fixed 90% threshold~~ — resolved in v0.1.1; configurable via `type_inference_threshold` in `rule_overrides` |
 | L-02 | Date formats tested are hardcoded to five common patterns; exotic formats will be misclassified as character |
 | L-03 | The report appendix reads from in-memory `col_stats`, not from SQLite. If the SQLite write fails but the report succeeds, the appendix and the database can show slightly different values in edge cases. Report render failures are non-fatal from v0.2.0: the snapshot is preserved and marked `render_status = "failed"`. |
-| L-04 | Performance scales linearly with rows but super-linearly with columns. Benchmarked on macOS / aarch64 / R 4.6.0 with 1 M-row synthetic data: 10 cols → 47.6 s (21,031 rows/s); 20 cols → 91.9 s (10,881 rows/s); 49 cols → 138.9 s (7,200 rows/s). Very wide files (100+ columns) will be substantially slower. |
+| L-04 | Performance scales linearly with rows and approximately linearly (empirically slightly sub-linearly) with columns — roughly O(rows × columns). Benchmarked on macOS / aarch64 / R 4.6.0 with 1 M-row synthetic data: 10 cols → 47.6 s (4.76 s/col); 20 cols → 91.9 s (4.60 s/col); 49 cols → 138.9 s (2.83 s/col). The per-column cost does not grow with width, so total time for very wide files rises in proportion to the column count rather than faster. |

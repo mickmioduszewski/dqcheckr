@@ -1,6 +1,6 @@
 # Run all generic quality checks on a dataset
 
-Runs the full QC check suite (QC-01 to QC-15, SC-01, SC-02) against a
+Runs the full QC check suite (QC-01 to QC-16, SC-01, SC-02) against a
 single data frame snapshot.
 
 ## Usage
@@ -46,8 +46,5 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg     <- load_config("starwars_csv", config_dir = cfg_dir)
 path    <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df      <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 results <- run_qc_checks(df, cfg)
-#> Error in duplicated.default(df): duplicated() applies only to vectors
 ```

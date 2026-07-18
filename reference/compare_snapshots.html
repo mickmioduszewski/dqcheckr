@@ -11,7 +11,7 @@ renders an HTML drift report."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -81,8 +81,10 @@ If <code>NULL</code>, defaults to the most-recent snapshot by ID.</p></dd>
 
 <dt id="arg-db-path">db_path<a class="anchor" aria-label="anchor" href="#arg-db-path"></a></dt>
 <dd><p>Character or <code>NULL</code>. Path to the SQLite snapshot
-database. If <code>NULL</code> (the default), the path is read from
-<code>snapshot_db</code> in <code>dqcheckr.yml</code>.</p></dd>
+database. If <code>NULL</code> (the default), the path is resolved from
+<code>snapshot_db</code> the same way <code><a href="run_dq_check.html">run_dq_check</a></code> resolves it:
+from <code>&lt;dataset_name&gt;.yml</code> if set there, otherwise <code>dqcheckr.yml</code>,
+otherwise the built-in default <code>"data/snapshots.sqlite"</code>.</p></dd>
 
 
 <dt id="arg-config-dir">config_dir<a class="anchor" aria-label="anchor" href="#arg-config-dir"></a></dt>
@@ -137,13 +139,15 @@ after rendering (only takes effect in interactive sessions).</p></dd>
 <span class="r-in"><span>  <span class="st">'delimiter: ","'</span></span></span>
 <span class="r-in"><span><span class="op">)</span>, <span class="va">ds_yml</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, open_report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in detect_files(config):</span> current_file not found: </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005159_1.html</span>
 <span class="r-in"><span><span class="fu"><a href="run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, open_report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in detect_files(config):</span> current_file not found: </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005205_2.html</span>
 <span class="r-in"><span><span class="va">drift</span> <span class="op">&lt;-</span> <span class="fu">compare_snapshots</span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE):</span> Snapshot database not found: /tmp/RtmpZiWzuR/snap.sqlite</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] drift: starwars_csv snapshot #1 vs #2</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">drift</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error:</span> object 'drift' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "dataset_name"         "snap_prev"            "snap_curr"           </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "table_drift"          "schema_changes"       "missing_rate_changes"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
@@ -157,7 +161,7 @@ after rendering (only takes effect in interactive sessions).</p></dd>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

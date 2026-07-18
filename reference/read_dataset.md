@@ -1,7 +1,16 @@
 # Read a dataset file into a data frame
 
 Reads a CSV or fixed-width file, coercing all columns to character and
-trimming whitespace. Encoding and delimiter are taken from `config`.
+trimming whitespace. Encoding and delimiter are taken from `config`. A
+declared encoding of ASCII (or a formal alias such as `US-ASCII`) is
+read as UTF-8: ASCII is a strict subset of UTF-8, so this is lossless,
+and it protects against deliveries whose non-ASCII bytes appear beyond
+any sample a sniffer looked at. When the effective encoding is UTF-8 the
+whole file is validity-scanned before parsing; a delivery that is not
+valid UTF-8 is read using a single-byte fallback encoding instead, and
+the mismatch is surfaced by
+[`check_file_encoding`](https://mickmioduszewski.github.io/dqcheckr/reference/check_file_encoding.md)
+(QC-16) as a FAIL result rather than crashing the run.
 
 ## Usage
 
@@ -37,6 +46,4 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 ```

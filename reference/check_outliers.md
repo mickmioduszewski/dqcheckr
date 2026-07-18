@@ -51,8 +51,74 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_outliers(df, cfg)
-#> list()
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-15"
+#> 
+#> [[1]]$check_name
+#> [1] "Outlier detection"
+#> 
+#> [[1]]$column
+#> [1] "height"
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "No outlier threshold configured."
+#> 
+#> [[1]]$threshold
+#> [1] NA
+#> 
+#> [[1]]$message
+#> [1] "Column 'height': outlier check skipped (no threshold)."
+#> 
+#> 
+#> [[2]]
+#> [[2]]$check_id
+#> [1] "QC-15"
+#> 
+#> [[2]]$check_name
+#> [1] "Outlier detection"
+#> 
+#> [[2]]$column
+#> [1] "mass"
+#> 
+#> [[2]]$status
+#> [1] "PASS"
+#> 
+#> [[2]]$observed
+#> [1] "No outlier threshold configured."
+#> 
+#> [[2]]$threshold
+#> [1] NA
+#> 
+#> [[2]]$message
+#> [1] "Column 'mass': outlier check skipped (no threshold)."
+#> 
+#> 
+#> [[3]]
+#> [[3]]$check_id
+#> [1] "QC-15"
+#> 
+#> [[3]]$check_name
+#> [1] "Outlier detection"
+#> 
+#> [[3]]$column
+#> [1] "birth_year"
+#> 
+#> [[3]]$status
+#> [1] "PASS"
+#> 
+#> [[3]]$observed
+#> [1] "No outlier threshold configured."
+#> 
+#> [[3]]$threshold
+#> [1] NA
+#> 
+#> [[3]]$message
+#> [1] "Column 'birth_year': outlier check skipped (no threshold)."
+#> 
+#> 
 ```

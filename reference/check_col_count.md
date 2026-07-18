@@ -36,8 +36,6 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_col_count(df, cfg)
 #> [[1]]
 #> [[1]]$check_id
@@ -53,13 +51,13 @@ check_col_count(df, cfg)
 #> [1] "INFO"
 #> 
 #> [[1]]$observed
-#> character(0)
+#> [1] "14"
 #> 
 #> [[1]]$threshold
 #> [1] NA
 #> 
 #> [[1]]$message
-#> character(0)
+#> [1] "File contains 14 columns."
 #> 
 #> 
 ```

@@ -75,8 +75,8 @@ writeLines(c(
   'delimiter: ","'
 ), file.path(tmp, "starwars_csv.yml"))
 result <- run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> Error in detect_files(config): current_file not found: 
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005213_3.html
 result$status
-#> Error: object 'result' not found
+#> [1] "FAIL"
 # }
 ```

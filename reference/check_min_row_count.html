@@ -35,7 +35,7 @@ Maximum row count – only when max_row_count is
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -107,7 +107,7 @@ disk, required for the optional file-size sub-check.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list of <code><a href="dq_result.html">dq_result</a></code> objects (one to three entries
+    <p>A list of <code><a href="dq_result.html">dq_result</a></code> objects (one to four entries
   depending on which sub-checks are active).</p>
     </div>
 
@@ -117,10 +117,30 @@ disk, required for the optional file-size sub-check.</p></dd>
 <span class="r-in"><span><span class="va">cfg</span>  <span class="op">&lt;-</span> <span class="fu"><a href="load_config.html">load_config</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">cfg_dir</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"demonstrations/data/starwars.csv"</span>, package <span class="op">=</span> <span class="st">"dqcheckr"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">df</span>   <span class="op">&lt;-</span> <span class="fu"><a href="read_dataset.html">read_dataset</a></span><span class="op">(</span><span class="va">path</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in value[[3L]](cond):</span> Failed to parse file '': does not exist in current working directory:</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">/home/runner/work/dqcheckr/dqcheckr/docs/reference</span>.</span>
 <span class="r-in"><span><span class="fu">check_min_row_count</span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span>, file_path <span class="op">=</span> <span class="va">path</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in if (nrow(df) == 0) {    results &lt;- c(results, list(dq_result(check_id = "QC-14",         check_name = "Empty file", status = "FAIL", observed = "0 rows",         message = "File contains no data rows.")))}:</span> argument is of length zero</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$check_id</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "QC-14"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$check_name</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Minimum row count"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$column</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$status</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PASS"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$observed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "87 rows"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$threshold</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "80 rows minimum"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$message</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "File has 87 rows, meeting the minimum of 80."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
@@ -133,7 +153,7 @@ disk, required for the optional file-size sub-check.</p></dd>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

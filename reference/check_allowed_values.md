@@ -39,8 +39,51 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_allowed_values(df, cfg)
-#> list()
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-09"
+#> 
+#> [[1]]$check_name
+#> [1] "Allowed values"
+#> 
+#> [[1]]$column
+#> [1] "sex"
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "All values are in the allowed list."
+#> 
+#> [[1]]$threshold
+#> [1] "Allowed: male, female, none, hermaphroditic"
+#> 
+#> [[1]]$message
+#> [1] "Column 'sex' contains only allowed values."
+#> 
+#> 
+#> [[2]]
+#> [[2]]$check_id
+#> [1] "QC-09"
+#> 
+#> [[2]]$check_name
+#> [1] "Allowed values"
+#> 
+#> [[2]]$column
+#> [1] "gender"
+#> 
+#> [[2]]$status
+#> [1] "PASS"
+#> 
+#> [[2]]$observed
+#> [1] "All values are in the allowed list."
+#> 
+#> [[2]]$threshold
+#> [1] "Allowed: masculine, feminine"
+#> 
+#> [[2]]$message
+#> [1] "Column 'gender' contains only allowed values."
+#> 
+#> 
 ```

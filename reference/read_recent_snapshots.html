@@ -9,7 +9,7 @@ snapshot database, ordered newest-first."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,7 +79,10 @@ snapshot database, ordered newest-first.</p>
   <code>report_file</code> (the rendered report's filename, <code>NA</code> for
   snapshots written before dqcheckr 0.2.3).
   Returns an empty data frame with the same columns if the database does
-  not exist or contains no records for the dataset.</p>
+  not exist or contains no records for the dataset. If the database exists
+  but cannot be read (corrupt file, permissions, an unresolved lock), it
+  emits a warning naming the cause and returns the same empty data frame, so
+  a read failure is visible rather than masquerading as an empty history.</p>
     </div>
 
     <div class="section level2">
@@ -97,7 +100,7 @@ snapshot database, ordered newest-first.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

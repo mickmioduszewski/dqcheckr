@@ -32,4 +32,7 @@ frame if the database does not exist or contains no matching records.
 
 ``` r
 list_snapshots(db_path = tempfile(fileext = ".sqlite"))
+#> [1] id             dataset_name   file_name      run_timestamp  row_count     
+#> [6] overall_status
+#> <0 rows> (or 0-length row.names)
 ```

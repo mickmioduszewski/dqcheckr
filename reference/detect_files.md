@@ -30,7 +30,6 @@ cfg <- load_config("starwars_csv", config_dir = cfg_dir)
 cfg$current_file <- system.file("demonstrations/data/starwars.csv",
                                  package = "dqcheckr")
 files <- detect_files(cfg)
-#> Error in detect_files(cfg): current_file not found: 
 files$current
-#> Error: object 'files' not found
+#> [1] "/home/runner/work/_temp/Library/dqcheckr/demonstrations/data/starwars.csv"
 ```

@@ -9,7 +9,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,13 +75,16 @@ in <code>rule_overrides</code>.</p></dd>
     <p>Date formats are tried in this fixed precedence order:
 <code>"%Y-%m-%d"</code>, <code>"%d/%m/%Y"</code>, <code>"%m/%d/%Y"</code>,
 <code>"%Y%m%d"</code>, <code>"%d-%m-%Y"</code>. A column is classified as
-<code>"date"</code> only when <em>every</em> non-empty value parses under one
-format; a single malformed date therefore flips the whole column to
-<code>"numeric"</code> or <code>"character"</code> (such flips between deliveries are
-surfaced by check CP-02c). Two caveats follow from the precedence rules:
+<code>"date"</code> only when <em>every</em> non-empty value both matches that
+format's exact character shape and parses as a valid calendar date; a single
+malformed date therefore flips the whole column to <code>"numeric"</code> or
+<code>"character"</code> (such flips between deliveries are surfaced by check
+CP-02c). The shape is anchored, so a value with trailing characters
+(<code>"2024-01-15x"</code>) or extra digits (the 9-digit <code>"202401159"</code>) is
+<em>not</em> treated as a date. Two caveats follow from the precedence rules:
 ambiguous day/month values resolve day-first (<code>"%d/%m/%Y"</code> is
 tried before <code>"%m/%d/%Y"</code>), and all-8-digit identifier columns
-whose values happen to parse under <code>"%Y%m%d"</code> classify as dates.
+whose values happen to be valid <code>"%Y%m%d"</code> dates classify as dates.
 Pin the type with an entry in the <code>column_types</code> config map when the
 heuristic gets a column wrong.</p>
     </div>
@@ -110,7 +113,7 @@ heuristic gets a column wrong.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

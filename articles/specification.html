@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -61,7 +61,6 @@
                         <h4 data-toc-skip class="author">Mick
 Mioduszewski</h4>
             
-            <h4 data-toc-skip class="date">2026-06-08</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mickmioduszewski/dqcheckr/blob/main/vignettes/specification.Rmd" class="external-link"><code>vignettes/specification.Rmd</code></a></small>
       <div class="d-none name"><code>specification.Rmd</code></div>
@@ -69,8 +68,8 @@ Mioduszewski</h4>
 
     
     
-<p><strong>Version</strong>: 0.2.1 <strong>Author</strong>: Mick
-Mioduszewski <strong>Date</strong>: 2026-06-08</p>
+<p><strong>Version</strong>: 0.2.5 <strong>Author</strong>: Mick
+Mioduszewski <strong>Date</strong>: 2026-07-18</p>
 <hr>
 <div class="section level2">
 <h2 id="part-a-purpose-and-intent">Part A — Purpose and Intent<a class="anchor" aria-label="anchor" href="#part-a-purpose-and-intent"></a>
@@ -333,55 +332,63 @@ long-term trend queries without reading the source files again.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">dataset_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"customer_accounts"</span></span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">folder</span><span class="kw">:</span><span class="at"> </span><span class="st">"data/incoming/customer_accounts/"</span></span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">format</span><span class="kw">:</span><span class="at"> csv</span><span class="co">                 # csv | fwf</span></span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">encoding</span><span class="kw">:</span><span class="at"> </span><span class="st">"UTF-8"</span></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="fu">delimiter</span><span class="kw">:</span><span class="at"> </span><span class="st">","</span><span class="co">              # csv only</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">quote_char</span><span class="kw">:</span><span class="at"> </span><span class="st">'"'</span><span class="co">             # csv only — quote character (default ")</span></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">col_names</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">                # csv only — explicit column names (overrides the</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">                            #   file header); required for headerless files</span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="fu">csv_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                 # csv only — leading lines to drop (default 0). Set</span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">                            #   to 1 with col_names to replace an unusable header</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">                            #   row, e.g. one that repeats column names.</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="fu">fwf_widths</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">               # fwf only</span></span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="fu">fwf_col_names</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">            # fwf only</span></span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="fu">fwf_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                 # fwf only — header rows to skip (default 0)</span></span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
-<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co"># Optional: explicit file paths override folder-scan version detection</span></span>
-<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co"># current_file: "data/incoming/customer_accounts/20260410.csv"</span></span>
-<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
-<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a></span>
-<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a><span class="co"># Optional: schema contract</span></span>
-<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
-<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
-<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
-<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
-<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
-<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
-<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a></span>
-<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a><span class="co"># Optional: key columns that must be unique</span></span>
-<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
-<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
-<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a></span>
-<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a><span class="co"># Optional rule overrides (merged over global defaults)</span></span>
-<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
-<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span></span>
-<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
-<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.005</span></span>
-<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000</span></span>
-<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a></span>
-<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="co"># Optional per-column rules</span></span>
-<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
-<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
-<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span></span>
-<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span></span>
-<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
-<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
-<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
-<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
-<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
-<span id="cb4-50"><a href="#cb4-50" tabindex="-1"></a></span>
-<span id="cb4-51"><a href="#cb4-51" tabindex="-1"></a><span class="co"># Optional custom checks</span></span>
-<span id="cb4-52"><a href="#cb4-52" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">encoding</span><span class="kw">:</span><span class="at"> </span><span class="st">"UTF-8"</span><span class="co">          # ASCII (a lossless UTF-8 subset) is read as UTF-8;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">                            #   UTF-8 files are validity-scanned per delivery (QC-16)</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">delimiter</span><span class="kw">:</span><span class="at"> </span><span class="st">","</span><span class="co">              # csv only</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">quote_char</span><span class="kw">:</span><span class="at"> </span><span class="st">'"'</span><span class="co">             # csv only — quote character (default ")</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">col_names</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">                # csv only — explicit column names (overrides the</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">                            #   file header); required for headerless files</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="fu">csv_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                 # csv only — leading lines to drop (default 0). Set</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">                            #   to 1 with col_names to replace an unusable header</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">                            #   row, e.g. one that repeats column names.</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="fu">fwf_widths</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">               # fwf only</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="fu">fwf_col_names</span><span class="kw">:</span><span class="at"> </span><span class="ch">~</span><span class="co">            # fwf only</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="fu">fwf_skip</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span><span class="co">                 # fwf only — header rows to skip (default 0)</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co"># Optional: explicit file paths override folder-scan version detection</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a><span class="co"># current_file: "data/incoming/customer_accounts/20260410.csv"</span></span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a><span class="co"># previous_file: "data/incoming/customer_accounts/20260401.csv"</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a><span class="co"># Optional: schema contract</span></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="fu">expected_columns</span><span class="kw">:</span></span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> name</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> country_code</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_status</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> account_balance</span></span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> created_date</span></span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a><span class="co"># Optional: key columns that must be unique</span></span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a><span class="fu">key_columns</span><span class="kw">:</span></span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> id</span></span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co"># Optional: pin a column's logical type instead of inferring it (see C.5).</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="co"># Each value must be one of character, numeric, date (any other aborts with</span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="co"># dqcheckr_invalid_config).</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="fu">column_types</span><span class="kw">:</span></span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="at">  </span><span class="fu">account_id</span><span class="kw">:</span><span class="at"> character</span></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="at">  </span><span class="fu">opened_on</span><span class="kw">:</span><span class="at"> date</span></span>
+<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a></span>
+<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="co"># Optional rule overrides (merged over global defaults)</span></span>
+<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="fu">rule_overrides</span><span class="kw">:</span></span>
+<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="at">  </span><span class="fu">max_missing_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span></span>
+<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="at">  </span><span class="fu">max_row_count_change_pct</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span></span>
+<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="at">  </span><span class="fu">max_non_numeric_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.005</span></span>
+<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="at">  </span><span class="fu">min_row_count</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000</span></span>
+<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a></span>
+<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a><span class="co"># Optional per-column rules</span></span>
+<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a><span class="fu">column_rules</span><span class="kw">:</span></span>
+<span id="cb4-50"><a href="#cb4-50" tabindex="-1"></a><span class="at">  </span><span class="fu">country_code</span><span class="kw">:</span></span>
+<span id="cb4-51"><a href="#cb4-51" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"GB"</span><span class="kw">,</span><span class="at"> </span><span class="st">"US"</span><span class="kw">,</span><span class="at"> </span><span class="st">"DE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"FR"</span><span class="kw">]</span></span>
+<span id="cb4-52"><a href="#cb4-52" tabindex="-1"></a><span class="at">    </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{2}$"</span></span>
+<span id="cb4-53"><a href="#cb4-53" tabindex="-1"></a><span class="at">  </span><span class="fu">account_status</span><span class="kw">:</span></span>
+<span id="cb4-54"><a href="#cb4-54" tabindex="-1"></a><span class="at">    </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"ACTIVE"</span><span class="kw">,</span><span class="at"> </span><span class="st">"CLOSED"</span><span class="kw">,</span><span class="at"> </span><span class="st">"SUSPENDED"</span><span class="kw">]</span></span>
+<span id="cb4-55"><a href="#cb4-55" tabindex="-1"></a><span class="at">  </span><span class="fu">account_balance</span><span class="kw">:</span></span>
+<span id="cb4-56"><a href="#cb4-56" tabindex="-1"></a><span class="at">    </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb4-57"><a href="#cb4-57" tabindex="-1"></a><span class="at">    </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
+<span id="cb4-58"><a href="#cb4-58" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" tabindex="-1"></a><span class="co"># Optional custom checks</span></span>
+<span id="cb4-60"><a href="#cb4-60" tabindex="-1"></a><span class="fu">custom_checks_file</span><span class="kw">:</span><span class="at"> </span><span class="st">"custom/customer_accounts_checks.R"</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="c-3-file-version-detection">C.3 File version detection<a class="anchor" aria-label="anchor" href="#c-3-file-version-detection"></a>
@@ -439,7 +446,8 @@ order:</p>
 </tr>
 <tr class="even">
 <td>2</td>
-<td>≥ 90% of non-null/non-empty values coerce to numeric</td>
+<td>≥ <code>type_inference_threshold</code> of non-null/non-empty values
+coerce to numeric</td>
 <td><code>numeric</code></td>
 </tr>
 <tr class="odd">
@@ -457,9 +465,13 @@ order:</p>
 <p>Known date formats tested: <code>%Y-%m-%d</code>,
 <code>%d/%m/%Y</code>, <code>%m/%d/%Y</code>, <code>%Y%m%d</code>,
 <code>%d-%m-%Y</code>.</p>
-<p>The 90% threshold means a column with up to 10% bad (non-numeric)
-values is still classified as numeric, making those bad values visible
-to QC-11.</p>
+<p><code>type_inference_threshold</code> defaults to <code>0.90</code>
+and is configurable in <code>default_rules</code> (or per-dataset
+<code>rule_overrides</code>). At the default, a column with up to 10%
+bad (non-numeric) values is still classified as numeric, making those
+bad values visible to QC-11. A column’s type may also be pinned
+explicitly with <code>column_types</code> (see C.2), which bypasses
+inference entirely.</p>
 </div>
 <div class="section level3">
 <h3 id="c-6-quality-checks">C.6 Quality checks<a class="anchor" aria-label="anchor" href="#c-6-quality-checks"></a>
@@ -597,6 +609,21 @@ to QC-11.</p>
 (<code>iqr_fence_multiplier</code>) threshold</td>
 <td>— (skipped if neither threshold is configured)</td>
 </tr>
+<tr class="even">
+<td>QC-16</td>
+<td>File encoding</td>
+<td>File</td>
+<td>Delivery is not valid UTF-8 when the config declares UTF-8 (file
+scanned in bounded chunks before parsing, so arbitrarily large files are
+verified in flat memory; read completes via a single-byte fallback and
+the likely actual encoding is reported). Declared ASCII is read as UTF-8
+(lossless subset); declared single-byte encodings (ISO-8859-x,
+Windows-125x) always PASS (no invalid byte sequences exist). A declared
+multi-byte or unknown encoding (UTF-16/32, Shift-JIS, …) is read as
+declared but not validity-checked, so it WARNs rather than claiming a
+spurious PASS; a scan that cannot complete also WARNs</td>
+<td>—</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Schema contract checks (SC series)</strong> — only when
@@ -720,8 +747,11 @@ column; always emits a result</td>
 so each type of schema change can be independently read in the report
 and suppressed via config. The <code>new_cols_vs_previous</code> and
 <code>missing_cols_vs_previous</code> columns in the
-<code>snapshots</code> table are derived directly from the CP-02a/b
-results — they are not computed separately.</p>
+<code>snapshots</code> table are computed independently from the
+unfiltered schema diff (not from the CP-02 results), so they continue to
+record what changed even when <code>flag_new_columns</code> /
+<code>flag_dropped_columns</code> suppress the corresponding CP-02
+report entries.</p>
 </blockquote>
 </div>
 <div class="section level3">
@@ -864,6 +894,12 @@ render fails)</td>
 <td>TEXT</td>
 <td>Comma-separated <code>col (prev-&gt;curr)</code> pairs; NULL if
 none</td>
+</tr>
+<tr class="odd">
+<td><code>report_file</code></td>
+<td>TEXT</td>
+<td>Filename of the rendered HTML report (added 0.2.3); NULL/NA for
+older rows and for runs where no report was written</td>
 </tr>
 </tbody>
 </table>
@@ -1086,10 +1122,10 @@ snapshots):</p>
 <td>Warning emitted; HTML report still written</td>
 </tr>
 <tr class="odd">
-<td>Report render fails</td>
+<td>Report render fails or is skipped (no Quarto CLI)</td>
 <td>Warning emitted; snapshot marked
-<code>render_status = "failed"</code>
-</td>
+<code>render_status = "failed"</code> and its <code>report_file</code>
+cleared, so no consumer links a report that was never written</td>
 </tr>
 <tr class="even">
 <td>
@@ -1114,36 +1150,36 @@ snapshots):</p>
 <td>CSV / FWF ingestion</td>
 </tr>
 <tr class="even">
+<td><code>stringi</code></td>
+<td>Encoding validation and detection during ingestion</td>
+</tr>
+<tr class="odd">
 <td>
 <code>DBI</code> + <code>RSQLite</code>
 </td>
 <td>Snapshot store</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>quarto</code></td>
 <td>Report rendering (Quarto CLI required separately)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>knitr</code></td>
 <td>Template execution during Quarto render</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>kableExtra</code></td>
 <td>Styled HTML tables in report templates</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>ggplot2</code> + <code>gridExtra</code>
 </td>
 <td>Trend charts in report templates</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>yaml</code></td>
 <td>Config parsing</td>
-</tr>
-<tr class="even">
-<td><code>dplyr</code></td>
-<td>Pipe operator (<code>%&gt;%</code>) used in report templates</td>
 </tr>
 <tr class="odd">
 <td><code>tidyr</code></td>
@@ -1304,11 +1340,13 @@ preserved and marked <code>render_status = "failed"</code>.</td>
 </tr>
 <tr class="even">
 <td>L-04</td>
-<td>Performance scales linearly with rows but super-linearly with
-columns. Benchmarked on macOS / aarch64 / R 4.6.0 with 1 M-row synthetic
-data: 10 cols → 47.6 s (21,031 rows/s); 20 cols → 91.9 s (10,881
-rows/s); 49 cols → 138.9 s (7,200 rows/s). Very wide files (100+
-columns) will be substantially slower.</td>
+<td>Performance scales linearly with rows and approximately linearly
+(empirically slightly sub-linearly) with columns — roughly O(rows ×
+columns). Benchmarked on macOS / aarch64 / R 4.6.0 with 1 M-row
+synthetic data: 10 cols → 47.6 s (4.76 s/col); 20 cols → 91.9 s (4.60
+s/col); 49 cols → 138.9 s (2.83 s/col). The per-column cost does not
+grow with width, so total time for very wide files rises in proportion
+to the column count rather than faster.</td>
 </tr>
 </tbody>
 </table>
@@ -1325,7 +1363,7 @@ columns) will be substantially slower.</td>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

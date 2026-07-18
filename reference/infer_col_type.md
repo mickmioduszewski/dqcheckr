@@ -31,15 +31,18 @@ A single character string: `"date"`, `"numeric"`, `"character"`, or
 
 Date formats are tried in this fixed precedence order: `"%Y-%m-%d"`,
 `"%d/%m/%Y"`, `"%m/%d/%Y"`, `"%Y%m%d"`, `"%d-%m-%Y"`. A column is
-classified as `"date"` only when *every* non-empty value parses under
-one format; a single malformed date therefore flips the whole column to
-`"numeric"` or `"character"` (such flips between deliveries are surfaced
-by check CP-02c). Two caveats follow from the precedence rules:
+classified as `"date"` only when *every* non-empty value both matches
+that format's exact character shape and parses as a valid calendar date;
+a single malformed date therefore flips the whole column to `"numeric"`
+or `"character"` (such flips between deliveries are surfaced by check
+CP-02c). The shape is anchored, so a value with trailing characters
+(`"2024-01-15x"`) or extra digits (the 9-digit `"202401159"`) is *not*
+treated as a date. Two caveats follow from the precedence rules:
 ambiguous day/month values resolve day-first (`"%d/%m/%Y"` is tried
 before `"%m/%d/%Y"`), and all-8-digit identifier columns whose values
-happen to parse under `"%Y%m%d"` classify as dates. Pin the type with an
-entry in the `column_types` config map when the heuristic gets a column
-wrong.
+happen to be valid `"%Y%m%d"` dates classify as dates. Pin the type with
+an entry in the `column_types` config map when the heuristic gets a
+column wrong.
 
 ## Examples
 

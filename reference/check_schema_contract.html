@@ -19,7 +19,7 @@ Returns an empty list if expected_columns is not configured.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,8 +92,6 @@ Returns an empty list if expected_columns is not configured.'></head><body>
 <span class="r-in"><span><span class="va">cfg</span>  <span class="op">&lt;-</span> <span class="fu"><a href="load_config.html">load_config</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">cfg_dir</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"demonstrations/data/starwars.csv"</span>, package <span class="op">=</span> <span class="st">"dqcheckr"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">df</span>   <span class="op">&lt;-</span> <span class="fu"><a href="read_dataset.html">read_dataset</a></span><span class="op">(</span><span class="va">path</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in value[[3L]](cond):</span> Failed to parse file '': does not exist in current working directory:</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">/home/runner/work/dqcheckr/dqcheckr/docs/reference</span>.</span>
 <span class="r-in"><span><span class="fu">check_schema_contract</span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[1]]$check_id</span>
@@ -126,318 +124,19 @@ Returns an empty list if expected_columns is not configured.'></head><body>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[2]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "name"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[2]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "PASS"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[2]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'name' is absent."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "All expected columns are present."</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[2]]$threshold</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [[2]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'name' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "height"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'height' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[3]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'height' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "mass"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'mass' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[4]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'mass' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "hair_color"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'hair_color' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[5]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'hair_color' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "skin_color"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'skin_color' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[6]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'skin_color' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "eye_color"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'eye_color' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[7]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'eye_color' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "birth_year"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'birth_year' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[8]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'birth_year' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "sex"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'sex' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[9]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'sex' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "gender"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'gender' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[10]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'gender' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "homeworld"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'homeworld' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[11]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'homeworld' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "species"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'species' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[12]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'species' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "films"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'films' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[13]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'films' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "vehicles"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'vehicles' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[14]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'vehicles' is in expected_columns but absent from the file."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$check_id</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "SC-02"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$check_name</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Missing expected column"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$column</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "starships"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$status</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "FAIL"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$observed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Expected column 'starships' is absent."</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$threshold</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [[15]]$message</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Column 'starships' is in expected_columns but absent from the file."</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "No expected columns are missing from the file."</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
@@ -452,7 +151,7 @@ Returns an empty list if expected_columns is not configured.'></head><body>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

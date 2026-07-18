@@ -44,8 +44,74 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_non_numeric(df, cfg)
-#> list()
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-11"
+#> 
+#> [[1]]$check_name
+#> [1] "Non-numeric values"
+#> 
+#> [[1]]$column
+#> [1] "height"
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "0 non-numeric value(s) (0.00%)"
+#> 
+#> [[1]]$threshold
+#> [1] "WARN >0.00%, FAIL >1.00%"
+#> 
+#> [[1]]$message
+#> [1] "Column 'height' has no non-numeric values."
+#> 
+#> 
+#> [[2]]
+#> [[2]]$check_id
+#> [1] "QC-11"
+#> 
+#> [[2]]$check_name
+#> [1] "Non-numeric values"
+#> 
+#> [[2]]$column
+#> [1] "mass"
+#> 
+#> [[2]]$status
+#> [1] "PASS"
+#> 
+#> [[2]]$observed
+#> [1] "0 non-numeric value(s) (0.00%)"
+#> 
+#> [[2]]$threshold
+#> [1] "WARN >0.00%, FAIL >1.00%"
+#> 
+#> [[2]]$message
+#> [1] "Column 'mass' has no non-numeric values."
+#> 
+#> 
+#> [[3]]
+#> [[3]]$check_id
+#> [1] "QC-11"
+#> 
+#> [[3]]$check_name
+#> [1] "Non-numeric values"
+#> 
+#> [[3]]$column
+#> [1] "birth_year"
+#> 
+#> [[3]]$status
+#> [1] "PASS"
+#> 
+#> [[3]]$observed
+#> [1] "0 non-numeric value(s) (0.00%)"
+#> 
+#> [[3]]$threshold
+#> [1] "WARN >0.00%, FAIL >1.00%"
+#> 
+#> [[3]]$message
+#> [1] "Column 'birth_year' has no non-numeric values."
+#> 
+#> 
 ```

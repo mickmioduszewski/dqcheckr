@@ -37,7 +37,11 @@ compare_snapshots(
 - db_path:
 
   Character or `NULL`. Path to the SQLite snapshot database. If `NULL`
-  (the default), the path is read from `snapshot_db` in `dqcheckr.yml`.
+  (the default), the path is resolved from `snapshot_db` the same way
+  [`run_dq_check`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.md)
+  resolves it: from `<dataset_name>.yml` if set there, otherwise
+  `dqcheckr.yml`, otherwise the built-in default
+  `"data/snapshots.sqlite"`.
 
 - config_dir:
 
@@ -91,12 +95,14 @@ writeLines(c(
   'delimiter: ","'
 ), ds_yml)
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> Error in detect_files(config): current_file not found: 
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005159_1.html
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> Error in detect_files(config): current_file not found: 
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpXmiaDo/starwars_csv_20260718_005205_2.html
 drift <- compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE)
-#> Error in compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE): Snapshot database not found: /tmp/RtmpZiWzuR/snap.sqlite
+#> [dqcheckr] drift: starwars_csv snapshot #1 vs #2
 names(drift)
-#> Error: object 'drift' not found
+#> [1] "dataset_name"         "snap_prev"            "snap_curr"           
+#> [4] "table_drift"          "schema_changes"       "missing_rate_changes"
+#> [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    
 # }
 ```

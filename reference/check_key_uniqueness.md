@@ -39,8 +39,6 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_key_uniqueness(df, cfg)
 #> [[1]]
 #> [[1]]$check_id
@@ -53,16 +51,16 @@ check_key_uniqueness(df, cfg)
 #> [1] "name"
 #> 
 #> [[1]]$status
-#> [1] "FAIL"
+#> [1] "PASS"
 #> 
 #> [[1]]$observed
-#> [1] "Column not found in file"
+#> [1] "0 duplicate value(s) found"
 #> 
 #> [[1]]$threshold
 #> [1] NA
 #> 
 #> [[1]]$message
-#> [1] "Key column 'name' is not present in the file."
+#> [1] "Key column 'name' has all unique values."
 #> 
 #> 
 ```

@@ -42,8 +42,74 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_numeric_stats(df, cfg)
-#> list()
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-07"
+#> 
+#> [[1]]$check_name
+#> [1] "Numeric stats"
+#> 
+#> [[1]]$column
+#> [1] "height"
+#> 
+#> [[1]]$status
+#> [1] "INFO"
+#> 
+#> [[1]]$observed
+#> [1] "min=66, max=264, mean=174.6, sd=34.77"
+#> 
+#> [[1]]$threshold
+#> [1] NA
+#> 
+#> [[1]]$message
+#> [1] "Summary statistics for numeric column 'height'."
+#> 
+#> 
+#> [[2]]
+#> [[2]]$check_id
+#> [1] "QC-07"
+#> 
+#> [[2]]$check_name
+#> [1] "Numeric stats"
+#> 
+#> [[2]]$column
+#> [1] "mass"
+#> 
+#> [[2]]$status
+#> [1] "INFO"
+#> 
+#> [[2]]$observed
+#> [1] "min=15, max=1358, mean=97.31, sd=169.5"
+#> 
+#> [[2]]$threshold
+#> [1] NA
+#> 
+#> [[2]]$message
+#> [1] "Summary statistics for numeric column 'mass'."
+#> 
+#> 
+#> [[3]]
+#> [[3]]$check_id
+#> [1] "QC-07"
+#> 
+#> [[3]]$check_name
+#> [1] "Numeric stats"
+#> 
+#> [[3]]$column
+#> [1] "birth_year"
+#> 
+#> [[3]]$status
+#> [1] "INFO"
+#> 
+#> [[3]]$observed
+#> [1] "min=8, max=896, mean=87.57, sd=154.7"
+#> 
+#> [[3]]$threshold
+#> [1] NA
+#> 
+#> [[3]]$message
+#> [1] "Summary statistics for numeric column 'birth_year'."
+#> 
+#> 
 ```

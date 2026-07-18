@@ -96,6 +96,8 @@ The QC and schema checks run by
   : QC-03: Check for fully-duplicate rows
 - [`check_empty_column()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_empty_column.md)
   : QC-02: Check for entirely empty columns
+- [`check_file_encoding()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_file_encoding.md)
+  : QC-16: File encoding sanity
 - [`check_inferred_types()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_inferred_types.md)
   : QC-06: Report inferred column types
 - [`check_key_uniqueness()`](https://mickmioduszewski.github.io/dqcheckr/reference/check_key_uniqueness.md)

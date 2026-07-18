@@ -39,8 +39,51 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_numeric_bounds(df, cfg)
-#> list()
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-10"
+#> 
+#> [[1]]$check_name
+#> [1] "Numeric bounds"
+#> 
+#> [[1]]$column
+#> [1] "height"
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "All values are within bounds."
+#> 
+#> [[1]]$threshold
+#> [1] "min: 50; max: 300"
+#> 
+#> [[1]]$message
+#> [1] "Column 'height' values are all within bounds."
+#> 
+#> 
+#> [[2]]
+#> [[2]]$check_id
+#> [1] "QC-10"
+#> 
+#> [[2]]$check_name
+#> [1] "Numeric bounds"
+#> 
+#> [[2]]$column
+#> [1] "mass"
+#> 
+#> [[2]]$status
+#> [1] "PASS"
+#> 
+#> [[2]]$observed
+#> [1] "All values are within bounds."
+#> 
+#> [[2]]$threshold
+#> [1] "min: 1; max: 2000"
+#> 
+#> [[2]]$message
+#> [1] "Column 'mass' values are all within bounds."
+#> 
+#> 
 ```

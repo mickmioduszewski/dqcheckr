@@ -44,7 +44,7 @@ check_min_row_count(df, config, file_path = NULL)
 
 A list of
 [`dq_result`](https://mickmioduszewski.github.io/dqcheckr/reference/dq_result.md)
-objects (one to three entries depending on which sub-checks are active).
+objects (one to four entries depending on which sub-checks are active).
 
 ## Examples
 
@@ -53,8 +53,28 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_min_row_count(df, cfg, file_path = path)
-#> Error in if (nrow(df) == 0) {    results <- c(results, list(dq_result(check_id = "QC-14",         check_name = "Empty file", status = "FAIL", observed = "0 rows",         message = "File contains no data rows.")))}: argument is of length zero
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-14"
+#> 
+#> [[1]]$check_name
+#> [1] "Minimum row count"
+#> 
+#> [[1]]$column
+#> [1] NA
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "87 rows"
+#> 
+#> [[1]]$threshold
+#> [1] "80 rows minimum"
+#> 
+#> [[1]]$message
+#> [1] "File has 87 rows, meeting the minimum of 80."
+#> 
+#> 
 ```

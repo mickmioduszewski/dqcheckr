@@ -2,7 +2,7 @@
 
 Automates quality verification of recurring external dataset deliveries.
 For each new file arrival, it runs single-snapshot quality checks (QC-01
-to QC-15, SC-01/SC-02), compares the file to the previous delivery
+to QC-16, SC-01/SC-02), compares the file to the previous delivery
 (CP-01 to CP-08), writes a self-contained 'HTML' report, and records
 summary statistics in a local 'SQLite' database for long-term trend
 tracking. Supports 'CSV' and fixed-width formats. Custom
@@ -23,6 +23,8 @@ analysis of `R/` cannot see them as used – without a reference here,
 ## See also
 
 Useful links:
+
+- <https://mickmioduszewski.github.io/dqcheckr/>
 
 - <https://github.com/mickmioduszewski/dqcheckr>
 

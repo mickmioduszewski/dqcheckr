@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -109,11 +109,12 @@ from source:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span><span class="st">"path/to/dqr/dqcheckr"</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mickmioduszewski.github.io/dqcheckr/">dqcheckr</a></span><span class="op">)</span></span></code></pre></div>
-<p>All dependencies are on CRAN: <code>readr</code>, <code>DBI</code>,
-<code>RSQLite</code>, <code>rmarkdown</code>, <code>knitr</code>,
-<code>kableExtra</code>, <code>ggplot2</code>, <code>gridExtra</code>,
-<code>yaml</code>, <code>dplyr</code>, <code>tidyr</code>,
-<code>rlang</code>.</p>
+<p>All dependencies are on CRAN: <code>readr</code>,
+<code>stringi</code>, <code>DBI</code>, <code>RSQLite</code>,
+<code>quarto</code>, <code>knitr</code>, <code>kableExtra</code>,
+<code>ggplot2</code>, <code>gridExtra</code>, <code>yaml</code>,
+<code>tidyr</code>, <code>rlang</code>. Report rendering additionally
+needs the Quarto CLI installed separately (see <a href="https://quarto.org" class="external-link uri">https://quarto.org</a>).</p>
 <hr>
 </div>
 <div class="section level2">
@@ -226,9 +227,10 @@ everything else inherits from the global defaults.</p>
 <div class="section level3">
 <h3 id="what-is-required-vs-optional">What is required vs optional<a class="anchor" aria-label="anchor" href="#what-is-required-vs-optional"></a>
 </h3>
-<p>The only fields the package requires to run are the file location
-(<code>folder</code> or <code>current_file</code>) and the
-<code>format</code>. Every other config key is optional — the
+<p>The fields the package requires to run are the file location
+(<code>folder</code> or <code>current_file</code>), the
+<code>format</code>, and — for <code>format: fwf</code> —
+<code>fwf_widths</code>. Every other config key is optional — the
 corresponding checks are simply skipped when the key is absent.</p>
 <table class="table">
 <colgroup>
@@ -240,6 +242,20 @@ corresponding checks are simply skipped when the key is absent.</p>
 <th>Skipped / default when absent</th>
 </tr></thead>
 <tbody>
+<tr class="odd">
+<td><code>fwf_widths</code></td>
+<td>
+<strong>Required</strong> for <code>format: fwf</code>; the run
+aborts with <code>dqcheckr_invalid_config</code> if absent. Ignored for
+CSV</td>
+</tr>
+<tr class="even">
+<td><code>column_types</code></td>
+<td>Column types are inferred (see C.5) instead of pinned; each value
+must be <code>character</code>, <code>numeric</code>, or
+<code>date</code>
+</td>
+</tr>
 <tr class="odd">
 <td><code>key_columns</code></td>
 <td>QC-12 (key uniqueness) skipped</td>
@@ -490,6 +506,16 @@ composite)</td>
 fence (<code>iqr_fence_multiplier</code>)</td>
 <td>FAIL</td>
 </tr>
+<tr class="even">
+<td>QC-16</td>
+<td>File encoding</td>
+<td>Delivery not valid UTF-8 as declared (file scanned in chunks; run
+completes via a single-byte fallback and reports the likely actual
+encoding). WARN when the encoding is multi-byte/unknown (e.g. UTF-16,
+Shift-JIS) and so not validity-checked, or when the scan itself could
+not complete</td>
+<td>FAIL / WARN</td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -731,6 +757,7 @@ objects.</p>
 <span><span class="fu"><a href="../reference/check_pattern.html">check_pattern</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span>            <span class="co"># QC-13</span></span>
 <span><span class="fu"><a href="../reference/check_min_row_count.html">check_min_row_count</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span>      <span class="co"># QC-14</span></span>
 <span><span class="fu"><a href="../reference/check_outliers.html">check_outliers</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span>           <span class="co"># QC-15</span></span>
+<span><span class="fu"><a href="../reference/check_file_encoding.html">check_file_encoding</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span>      <span class="co"># QC-16</span></span>
 <span><span class="fu"><a href="../reference/check_schema_contract.html">check_schema_contract</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">cfg</span><span class="op">)</span>    <span class="co"># SC-01 / SC-02</span></span>
 <span></span>
 <span><span class="co"># Inspect a result</span></span>
@@ -941,7 +968,7 @@ reports and database records. Source files are never touched.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

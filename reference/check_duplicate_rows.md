@@ -37,8 +37,28 @@ cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
 cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
 path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
 df   <- read_dataset(path, cfg)
-#> Error in value[[3L]](cond): Failed to parse file '': does not exist in current working directory:
-#> /home/runner/work/dqcheckr/dqcheckr/docs/reference.
 check_duplicate_rows(df, cfg)
-#> Error in duplicated.default(df): duplicated() applies only to vectors
+#> [[1]]
+#> [[1]]$check_id
+#> [1] "QC-03"
+#> 
+#> [[1]]$check_name
+#> [1] "Duplicate rows"
+#> 
+#> [[1]]$column
+#> [1] NA
+#> 
+#> [[1]]$status
+#> [1] "PASS"
+#> 
+#> [[1]]$observed
+#> [1] "0 fully-duplicate row(s)"
+#> 
+#> [[1]]$threshold
+#> [1] NA
+#> 
+#> [[1]]$message
+#> [1] "No fully-duplicate rows found."
+#> 
+#> 
 ```
