@@ -264,8 +264,10 @@ test_that(".mark_render_failed() clears report_file so no phantom link survives"
   db  <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   sid <- write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(),
-                        list(), list(), base_config(),
-                        report_file = "ds_20260101_000000.html")
+                        list(), list(), base_config())
+  # A row that had recorded a report_file (render succeeded) then gets marked
+  # failed -- the filename must be cleared so no phantom link survives.
+  dqcheckr:::.set_report_file(db, sid, "ds_20260101_000000.html")
   dqcheckr:::.mark_render_failed(db, sid)
   snaps <- read_recent_snapshots(db, "ds")
   expect_equal(snaps$render_status[1], "failed")
@@ -437,15 +439,20 @@ test_that("compute_col_stats() defines missing_rate as 0 for a zero-row frame", 
 
 # -- report_file column (0.2.3, B-04 second half) --------------------------------
 
-test_that("write_snapshot() stores report_file and migration adds the column", {
+test_that(".set_report_file() stores report_file and migration adds the column", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
-  write_snapshot(db, "rf_ds", "f.csv", make_accounts_df(),
-                 make_results(), list(), list(), base_config(),
-                 run_time = rt, report_file = "rf_ds_20260704_101112.html")
+  # report_file is written only post-render via .set_report_file(); write_snapshot()
+  # inserts it as NULL (render_status = 'pending') and cannot name a report itself.
+  sid <- write_snapshot(db, "rf_ds", "f.csv", make_accounts_df(),
+                        make_results(), list(), list(), base_config(),
+                        run_time = rt)
+  expect_true(is.na(read_recent_snapshots(db, "rf_ds")$report_file[1]))
+  .set_report_file(db, sid, "rf_ds_20260704_101112.html")
   snaps <- read_recent_snapshots(db, "rf_ds")
   expect_equal(snaps$report_file[1], "rf_ds_20260704_101112.html")
+  expect_equal(snaps$render_status[1], "success")
 })
 
 test_that("report_file is NA when not supplied (pre-0.2.3 writers)", {

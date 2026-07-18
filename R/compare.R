@@ -1,6 +1,6 @@
 #' Compute missing rate for a vector
 #'
-#' Defined as 0 for a zero-length vector — mean(logical(0)) would be NaN and
+#' Defined as 0 for a zero-length vector -- mean(logical(0)) would be NaN and
 #' poison downstream threshold comparisons (empty files are reported by QC-14).
 #' @keywords internal
 #' @noRd
@@ -67,14 +67,17 @@ compare_schema <- function(df_current, df_previous, config,
   dropped_cols <- setdiff(names(df_previous), names(df_current))
   common_cols  <- intersect(names(df_current), names(df_previous))
 
-  type_changed_cols <- character(0)
-  for (col in common_cols) {
+  # An all-empty/blank column infers as "unknown" (see infer_col_type()); a
+  # column that is populated this delivery but was blank last time (or vice
+  # versa) is not a genuine type change, so exclude "unknown" on either side.
+  changed <- vapply(common_cols, function(col) {
     t_curr <- types_current[[col]]
     t_prev <- types_previous[[col]]
-    if (t_curr != t_prev)
-      type_changed_cols <- c(type_changed_cols,
-                             sprintf("%s (%s -> %s)", col, t_prev, t_curr))
-  }
+    t_curr != t_prev && t_curr != "unknown" && t_prev != "unknown"
+  }, logical(1))
+  type_changed_cols <- unname(vapply(common_cols[changed], function(col) {
+    sprintf("%s (%s -> %s)", col, types_previous[[col]], types_current[[col]])
+  }, character(1)))
 
   # CP-02a: new columns
   reported_new <- if (flag_new) new_cols else character(0)

@@ -127,9 +127,10 @@ init_snapshot_db <- function(db_path) {
       list(snapshot_id))
   }, error = function(e)
     # A silent failure here is the bug this guard exists to prevent: the row
-    # would keep render_status = 'success' for a report that was never written.
+    # would keep its INSERT-time render_status = 'pending' for a report that was
+    # never written, instead of being flipped to 'failed'.
     warning("Could not mark snapshot ", snapshot_id, " as render-failed; its ",
-            "render_status may still read 'success': ", conditionMessage(e),
+            "render_status may still read 'pending': ", conditionMessage(e),
             call. = FALSE))
 }
 
@@ -190,7 +191,7 @@ compute_col_stats <- function(df, config, types = NULL) {
 
     miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
 
-    # Parallel vectors, one data.frame per column — not one per stat row.
+    # Parallel vectors, one data.frame per column -- not one per stat row.
     checks     <- c("inferred_type", "missing_count", "missing_rate",
                     "distinct_count")
     values     <- c(col_type, as.character(miss_count),
@@ -256,13 +257,14 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
                            qc_results, cp_results, custom_results, config,
                            col_stats = NULL,
                            comparison_mode = "comparison",
-                           run_time = NULL,
-                           report_file = NULL) {
+                           run_time = NULL) {
   # One clock read per run: run_dq_check() passes the same run_time here and
   # to render_report() so the report filename reconstructed from the stored
   # run_timestamp (e.g. by the GUI) always matches the file actually written.
-  # report_file stores that filename outright so consumers don't have to
-  # reconstruct it at all (render failures are flagged via render_status).
+  # report_file is NOT written here: it is always NULL at INSERT and is only set
+  # by .set_report_file() after the report is confirmed written, so the column
+  # can never name a report that was not written (the invariant is structural,
+  # not caller-enforced). Render failures are flagged via render_status.
   run_time <- run_time %||% Sys.time()
   tryCatch({
     init_snapshot_db(db_path)
@@ -328,9 +330,8 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
           overall_status,
           new_cols_vs_previous, missing_cols_vs_previous,
           new_cols_vs_schema, missing_cols_vs_schema,
-          comparison_mode, render_status, type_changed_cols_vs_previous,
-          report_file)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+          comparison_mode, render_status, type_changed_cols_vs_previous)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
         list(dataset_name,
              format(run_time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
              file_name,
@@ -340,8 +341,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
              new_cols_prev_str, drop_cols_prev_str,
              new_schema, miss_schema,
              comparison_mode,
-             type_chg_str,
-             report_file %||% NA_character_)
+             type_chg_str)
       )
 
       snapshot_id <- DBI::dbGetQuery(con,
@@ -453,7 +453,7 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
 
     # Backfill columns a pre-0.2.3 database predates. SELECT * returns only the
     # columns that physically exist, so an un-migrated DB yields a frame that is
-    # *missing* these columns outright — consumers branching on report_file (or
+    # *missing* these columns outright -- consumers branching on report_file (or
     # the 0.1.x-era columns) would error rather than see NA. We do NOT ALTER the
     # table here: a read must not mutate the file (read-only shares, the NSW
     # OneDrive deployment) nor race a concurrent write. Instead fill each absent

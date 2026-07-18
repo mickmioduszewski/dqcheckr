@@ -169,7 +169,7 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(paste0("Database has no 'snapshots' table: ", db_path),
                  class = c("dqcheckr_schema_error", "dqcheckr_error"))
 
-  # SELECT * — .compute_drift() and the drift template read named columns off
+  # SELECT * -- .compute_drift() and the drift template read named columns off
   # these rows; a new column referenced there must exist in the snapshots schema.
   snaps <- DBI::dbGetQuery(con,
     "SELECT * FROM snapshots WHERE dataset_name = ? ORDER BY id",
@@ -189,7 +189,7 @@ compare_snapshots <- function(dataset_name,
   id_curr <- .as_snapshot_id(snapshot_id_curr, "snapshot_id_curr") %||%
              snaps$id[nrow(snaps)]
 
-  # Explicit IDs must belong to this dataset — .compute_drift() queries by ID
+  # Explicit IDs must belong to this dataset -- .compute_drift() queries by ID
   # only, so an unchecked ID from another dataset would silently produce a
   # cross-dataset "drift" comparison.
   for (id in c(id_prev, id_curr)) {

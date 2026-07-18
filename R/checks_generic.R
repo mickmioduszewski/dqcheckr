@@ -625,7 +625,7 @@ check_pattern <- function(df, config) {
     non_empty  <- df[[col]][!.missing_vals(df[[col]])]
     # An invalid regex in hand-edited YAML must fail this check, not abort
     # the whole run with a raw grepl() error (PCRE also emits a compilation
-    # warning before the error — suppress it; the FAIL result carries the
+    # warning before the error -- suppress it; the FAIL result carries the
     # message).
     bad_count  <- tryCatch(
       suppressWarnings(sum(!grepl(pattern, non_empty, perl = TRUE))),

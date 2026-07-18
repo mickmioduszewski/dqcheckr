@@ -66,7 +66,7 @@ run_custom_checks <- function(df, config) {
                  class = c("dqcheckr_invalid_custom_checks", "dqcheckr_error"))
   }
 
-  # Validate each element at this boundary — where the check author can act
+  # Validate each element at this boundary -- where the check author can act
   # on the message. Malformed results would otherwise fail much later inside
   # overall_status() or the snapshot writer with misleading errors.
   required_fields <- c("check_id", "check_name", "column", "status",

@@ -203,7 +203,7 @@ infer_col_type <- function(x, threshold = 0.90) {
 
   # Each format is paired with an anchored shape regex. as.Date() delegates to
   # strptime(), which matches a *prefix* and silently ignores trailing
-  # characters — so "2024-01-15xyz" and the 9-digit id "202401159" (its first 8
+  # characters -- so "2024-01-15xyz" and the 9-digit id "202401159" (its first 8
   # chars parse under %Y%m%d) would both be accepted as dates. Requiring the
   # whole string to match the format's shape first closes that. The %Y%m%d shape
   # is exactly 8 digits, so a genuine 8-digit identifier that also happens to be

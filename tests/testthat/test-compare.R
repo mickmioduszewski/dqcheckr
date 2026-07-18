@@ -72,6 +72,17 @@ test_that("compare_schema() returns WARN on type change (CP-02c)", {
   expect_equal(res[[3]]$check_id, "CP-02c")
 })
 
+test_that("compare_schema() does not flag CP-02c when a column was blank last time", {
+  # account_balance is all-empty in the previous delivery -> infers "unknown".
+  # A populated column this time is not a genuine type change (B-01 regression).
+  prev                 <- make_prev()
+  prev$account_balance <- c("", "", "", "", "")
+  res <- compare_schema(make_curr(), prev, base_config())
+  expect_equal(res[[3]]$check_id, "CP-02c")
+  expect_equal(res[[3]]$status, "PASS")
+  expect_length(attr(res, "type_changed_cols"), 0)
+})
+
 test_that("compare_schema() returns 3 results with correct check_ids", {
   res <- compare_schema(make_curr(), make_prev(), base_config())
   expect_length(res, 3L)
