@@ -107,7 +107,10 @@ after rendering (only takes effect in interactive sessions).</p></dd>
     <p>Invisibly, a named list with elements <code>dataset_name</code>,
   <code>snap_prev</code>, <code>snap_curr</code>, <code>table_drift</code>,
   <code>schema_changes</code>, <code>missing_rate_changes</code>,
-  <code>non_numeric_changes</code>, <code>mean_shifts</code>, <code>distinct_changes</code>.</p>
+  <code>non_numeric_changes</code>, <code>mean_shifts</code>, <code>distinct_changes</code>,
+  and <code>report_path</code> (the full path to the rendered HTML drift report, or
+  <code>NULL</code> when no report was written). Callers should use
+  <code>report_path</code> rather than reconstructing the filename from a pattern.</p>
     </div>
     <div class="section level2">
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
@@ -139,15 +142,16 @@ after rendering (only takes effect in interactive sessions).</p></dd>
 <span class="r-in"><span>  <span class="st">'delimiter: ","'</span></span></span>
 <span class="r-in"><span><span class="op">)</span>, <span class="va">ds_yml</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, open_report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpZlIN7w/starwars_csv_20260718_005313_1.html</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201046_1.html</span>
 <span class="r-in"><span><span class="fu"><a href="run_dq_check.html">run_dq_check</a></span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, open_report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpZlIN7w/starwars_csv_20260718_005319_2.html</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201051_2.html</span>
 <span class="r-in"><span><span class="va">drift</span> <span class="op">&lt;-</span> <span class="fu">compare_snapshots</span><span class="op">(</span><span class="st">"starwars_csv"</span>, config_dir <span class="op">=</span> <span class="va">tmp</span>, report <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> [dqcheckr] drift: starwars_csv snapshot #1 vs #2</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">drift</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "dataset_name"         "snap_prev"            "snap_curr"           </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [4] "table_drift"          "schema_changes"       "missing_rate_changes"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "dataset_name"         "snap_prev"            "snap_curr"           </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [4] "table_drift"          "schema_changes"       "missing_rate_changes"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [10] "report_path"         </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

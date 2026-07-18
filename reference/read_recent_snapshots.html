@@ -78,6 +78,13 @@ snapshot database, ordered newest-first.</p>
   <code>render_status</code>, <code>type_changed_cols_vs_previous</code>, and
   <code>report_file</code> (the rendered report's filename, <code>NA</code> for
   snapshots written before dqcheckr 0.2.3).
+  <code>render_status</code> is one of <code>"pending"</code> (0.2.5+: the row was written
+  but its report has not finished rendering yet – <code>report_file</code> is
+  <code>NA</code> in this window), <code>"success"</code> (report written;
+  <code>report_file</code> names it), or <code>"failed"</code> (render skipped or errored;
+  <code>report_file</code> is <code>NA</code>). Consumers linking to a report should treat
+  a <code>"pending"</code> row as not-yet-available rather than reconstructing a
+  filename for a report that does not exist.
   Returns an empty data frame with the same columns if the database does
   not exist or contains no records for the dataset. If the database exists
   but cannot be read (corrupt file, permissions, an unresolved lock), it

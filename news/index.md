@@ -2,7 +2,80 @@
 
 ## dqcheckr (development version)
 
+### Internal
+
+- The per-column check loops (QC-07/08/09/10/11/13/15, SC-01/02, and the
+  comparison checks CP-04/05/06/07) no longer grow their result list
+  with `c(results, list(...))` inside a `for` loop, which reallocated
+  the whole list on every column and made a run O(columns^2). They now
+  build results with [`lapply()`](https://rdrr.io/r/base/lapply.html)
+  and compact once, so wide deliveries (100+ columns) build their
+  results in linear time. Check output is unchanged.
+
+- The missing/empty predicate (`is.na(x) | x == ""`) and the four
+  comparison-check default thresholds are each now defined once and
+  shared by the QC checks, the comparison checks, the drift report, and
+  the snapshot writer, instead of being reimplemented at each call site.
+  This removes the risk of, for example, the QC report and the drift
+  report applying different default thresholds to the same rule after
+  only one copy was edited.
+
+### Testing
+
+- Added coverage for two previously-untested error paths: an FWF config
+  that omits `fwf_widths` (must abort with `dqcheckr_invalid_config`),
+  and `render_report()` when Quarto returns without writing an output
+  file (must abort with `dqcheckr_render_error` rather than name a
+  report that does not exist).
+
 ### Bug fixes
+
+- [`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md)
+  now returns the rendered drift report’s path as a `report_path`
+  element on its result (`NULL` when no report was written), so a caller
+  can link to the report directly instead of reconstructing the filename
+  from a slug pattern – the reconstruction approach is fragile and broke
+  when the drift filename gained its snapshot ids.
+
+- A snapshot’s `render_status` now carries a `"pending"` state while its
+  report is still rendering. The row is written as `"pending"` and only
+  flipped to `"success"` (with `report_file`) once the report is
+  confirmed on disk, or to `"failed"` if the render is skipped or
+  errors. Previously the row was written as `"success"` with a NULL
+  `report_file` before the render finished, which a concurrent reader
+  could not tell apart from a completed pre-0.2.3 row and would turn
+  into a broken report link. Consumers linking to a report should treat
+  a `"pending"` row as not-yet-available rather than reconstructing a
+  filename.
+
+- The drift report no longer silently reports a report that was never
+  written. When Quarto returned without error but produced no output
+  file,
+  [`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md)
+  still announced (and, with `open_report = TRUE`, tried to open) the
+  intended path. The drift writer now raises the same typed error the
+  main report already did, and
+  [`compare_snapshots()`](https://mickmioduszewski.github.io/dqcheckr/reference/compare_snapshots.md)
+  downgrades it to a warning with no report link – the computed drift is
+  still returned.
+
+- Drift report filenames now include both compared snapshot ids
+  (`drift_dataset_20260718_010203_1_2.html`), so two comparisons of one
+  dataset started in the same wall-clock second (a loop over id pairs,
+  two GUI users) no longer collide on a single filename and silently
+  overwrite each other – the same protection `report_filename()` already
+  gives the main report.
+
+- Column statistics can no longer store a non-finite value even when the
+  aggregate itself overflows. An earlier fix excluded non-finite
+  *inputs* (`Inf`/`-Inf` from a corrupted delivery), but
+  [`sd()`](https://rdrr.io/r/stats/sd.html) of finite-but-very-large
+  values still overflows the double range internally and returned `Inf`,
+  which was stored as the literal string `"Inf"` and poisoned drift
+  arithmetic. Every numeric aggregate is now serialised through a
+  finiteness guard (non-finite -\> `NA`), and the drift reader maps any
+  non-finite value parsed from an older database to `NA` as well, so a
+  snapshot written before this fix cannot re-poison a comparison.
 
 - Report filenames now include the snapshot id
   (`dataset_20260718_010203_47.html`), so two runs of one dataset that

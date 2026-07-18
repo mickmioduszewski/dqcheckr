@@ -33,6 +33,12 @@ A data frame with one row per run and columns including `id`,
 `missing_cols_vs_schema`, `comparison_mode`, `render_status`,
 `type_changed_cols_vs_previous`, and `report_file` (the rendered
 report's filename, `NA` for snapshots written before dqcheckr 0.2.3).
+`render_status` is one of `"pending"` (0.2.5+: the row was written but
+its report has not finished rendering yet – `report_file` is `NA` in
+this window), `"success"` (report written; `report_file` names it), or
+`"failed"` (render skipped or errored; `report_file` is `NA`). Consumers
+linking to a report should treat a `"pending"` row as not-yet-available
+rather than reconstructing a filename for a report that does not exist.
 Returns an empty data frame with the same columns if the database does
 not exist or contains no records for the dataset. If the database exists
 but cannot be read (corrupt file, permissions, an unresolved lock), it

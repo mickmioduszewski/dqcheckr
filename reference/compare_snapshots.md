@@ -62,7 +62,10 @@ compare_snapshots(
 
 Invisibly, a named list with elements `dataset_name`, `snap_prev`,
 `snap_curr`, `table_drift`, `schema_changes`, `missing_rate_changes`,
-`non_numeric_changes`, `mean_shifts`, `distinct_changes`.
+`non_numeric_changes`, `mean_shifts`, `distinct_changes`, and
+`report_path` (the full path to the rendered HTML drift report, or
+`NULL` when no report was written). Callers should use `report_path`
+rather than reconstructing the filename from a pattern.
 
 ## Note
 
@@ -95,14 +98,15 @@ writeLines(c(
   'delimiter: ","'
 ), ds_yml)
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpZlIN7w/starwars_csv_20260718_005313_1.html
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201046_1.html
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpZlIN7w/starwars_csv_20260718_005319_2.html
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201051_2.html
 drift <- compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE)
 #> [dqcheckr] drift: starwars_csv snapshot #1 vs #2
 names(drift)
-#> [1] "dataset_name"         "snap_prev"            "snap_curr"           
-#> [4] "table_drift"          "schema_changes"       "missing_rate_changes"
-#> [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    
+#>  [1] "dataset_name"         "snap_prev"            "snap_curr"           
+#>  [4] "table_drift"          "schema_changes"       "missing_rate_changes"
+#>  [7] "non_numeric_changes"  "mean_shifts"          "distinct_changes"    
+#> [10] "report_path"         
 # }
 ```
