@@ -173,6 +173,29 @@ test_that("detect_files() uses filename as tiebreaker when mtimes are equal (RC-
   expect_equal(basename(result$previous), "a_delivery.csv")
 })
 
+test_that("detect_files() mtime tie-break is locale-independent (B-19)", {
+  tmp  <- withr::local_tempdir()
+  f_up <- file.path(tmp, "B_delivery.csv")   # 'B' (0x42) sorts before 'a' (0x61)
+  f_lo <- file.path(tmp, "a_delivery.csv")   #   in C byte order
+  writeLines("x\n2", f_up)
+  writeLines("x\n1", f_lo)
+  t0 <- as.POSIXct("2024-01-01 12:00:00", tz = "UTC")
+  Sys.setFileTime(f_up, t0)
+  Sys.setFileTime(f_lo, t0)
+
+  pick <- function(loc) {
+    old <- Sys.getlocale("LC_COLLATE")
+    if (suppressWarnings(Sys.setlocale("LC_COLLATE", loc)) == "") return(NA_character_)
+    on.exit(Sys.setlocale("LC_COLLATE", old), add = TRUE)
+    basename(detect_files(list(folder = tmp))$current)
+  }
+  # C byte order: 'a' (97) > 'B' (66), so descending makes a_delivery current.
+  expect_equal(pick("C"), "a_delivery.csv")
+  # A case-folding locale must not change the choice (skip if unavailable).
+  en <- pick("en_US.UTF-8")
+  if (!is.na(en)) expect_equal(en, "a_delivery.csv")
+})
+
 # -- detect_files() ignores directories (0.2.3, B-03) -----------------------------
 
 test_that("detect_files() ignores subdirectories in folder mode", {

@@ -2,7 +2,7 @@
 #'
 #' Automates quality verification of recurring external dataset deliveries.
 #' For each new file arrival, it runs single-snapshot quality checks (QC-01 to
-#' QC-15, SC-01/SC-02), compares the file to the previous delivery (CP-01 to
+#' QC-16, SC-01/SC-02), compares the file to the previous delivery (CP-01 to
 #' CP-08), writes a self-contained 'HTML' report, and records summary statistics
 #' in a local 'SQLite' database for long-term trend tracking. Supports 'CSV' and
 #' fixed-width formats. Custom organisation-specific checks can be supplied as
@@ -20,7 +20,6 @@
 #' @importFrom ggplot2 ggplot aes geom_line geom_point geom_col labs
 #' @importFrom ggplot2 scale_fill_manual theme_minimal
 #' @importFrom gridExtra grid.arrange
-#' @importFrom dplyr %>%
 #' @importFrom tidyr pivot_longer
 #' @importFrom knitr raw_html
 #'

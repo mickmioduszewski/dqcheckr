@@ -24,6 +24,14 @@ A data frame with all columns as character vectors.
 \description{
 Reads a CSV or fixed-width file, coercing all columns to character and
 trimming whitespace. Encoding and delimiter are taken from \code{config}.
+A declared encoding of ASCII (or a formal alias such as \code{US-ASCII})
+is read as UTF-8: ASCII is a strict subset of UTF-8, so this is lossless,
+and it protects against deliveries whose non-ASCII bytes appear beyond any
+sample a sniffer looked at. When the effective encoding is UTF-8 the whole
+file is validity-scanned before parsing; a delivery that is not valid
+UTF-8 is read using a single-byte fallback encoding instead, and the
+mismatch is surfaced by \code{\link{check_file_encoding}} (QC-16) as a
+FAIL result rather than crashing the run.
 }
 \examples{
 cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")

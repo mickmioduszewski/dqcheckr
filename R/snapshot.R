@@ -2,6 +2,13 @@
 .sqlite_connect <- function(db_path) {
   con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
   DBI::dbExecute(con, "PRAGMA foreign_keys = ON")
+  # Deployments point several datasets at one shared snapshot DB (see
+  # RBB-sample/), so brief write contention between concurrent runs is normal.
+  # Without a busy timeout the loser fails instantly with 'database is locked'
+  # and its snapshot is swallowed into a warning; wait for the writer instead.
+  # WAL journalling is deliberately NOT enabled here: it needs shared memory and
+  # is unsafe on the network / OneDrive filesystems dqcheckr is deployed on.
+  DBI::dbExecute(con, "PRAGMA busy_timeout = 30000")
   con
 }
 
@@ -12,6 +19,19 @@ init_snapshot_db <- function(db_path) {
   dir.create(dirname(db_path), recursive = TRUE, showWarnings = FALSE)
   con <- .sqlite_connect(db_path)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  # Serialize create-and-migrate. The column check and the ALTERs must be atomic
+  # with respect to other processes: two first-runs after an upgrade, sharing
+  # one DB, would otherwise both read the pre-migration column list and both try
+  # to ADD the same column, and the loser dies with 'duplicate column name'
+  # (busy_timeout alone does not help -- the loser has already read the stale
+  # list before it waits). BEGIN IMMEDIATE takes the write lock up front, so the
+  # second process blocks here, then reads the already-migrated column list and
+  # skips the ALTERs.
+  DBI::dbExecute(con, "BEGIN IMMEDIATE")
+  committed <- FALSE
+  on.exit(if (!committed) try(DBI::dbExecute(con, "ROLLBACK"), silent = TRUE),
+          add = TRUE, after = FALSE)
 
   DBI::dbExecute(con, "
     CREATE TABLE IF NOT EXISTS snapshots (
@@ -49,9 +69,29 @@ init_snapshot_db <- function(db_path) {
     )
   ")
 
-  # Auto-migrate 0.1.x databases that are missing the new columns.
   existing_cols <- DBI::dbGetQuery(
     con, "SELECT name FROM pragma_table_info('snapshots')")$name
+
+  # Refuse to adopt a pre-existing `snapshots` table that is not ours. If the
+  # file already held a table of that name from another application, the CREATE
+  # above was a no-op and the ALTERs below would silently mutate the user's
+  # table. Every dqcheckr schema back to 0.1.x has these core columns; their
+  # absence means the table belongs to someone else. (SQLite column names are
+  # case-insensitive, so compare case-folded.)
+  required   <- c("dataset_name", "run_timestamp", "file_name",
+                  "row_count", "col_count", "overall_status")
+  have       <- tolower(existing_cols)
+  if (!all(required %in% have))
+    rlang::abort(
+      paste0("The database at '", db_path, "' already contains a 'snapshots' ",
+             "table that is not a dqcheckr snapshot table (missing: ",
+             paste(setdiff(required, have), collapse = ", "),
+             "). Refusing to modify it."),
+      class = c("dqcheckr_schema_error", "dqcheckr_error"))
+
+  # Auto-migrate 0.1.x databases that are missing the newer columns. Match
+  # case-insensitively so a column stored as e.g. `Report_File` is recognised
+  # and not re-added (which SQLite would reject as a duplicate).
   new_col_defs <- list(
     comparison_mode               = "TEXT NOT NULL DEFAULT 'comparison'",
     render_status                 = "TEXT NOT NULL DEFAULT 'success'",
@@ -59,15 +99,23 @@ init_snapshot_db <- function(db_path) {
     report_file                   = "TEXT"
   )
   for (col_name in names(new_col_defs)) {
-    if (!col_name %in% existing_cols)
+    if (!tolower(col_name) %in% have)
       DBI::dbExecute(con, sprintf("ALTER TABLE snapshots ADD COLUMN %s %s",
                                   col_name, new_col_defs[[col_name]]))
   }
 
+  DBI::dbExecute(con, "COMMIT")
+  committed <- TRUE
   invisible(db_path)
 }
 
 #' Mark a snapshot's render_status as failed
+#'
+#' Also clears report_file so a row can never name a report that was not written:
+#' render_status = 'failed' is the guard consumers key on, and report_file is
+#' NULLed to stay consistent with it. report_file is only ever set (by
+#' \code{.set_report_file}) after a report is confirmed written, so on this path
+#' it is already NULL -- the clear is belt-and-braces.
 #' @keywords internal
 #' @noRd
 .mark_render_failed <- function(db_path, snapshot_id) {
@@ -75,9 +123,34 @@ init_snapshot_db <- function(db_path) {
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     DBI::dbExecute(con,
-      "UPDATE snapshots SET render_status = 'failed' WHERE id = ?",
+      "UPDATE snapshots SET render_status = 'failed', report_file = NULL WHERE id = ?",
       list(snapshot_id))
-  }, error = function(e) invisible(NULL))
+  }, error = function(e)
+    # A silent failure here is the bug this guard exists to prevent: the row
+    # would keep render_status = 'success' for a report that was never written.
+    warning("Could not mark snapshot ", snapshot_id, " as render-failed; its ",
+            "render_status may still read 'success': ", conditionMessage(e),
+            call. = FALSE))
+}
+
+#' Record the rendered report's filename on its snapshot row
+#'
+#' Written by a post-render UPDATE (not at INSERT time) so the filename can carry
+#' the snapshot id -- which is only known after the row exists -- and so the
+#' column never names a file that was not actually written. B-42.
+#' @keywords internal
+#' @noRd
+.set_report_file <- function(db_path, snapshot_id, report_file) {
+  tryCatch({
+    con <- .sqlite_connect(db_path)
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    DBI::dbExecute(con,
+      "UPDATE snapshots SET report_file = ? WHERE id = ?",
+      list(report_file, snapshot_id))
+  }, error = function(e)
+    warning("Could not record report filename for snapshot ", snapshot_id,
+            "; the history link may be missing: ", conditionMessage(e),
+            call. = FALSE))
 }
 
 #' Compute per-column statistics for snapshot storage
@@ -109,7 +182,11 @@ compute_col_stats <- function(df, config, types = NULL) {
 
     if (col_type == "numeric") {
       vals <- suppressWarnings(as.numeric(x))
-      nn   <- vals[!is.na(vals)]
+      # Non-finite parses (Inf/-Inf from a corrupted delivery -- write.csv emits
+      # the literal "Inf") are excluded from the aggregates: mean/sd of a vector
+      # containing them is NaN, which would be stored as the literal string
+      # "NaN" and poison drift arithmetic downstream.
+      nn   <- vals[is.finite(vals)]
       nn_count <- sum(!is.na(non_empty) &
                       is.na(suppressWarnings(as.numeric(non_empty))))
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
@@ -139,6 +216,16 @@ compute_col_stats <- function(df, config, types = NULL) {
                stringsAsFactors = FALSE)
   })
 
+  # A zero-column delivery (e.g. an empty file) yields no per-column frames;
+  # do.call(rbind, list()) is NULL, which would make write_snapshot() fail on
+  # col_stats$snapshot_id<- and lose the whole snapshot row. Return an empty
+  # frame with the expected schema so the run is still recorded.
+  if (length(col_frames) == 0) {
+    return(data.frame(
+      column_name = character(0), dq_check = character(0),
+      value = character(0), threshold = character(0),
+      severity_on_breach = character(0), stringsAsFactors = FALSE))
+  }
   do.call(rbind, col_frames)
 }
 
@@ -181,7 +268,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     type_chg_str       <- if (length(type_chg_cols) > 0)
       paste(type_chg_cols,  collapse = ",") else NA_character_
 
-    expected <- config$expected_columns
+    expected <- config[["expected_columns"]]
     if (!is.null(expected)) {
       sc01_fail <- Filter(\(r) r$check_id == "SC-01" && r$status == "FAIL",
                           qc_results)
@@ -230,11 +317,15 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
       snapshot_id <- DBI::dbGetQuery(con,
         "SELECT last_insert_rowid() AS id")$id[[1]]
 
-      col_stats$snapshot_id <- snapshot_id
-
-      DBI::dbAppendTable(con, "column_snapshots",
-        col_stats[, c("snapshot_id", "column_name", "dq_check",
-                      "value", "threshold", "severity_on_breach")])
+      # A zero-column delivery yields no per-column stats; assigning a scalar
+      # snapshot_id to a 0-row frame errors, so skip the append entirely and
+      # still record the snapshots row.
+      if (nrow(col_stats) > 0) {
+        col_stats$snapshot_id <- snapshot_id
+        DBI::dbAppendTable(con, "column_snapshots",
+          col_stats[, c("snapshot_id", "column_name", "dq_check",
+                        "value", "threshold", "severity_on_breach")])
+      }
 
       custom_col <- Filter(function(r) !is.na(r$column), custom_results)
       if (length(custom_col) > 0) {
@@ -255,7 +346,12 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     })
   },
   error = function(e) {
-    warning("SQLite write failed: ", conditionMessage(e))
+    # Non-fatal by design: the run continues without a snapshot. The message is
+    # cause-neutral because this block also covers init/migration and status
+    # computation, not only the INSERT -- run_dq_check() surfaces the resulting
+    # NULL snapshot_id in its final line so the loss is not silent.
+    warning("Snapshot not recorded (SQLite write failed): ", conditionMessage(e),
+            call. = FALSE)
     NULL
   })
 }
@@ -280,7 +376,10 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   \code{report_file} (the rendered report's filename, \code{NA} for
 #'   snapshots written before dqcheckr 0.2.3).
 #'   Returns an empty data frame with the same columns if the database does
-#'   not exist or contains no records for the dataset.
+#'   not exist or contains no records for the dataset. If the database exists
+#'   but cannot be read (corrupt file, permissions, an unresolved lock), it
+#'   emits a warning naming the cause and returns the same empty data frame, so
+#'   a read failure is visible rather than masquerading as an empty history.
 #'
 #' @examples
 #' history <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "starwars_csv")
@@ -308,12 +407,36 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
-    DBI::dbGetQuery(con,
+    res <- DBI::dbGetQuery(con,
       "SELECT * FROM snapshots
        WHERE dataset_name = ?
        ORDER BY id DESC
        LIMIT ?",
       list(dataset_name, as.integer(n)))
+
+    # Backfill columns a pre-0.2.3 database predates. SELECT * returns only the
+    # columns that physically exist, so an un-migrated DB yields a frame that is
+    # *missing* these columns outright — consumers branching on report_file (or
+    # the 0.1.x-era columns) would error rather than see NA. We do NOT ALTER the
+    # table here: a read must not mutate the file (read-only shares, the NSW
+    # OneDrive deployment) nor race a concurrent write. Instead fill each absent
+    # column with exactly the value ALTER TABLE ... DEFAULT would have written,
+    # so the same database reads identically before and after its first 0.2.3+
+    # write. rep(..., nrow(res)) keeps a zero-row result correctly typed.
+    defaults <- list(comparison_mode = "comparison", render_status = "success")
+    for (col in setdiff(names(empty), names(res))) {
+      fill <- defaults[[col]] %||% empty[[col]][NA_integer_]  # typed NA otherwise
+      res[[col]] <- rep(fill, nrow(res))
+    }
+    res[, names(empty), drop = FALSE]  # pin column order to the schema
   },
-  error = function(e) empty)
+  error = function(e) {
+    # A read failure (corrupt file, permissions, a lock that outlasted the busy
+    # timeout) is NOT the same as "no history yet". Returning empty silently
+    # would tell the caller there are no runs when the truth is the read failed,
+    # so surface it as a warning before falling back to the empty frame.
+    warning("Could not read snapshot history from '", db_path, "': ",
+            conditionMessage(e), call. = FALSE)
+    empty
+  })
 }

@@ -350,18 +350,24 @@ check_distinct_counts <- function(df, config, types = NULL) {
 #' @export
 check_allowed_values <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     allowed <- col_rules[[col]]$allowed_values
     if (is.null(allowed) || !col %in% names(df)) next
     allowed_vec <- unlist(allowed, use.names = FALSE)
+    # The numerically-typed subset of the allowed list, kept separate from the
+    # character form. A mixed YAML list like [2.1, 3.5, "N/A"] unlists to an
+    # all-character vector, so gating on is.numeric(allowed_vec) would skip the
+    # numeric comparison entirely and FAIL a file value of "2.10" (B-22). Only
+    # genuinely-numeric entries are compared numerically, so a *string* "007"
+    # still does not accept a file value of "7".
+    num_allowed <- unlist(allowed[vapply(allowed, is.numeric, logical(1))],
+                          use.names = FALSE)
     vals <- df[[col]][!.missing_vals(df[[col]])]
     bad  <- setdiff(unique(vals), as.character(allowed_vec))
-    # When YAML supplied numbers, compare numerically too: as.character(2.1)
-    # is "2.1", so a file value of "2.10" would otherwise FAIL spuriously.
-    if (length(bad) > 0 && is.numeric(allowed_vec)) {
+    if (length(bad) > 0 && length(num_allowed) > 0) {
       bad_num <- suppressWarnings(as.numeric(bad))
-      bad <- bad[is.na(bad_num) | !bad_num %in% allowed_vec]
+      bad <- bad[is.na(bad_num) | !bad_num %in% num_allowed]
     }
     status <- if (length(bad) > 0) "FAIL" else "PASS"
     results <- c(results, list(dq_result(
@@ -411,7 +417,7 @@ check_allowed_values <- function(df, config) {
 #' @export
 check_numeric_bounds <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     min_val <- col_rules[[col]]$min_value
     max_val <- col_rules[[col]]$max_value
@@ -539,7 +545,7 @@ check_non_numeric <- function(df, config, types = NULL) {
 #'
 #' @export
 check_key_uniqueness <- function(df, config) {
-  keys <- config$key_columns
+  keys <- config[["key_columns"]]
   if (is.null(keys) || length(keys) == 0) return(list())
 
   if (length(keys) == 1) {
@@ -626,7 +632,7 @@ check_key_uniqueness <- function(df, config) {
 #' @export
 check_pattern <- function(df, config) {
   results   <- list()
-  col_rules <- config$column_rules %||% list()
+  col_rules <- config[["column_rules"]] %||% list()
   for (col in names(col_rules)) {
     pattern <- col_rules[[col]]$pattern
     if (is.null(pattern) || !col %in% names(df)) next
@@ -694,7 +700,7 @@ check_pattern <- function(df, config) {
 #' @param file_path Character or \code{NULL}. Absolute path to the file on
 #'   disk, required for the optional file-size sub-check.
 #'
-#' @return A list of \code{\link{dq_result}} objects (one to three entries
+#' @return A list of \code{\link{dq_result}} objects (one to four entries
 #'   depending on which sub-checks are active).
 #'
 #' @examples
@@ -840,7 +846,9 @@ check_outliers <- function(df, config, types = NULL) {
     }
 
     vals <- suppressWarnings(as.numeric(df[[col]]))
-    nn   <- vals[!is.na(vals)]
+    # Drop non-finite parses (Inf/-Inf): they make sd() return NaN, and the
+    # downstream `if (sdev > 0)` / comparison then aborts on a missing value.
+    nn   <- vals[is.finite(vals)]
     if (length(nn) < 4) {
       results <- c(results, list(dq_result(
         check_id   = "QC-15",
@@ -897,6 +905,129 @@ check_outliers <- function(df, config, types = NULL) {
   results
 }
 
+#' QC-16: File encoding sanity
+#'
+#' Verifies that the delivered file's bytes matched the encoding declared in
+#' the config. \code{\link{read_dataset}} scans the whole file for UTF-8
+#' validity before parsing (when the effective encoding is UTF-8) and records
+#' the outcome on the returned data frame; this check turns that outcome into
+#' a result:
+#' \itemize{
+#'   \item \strong{PASS} when the file was valid UTF-8 as declared, or when a
+#'     declared single-byte encoding (e.g. \code{ISO-8859-1},
+#'     \code{Windows-1252}) made a validity scan meaningless -- every byte
+#'     sequence is valid in those encodings by construction.
+#'   \item \strong{FAIL} when the file was not valid UTF-8 as declared. The
+#'     run still completes: the file is read using a single-byte fallback
+#'     encoding, and the message reports the detector's best guess at the
+#'     actual encoding so the config can be corrected.
+#'   \item \strong{WARN} when the declared encoding is multi-byte or unknown
+#'     (e.g. \code{UTF-16LE}, \code{Shift-JIS}): dqcheckr scans only UTF-8, so
+#'     such a file is read as declared but its validity is not verified -- it is
+#'     never reported as "valid by construction".
+#'   \item \strong{WARN} when the UTF-8 scan itself could not complete (for
+#'     example out of memory on a very large delivery): validity is unknown, so
+#'     it is neither a clean PASS nor a definitive FAIL.
+#' }
+#' A supplier can change their export encoding between deliveries, which is
+#' why this runs against every delivery rather than only at configuration
+#' time. Returns an empty list when \code{df} did not come from
+#' \code{\link{read_dataset}} (no scan outcome to report).
+#'
+#' @param df A data frame with all columns as character vectors (as returned by
+#'   \code{\link{read_dataset}}).
+#' @param config Named list. Merged configuration as returned by
+#'   \code{\link{load_config}}. Present for interface consistency; the scan
+#'   outcome travels with \code{df}.
+#'
+#' @return A list with one \code{\link{dq_result}} object, or an empty list
+#'   when no scan outcome is attached to \code{df}.
+#'
+#' @examples
+#' cfg_dir <- system.file("demonstrations/config", package = "dqcheckr")
+#' cfg  <- load_config("starwars_csv", config_dir = cfg_dir)
+#' path <- system.file("demonstrations/data/starwars.csv", package = "dqcheckr")
+#' df   <- read_dataset(path, cfg)
+#' check_file_encoding(df, cfg)
+#'
+#' @export
+check_file_encoding <- function(df, config) {
+  info <- attr(df, "dq_encoding", exact = TRUE)
+  if (is.null(info)) return(list())
+  enc_class <- info$enc_class %||% "utf8"
+
+  # Definitive failure first: the file was not valid UTF-8 as declared.
+  if (isFALSE(info$valid)) {
+    guess_txt <- if (!is.null(info$guess))
+      sprintf(" The bytes look like %s.", info$guess)
+    else
+      " The actual encoding could not be determined."
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "FAIL",
+      observed   = sprintf("Not valid %s; read as %s for this run.%s",
+                           info$declared, info$used, guess_txt),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = sprintf(paste0(
+        "File is not valid %s as declared in the config.%s ",
+        "It was read as %s so this run could complete; verify the supplier's ",
+        "export encoding and update 'encoding' in the dataset config."),
+        info$declared, guess_txt, info$used)
+    )))
+  }
+
+  # A declared multi-byte or unknown encoding (UTF-16/32, Shift-JIS, ...) is not
+  # validity-checked -- dqcheckr only scans UTF-8. Do not claim it is "valid by
+  # construction"; WARN that it was read as declared without verification.
+  if (enc_class == "other") {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "WARN",
+      observed   = sprintf(paste0("'%s' is a multi-byte or unknown encoding that ",
+                                  "dqcheckr does not validity-check."), info$used),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = paste0("File encoding was not verified: only UTF-8 and ",
+                          "single-byte encodings are checked. The file was read ",
+                          "as declared. Prefer a UTF-8 export where possible.")
+    )))
+  }
+
+  if (isTRUE(info$valid)) {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "PASS",
+      observed   = if (enc_class == "single_byte")
+        sprintf("'%s' is a single-byte encoding; every byte sequence is valid by construction.",
+                info$used)
+      else
+        sprintf("File is valid %s.", info$used),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = "File encoding matches the configuration."
+    )))
+  }
+
+  # Validity is unknown: the UTF-8 scan itself failed (e.g. out of memory on a
+  # very large delivery). Not a clean PASS -- the file was read as declared with
+  # no verification -- and not a definitive FAIL either, so WARN.
+  if (is.na(info$valid)) {
+    return(list(dq_result(
+      check_id   = "QC-16",
+      check_name = "File encoding",
+      status     = "WARN",
+      observed   = sprintf("Could not verify %s: %s", info$used,
+                           info$scan_error %||% "the encoding scan did not complete"),
+      threshold  = sprintf("declared: %s", info$declared),
+      message    = paste0("File encoding could not be verified; the file was ",
+                          "read as declared without a validity scan.")
+    )))
+  }
+
+  list()   # unreachable: valid is TRUE/FALSE/NA, all handled above
+}
+
 #' SC-01 / SC-02: Check columns against the expected schema contract
 #'
 #' Compares the columns present in \code{df} against
@@ -928,7 +1059,7 @@ check_outliers <- function(df, config, types = NULL) {
 #'
 #' @export
 check_schema_contract <- function(df, config) {
-  expected <- config$expected_columns
+  expected <- config[["expected_columns"]]
   if (is.null(expected)) return(list())
 
   results <- list()
@@ -980,7 +1111,7 @@ check_schema_contract <- function(df, config) {
 
 #' Run all generic quality checks on a dataset
 #'
-#' Runs the full QC check suite (QC-01 to QC-15, SC-01, SC-02) against a
+#' Runs the full QC check suite (QC-01 to QC-16, SC-01, SC-02) against a
 #' single data frame snapshot.
 #'
 #' @param df A data frame with all columns as character vectors (as returned by
@@ -1006,6 +1137,7 @@ check_schema_contract <- function(df, config) {
 run_qc_checks <- function(df, config, file_path = NULL, types = NULL) {
   types <- types %||% resolve_col_types(df, config)
   c(
+    check_file_encoding(df, config),
     check_missing_rate(df, config),
     check_empty_column(df, config),
     check_duplicate_rows(df, config),

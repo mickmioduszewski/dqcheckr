@@ -1,8 +1,8 @@
 Package: dqcheckr
 Type: Package
 Title: Automated Data Quality Checks for Recurring Dataset Deliveries
-Version: 0.2.3
-Date: 2026-07-04
+Version: 0.2.5
+Date: 2026-07-18
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
                   role  = c("aut", "cre"))
@@ -19,8 +19,8 @@ BugReports: https://github.com/mickmioduszewski/dqcheckr/issues
 Encoding: UTF-8
 Language: en-GB
 Depends: R (>= 4.2)
-Imports: readr, DBI, RSQLite, quarto, knitr, kableExtra, ggplot2,
-        gridExtra, dplyr, tidyr, yaml, rlang, stats, utils
+Imports: readr, stringi, DBI, RSQLite, quarto, knitr, kableExtra, ggplot2,
+        gridExtra, tidyr, yaml, rlang, stats, utils
 Suggests: testthat (>= 3.1.0),
     withr,
     rmarkdown,

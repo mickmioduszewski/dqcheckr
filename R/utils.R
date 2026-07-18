@@ -90,14 +90,14 @@ load_config <- function(dataset_name, config_dir) {
       dataset_cfg[[key]] <- global_cfg[[key]]
   }
 
-  rules <- global_cfg$default_rules %||% list()
-  if (!is.null(dataset_cfg$rule_overrides)) {
-    for (key in names(dataset_cfg$rule_overrides))
-      rules[[key]] <- dataset_cfg$rule_overrides[[key]]
+  rules <- global_cfg[["default_rules"]] %||% list()
+  if (!is.null(dataset_cfg[["rule_overrides"]])) {
+    for (key in names(dataset_cfg[["rule_overrides"]]))
+      rules[[key]] <- dataset_cfg[["rule_overrides"]][[key]]
   }
-  dataset_cfg$rules <- rules
+  dataset_cfg[["rules"]] <- rules
 
-  ct <- dataset_cfg$column_types %||% list()
+  ct <- dataset_cfg[["column_types"]] %||% list()
   if (length(ct) > 0) {
     valid_types <- c("character", "numeric", "date")
     bad <- setdiff(unlist(ct, use.names = FALSE), valid_types)
@@ -110,7 +110,7 @@ load_config <- function(dataset_name, config_dir) {
 
   # column_order_severity flows straight into a dq_result status (CP-08), so
   # a typo like "error" would otherwise abort the run mid-check.
-  sev <- dataset_cfg$rules$column_order_severity
+  sev <- dataset_cfg[["rules"]][["column_order_severity"]]
   if (!is.null(sev) &&
       !(length(sev) == 1 && tolower(sev) %in% c("pass", "warn", "fail", "info")))
     rlang::abort(sprintf(
@@ -139,13 +139,16 @@ load_config <- function(dataset_name, config_dir) {
 #' Date formats are tried in this fixed precedence order:
 #' \code{"\%Y-\%m-\%d"}, \code{"\%d/\%m/\%Y"}, \code{"\%m/\%d/\%Y"},
 #' \code{"\%Y\%m\%d"}, \code{"\%d-\%m-\%Y"}. A column is classified as
-#' \code{"date"} only when \emph{every} non-empty value parses under one
-#' format; a single malformed date therefore flips the whole column to
-#' \code{"numeric"} or \code{"character"} (such flips between deliveries are
-#' surfaced by check CP-02c). Two caveats follow from the precedence rules:
+#' \code{"date"} only when \emph{every} non-empty value both matches that
+#' format's exact character shape and parses as a valid calendar date; a single
+#' malformed date therefore flips the whole column to \code{"numeric"} or
+#' \code{"character"} (such flips between deliveries are surfaced by check
+#' CP-02c). The shape is anchored, so a value with trailing characters
+#' (\code{"2024-01-15x"}) or extra digits (the 9-digit \code{"202401159"}) is
+#' \emph{not} treated as a date. Two caveats follow from the precedence rules:
 #' ambiguous day/month values resolve day-first (\code{"\%d/\%m/\%Y"} is
 #' tried before \code{"\%m/\%d/\%Y"}), and all-8-digit identifier columns
-#' whose values happen to parse under \code{"\%Y\%m\%d"} classify as dates.
+#' whose values happen to be valid \code{"\%Y\%m\%d"} dates classify as dates.
 #' Pin the type with an entry in the \code{column_types} config map when the
 #' heuristic gets a column wrong.
 #'
@@ -162,14 +165,30 @@ infer_col_type <- function(x, threshold = 0.90) {
 
   if (length(non_empty) == 0) return("unknown")
 
-  # Cheap rejection: a format that fails anywhere in the first 100 values
-  # cannot pass the all-must-parse rule, so skip the full-column parse for
-  # it. Results are identical; only non-matching formats get cheaper.
+  # Each format is paired with an anchored shape regex. as.Date() delegates to
+  # strptime(), which matches a *prefix* and silently ignores trailing
+  # characters — so "2024-01-15xyz" and the 9-digit id "202401159" (its first 8
+  # chars parse under %Y%m%d) would both be accepted as dates. Requiring the
+  # whole string to match the format's shape first closes that. The %Y%m%d shape
+  # is exactly 8 digits, so a genuine 8-digit identifier that also happens to be
+  # a valid calendar date still classifies as "date" (documented caveat below),
+  # while a 9-digit id is now correctly rejected.
+  #
+  # Cheap rejection: a format whose shape or parse fails anywhere in the first
+  # 100 values cannot pass the all-must-match rule, so skip the full-column pass
+  # for it. Results are identical; only non-matching formats get cheaper.
   head_sample  <- non_empty[seq_len(min(100L, length(non_empty)))]
   date_formats <- c("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%Y%m%d", "%d-%m-%Y")
-  for (fmt in date_formats) {
+  date_shapes  <- c("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "^[0-9]{2}/[0-9]{2}/[0-9]{4}$",
+                    "^[0-9]{2}/[0-9]{2}/[0-9]{4}$", "^[0-9]{8}$",
+                    "^[0-9]{2}-[0-9]{2}-[0-9]{4}$")
+  for (i in seq_along(date_formats)) {
+    fmt   <- date_formats[[i]]
+    shape <- date_shapes[[i]]
+    if (!all(grepl(shape, head_sample))) next
     parsed_head <- suppressWarnings(as.Date(head_sample, format = fmt))
     if (any(is.na(parsed_head))) next
+    if (!all(grepl(shape, non_empty))) next
     parsed <- suppressWarnings(as.Date(non_empty, format = fmt))
     if (!any(is.na(parsed))) return("date")
   }
@@ -203,9 +222,9 @@ infer_col_type <- function(x, threshold = 0.90) {
 #'
 #' @export
 resolve_col_type <- function(col, x, config) {
-  override <- (config$column_types %||% list())[[col]]
+  override <- (config[["column_types"]] %||% list())[[col]]
   if (!is.null(override)) return(override)
-  infer_col_type(x, config$rules$type_inference_threshold %||% 0.90)
+  infer_col_type(x, config[["rules"]][["type_inference_threshold"]] %||% 0.90)
 }
 
 #' Canonical report filename for a run
@@ -216,12 +235,33 @@ resolve_col_type <- function(col, x, config) {
 #'
 #' @param dataset_name Character. Dataset name.
 #' @param run_time POSIXct. The run's single timestamp.
-#' @return Character filename, e.g. \code{"mydata_20260704_101112.html"}.
+#' @param snapshot_id Integer or \code{NULL}. When supplied, appended to the
+#'   slug so two runs of one dataset that start in the same wall-clock second
+#'   cannot collide on one filename (the snapshot id is the unique run key).
+#' @return Character filename, e.g. \code{"mydata_20260704_101112_47.html"}
+#'   (or without the trailing id when \code{snapshot_id} is \code{NULL}).
 #' @keywords internal
 #' @noRd
-report_filename <- function(dataset_name, run_time) {
-  sprintf("%s_%s.html", dataset_name,
-          format(run_time, "%Y%m%d_%H%M%S", tz = "UTC"))
+report_filename <- function(dataset_name, run_time, snapshot_id = NULL) {
+  slug <- format(run_time, "%Y%m%d_%H%M%S", tz = "UTC")
+  if (!is.null(snapshot_id)) slug <- paste0(slug, "_", snapshot_id)
+  sprintf("%s_%s.html", dataset_name, slug)
+}
+
+#' Convert a stored UTC-ISO snapshot timestamp to a local-time display string
+#'
+#' Single source of truth for turning the \code{run_timestamp} stored in the
+#' snapshot DB (UTC ISO, e.g. \code{"2026-07-17T10:11:12Z"}) into the local-time
+#' string users see. The QC report renders local time from the live run_time
+#' (\code{report.R}, same \code{"\%Y-\%m-\%d \%H:\%M:\%S"} / \code{tz = ""}
+#' format) and the GUI history converts too; the drift report goes through here
+#' so all three surfaces agree for one instant (B-43). A value that does not
+#' parse is returned unchanged rather than shown as \code{NA}.
+#' @keywords internal
+#' @noRd
+utc_to_local_display <- function(ts) {
+  parsed <- as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  ifelse(is.na(parsed), ts, format(parsed, "%Y-%m-%d %H:%M:%S", tz = ""))
 }
 
 #' Move a file, falling back to copy+delete across filesystems
@@ -272,9 +312,9 @@ resolve_col_types <- function(df, config) {
 #' @keywords internal
 #' @noRd
 col_threshold <- function(config, col, key, default = NULL) {
-  col_val <- (config$column_rules %||% list())[[col]][[key]]
+  col_val <- (config[["column_rules"]] %||% list())[[col]][[key]]
   if (!is.null(col_val)) return(col_val)
-  rule_val <- config$rules[[key]]
+  rule_val <- config[["rules"]][[key]]
   if (!is.null(rule_val)) return(rule_val)
   default
 }
@@ -289,7 +329,7 @@ col_threshold <- function(config, col, key, default = NULL) {
 #' @keywords internal
 #' @noRd
 table_threshold <- function(config, key, default = NULL) {
-  val <- config$rules[[key]]
+  val <- config[["rules"]][[key]]
   if (!is.null(val)) return(val)
   default
 }

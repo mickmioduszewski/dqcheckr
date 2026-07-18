@@ -28,12 +28,12 @@ list_snapshots <- function(dataset_name = NULL,
     run_timestamp = character(), row_count = integer(),
     overall_status = character(), stringsAsFactors = FALSE
   )
-  if (!file.exists(db_path)) return(invisible(empty))
+  if (!file.exists(db_path)) return(empty)
 
   tryCatch({
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
-    if (!"snapshots" %in% DBI::dbListTables(con)) return(invisible(empty))
+    if (!"snapshots" %in% DBI::dbListTables(con)) return(empty)
 
     if (is.null(dataset_name)) {
       DBI::dbGetQuery(con,
@@ -51,7 +51,14 @@ list_snapshots <- function(dataset_name = NULL,
         list(dataset_name))
     }
   },
-  error = function(e) invisible(empty))
+  error = function(e) {
+    # A read failure is not the same as "no snapshots": warn with the cause
+    # before returning the empty frame, rather than reporting a corrupt/locked/
+    # unreadable database as an empty history.
+    warning("Could not read snapshots from '", db_path, "': ",
+            conditionMessage(e), call. = FALSE)
+    empty
+  })
 }
 
 #' Compare two snapshots from the SQLite database
@@ -66,8 +73,10 @@ list_snapshots <- function(dataset_name = NULL,
 #' @param snapshot_id_curr Integer or \code{NULL}. ID of the later snapshot.
 #'   If \code{NULL}, defaults to the most-recent snapshot by ID.
 #' @param db_path Character or \code{NULL}. Path to the SQLite snapshot
-#'   database. If \code{NULL} (the default), the path is read from
-#'   \code{snapshot_db} in \code{dqcheckr.yml}.
+#'   database. If \code{NULL} (the default), the path is resolved from
+#'   \code{snapshot_db} the same way \code{\link{run_dq_check}} resolves it:
+#'   from \code{<dataset_name>.yml} if set there, otherwise \code{dqcheckr.yml},
+#'   otherwise the built-in default \code{"data/snapshots.sqlite"}.
 #' @param config_dir Character. Path to the directory containing
 #'   \code{dqcheckr.yml}. Used to read thresholds, \code{report_output_dir},
 #'   and (when \code{db_path} is \code{NULL}) \code{snapshot_db}.
@@ -123,12 +132,12 @@ compare_snapshots <- function(dataset_name,
   thresholds <- if (file.exists(ds_yml)) {
     cfg <- load_config(dataset_name, config_dir)
     list(
-      snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.sqlite",
-      report_output_dir              = cfg$report_output_dir %||% "reports/",
-      max_missing_rate_change_pp     = cfg$rules$max_missing_rate_change_pp     %||% 2.0,
-      max_numeric_mean_shift_pct     = cfg$rules$max_numeric_mean_shift_pct     %||% 0.20,
-      max_non_numeric_rate_change_pp = cfg$rules$max_non_numeric_rate_change_pp %||% 1.0,
-      max_row_count_change_pct       = cfg$rules$max_row_count_change_pct       %||% 0.10
+      snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
+      report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+      max_missing_rate_change_pp     = cfg[["rules"]][["max_missing_rate_change_pp"]]     %||% 2.0,
+      max_numeric_mean_shift_pct     = cfg[["rules"]][["max_numeric_mean_shift_pct"]]     %||% 0.20,
+      max_non_numeric_rate_change_pp = cfg[["rules"]][["max_non_numeric_rate_change_pp"]] %||% 1.0,
+      max_row_count_change_pct       = cfg[["rules"]][["max_row_count_change_pct"]]       %||% 0.10
     )
   } else {
     .load_drift_thresholds(config_dir)
@@ -142,9 +151,23 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(paste0("Snapshot database not found: ", db_path),
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
+  # A corrupt / non-SQLite file or one without a snapshots table must raise a
+  # typed dqcheckr condition, not leak a raw RSQLite simpleError (B-30). SQLite
+  # opens lazily, so an invalid file only errors when its schema is first read
+  # (dbListTables), which is why that call -- not the connect -- is wrapped.
   con <- .sqlite_connect(db_path)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
 
+  tables <- tryCatch(DBI::dbListTables(con), error = function(e)
+    rlang::abort(paste0("Could not read snapshot database '", db_path, "': ",
+                        conditionMessage(e)),
+                 class = c("dqcheckr_db_error", "dqcheckr_error")))
+  if (!"snapshots" %in% tables)
+    rlang::abort(paste0("Database has no 'snapshots' table: ", db_path),
+                 class = c("dqcheckr_schema_error", "dqcheckr_error"))
+
+  # SELECT * — .compute_drift() and the drift template read named columns off
+  # these rows; a new column referenced there must exist in the snapshots schema.
   snaps <- DBI::dbGetQuery(con,
     "SELECT * FROM snapshots WHERE dataset_name = ? ORDER BY id",
     list(dataset_name))
@@ -155,8 +178,13 @@ compare_snapshots <- function(dataset_name,
       dataset_name, nrow(snaps)
     ), class = c("dqcheckr_not_found", "dqcheckr_error"))
 
-  id_prev <- snapshot_id_prev %||% snaps$id[nrow(snaps) - 1]
-  id_curr <- snapshot_id_curr %||% snaps$id[nrow(snaps)]
+  # Coerce explicit IDs to integer before the guards below: a character ID
+  # (e.g. "10") would make the `%in%`, `==` and `>` checks compare as strings
+  # ("10" > "9" is FALSE) and then abort untyped inside sprintf("%d", .). B-21.
+  id_prev <- .as_snapshot_id(snapshot_id_prev, "snapshot_id_prev") %||%
+             snaps$id[nrow(snaps) - 1]
+  id_curr <- .as_snapshot_id(snapshot_id_curr, "snapshot_id_curr") %||%
+             snaps$id[nrow(snaps)]
 
   # Explicit IDs must belong to this dataset — .compute_drift() queries by ID
   # only, so an unchecked ID from another dataset would silently produce a
@@ -206,6 +234,20 @@ compare_snapshots <- function(dataset_name,
 
 # --- Internal helpers ----------------------------------------------------------
 
+# Validate an explicit snapshot ID argument. Returns NULL for NULL (so the
+# caller's `%||% default` applies), an integer for a valid whole number, and
+# aborts (typed) for anything else -- a character or fractional ID would slip
+# past the ordering guards and abort untyped downstream. B-21.
+.as_snapshot_id <- function(x, arg) {
+  if (is.null(x)) return(NULL)
+  if (length(x) != 1L || is.na(x) || !is.numeric(x) ||
+      x != as.integer(x) || x < 1L)
+    rlang::abort(
+      sprintf("`%s` must be a single positive whole number (snapshot ID).", arg),
+      class = c("dqcheckr_invalid_argument", "dqcheckr_error"))
+  as.integer(x)
+}
+
 .load_drift_thresholds <- function(config_dir = ".") {
   cfg_file <- file.path(config_dir, "dqcheckr.yml")
   if (!file.exists(cfg_file))
@@ -213,15 +255,15 @@ compare_snapshots <- function(dataset_name,
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
 
   cfg <- yaml::read_yaml(cfg_file)
-  dr  <- cfg$default_rules %||% list()
+  dr  <- cfg[["default_rules"]] %||% list()
 
   list(
-    snapshot_db                    = cfg$snapshot_db %||% "data/snapshots.sqlite",
-    report_output_dir              = cfg$report_output_dir %||% "reports/",
-    max_missing_rate_change_pp     = dr$max_missing_rate_change_pp     %||% 2.0,
-    max_numeric_mean_shift_pct     = dr$max_numeric_mean_shift_pct     %||% 0.20,
-    max_non_numeric_rate_change_pp = dr$max_non_numeric_rate_change_pp %||% 1.0,
-    max_row_count_change_pct       = dr$max_row_count_change_pct       %||% 0.10
+    snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
+    report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+    max_missing_rate_change_pp     = dr[["max_missing_rate_change_pp"]]     %||% 2.0,
+    max_numeric_mean_shift_pct     = dr[["max_numeric_mean_shift_pct"]]     %||% 0.20,
+    max_non_numeric_rate_change_pp = dr[["max_non_numeric_rate_change_pp"]] %||% 1.0,
+    max_row_count_change_pct       = dr[["max_row_count_change_pct"]]       %||% 0.10
   )
 }
 
@@ -249,11 +291,21 @@ compare_snapshots <- function(dataset_name,
     rlang::abort(sprintf("Snapshot ID %d not found.", id_curr),
                  class = c("dqcheckr_not_found", "dqcheckr_error"))
 
+  # Local-time display of the stored UTC-ISO timestamp, matching the QC report
+  # and GUI history so the drift report does not show a different time for the
+  # same snapshot (B-43).
+  snap_prev$run_timestamp_local <- utc_to_local_display(snap_prev$run_timestamp)
+  snap_curr$run_timestamp_local <- utc_to_local_display(snap_curr$run_timestamp)
+
   stats_prev <- .get_col_stats(con, id_prev)
   stats_curr <- .get_col_stats(con, id_curr)
 
-  row_change_pct <- (snap_curr$row_count - snap_prev$row_count) /
-                    snap_prev$row_count
+  # A zero previous row count (e.g. two consecutive empty deliveries) makes the
+  # change 0/0 = NaN; guard it so the Row-count Exceeds cell renders "" (0->0 is
+  # no change) rather than a literal "NA" in the drift report. B-44/B-47.
+  row_change_pct <- if (snap_prev$row_count == 0) NA_real_
+                    else (snap_curr$row_count - snap_prev$row_count) /
+                         snap_prev$row_count
 
   table_drift <- data.frame(
     Metric   = c("Row count", "Column count",
@@ -276,7 +328,8 @@ compare_snapshots <- function(dataset_name,
   )
   table_drift$Exceeds    <- ""
   table_drift$Exceeds[1] <- ifelse(
-    abs(row_change_pct) > thresholds$max_row_count_change_pct, "***", ""
+    !is.na(row_change_pct) &
+      abs(row_change_pct) > thresholds$max_row_count_change_pct, "***", ""
   )
 
   types_prev <- stats_prev[stats_prev$dq_check == "inferred_type",
@@ -321,15 +374,23 @@ compare_snapshots <- function(dataset_name,
   dd$missing_rate_prev      <- .col(col_drift, "missing_rate_prev")
   dd$missing_rate_curr      <- .col(col_drift, "missing_rate_curr")
   dd$missing_rate_change_pp <- (dd$missing_rate_curr - dd$missing_rate_prev) * 100
-  dd$missing_rate_exceeds   <- abs(dd$missing_rate_change_pp) >
-                               thresholds$max_missing_rate_change_pp
+  # One-directional, matching the CP-03 check (compare.R): only an *increase* in
+  # missing rate breaches. A column that improved (fewer missing values) is not
+  # a breach. The threshold key is shared with CP-03, so both surfaces must read
+  # it the same way -- an abs() here would flag improvements the run report
+  # passes.
+  dd$missing_rate_exceeds   <- !is.na(dd$missing_rate_change_pp) &
+    dd$missing_rate_change_pp > thresholds$max_missing_rate_change_pp
 
   dd$non_numeric_rate_prev      <- .col(col_drift, "non_numeric_rate_prev")
   dd$non_numeric_rate_curr      <- .col(col_drift, "non_numeric_rate_curr")
   dd$non_numeric_rate_change_pp <- (dd$non_numeric_rate_curr -
                                     dd$non_numeric_rate_prev) * 100
+  # One-directional, matching the CP-07 check (compare.R): only an *increase* in
+  # the non-numeric rate breaches (more junk in a numeric column). See the
+  # missing-rate note above -- same shared-threshold reasoning.
   dd$non_numeric_rate_exceeds   <- !is.na(dd$non_numeric_rate_change_pp) &
-    abs(dd$non_numeric_rate_change_pp) > thresholds$max_non_numeric_rate_change_pp
+    dd$non_numeric_rate_change_pp > thresholds$max_non_numeric_rate_change_pp
 
   dd$numeric_mean_prev      <- .col(col_drift, "numeric_parseable_mean_prev")
   dd$numeric_mean_curr      <- .col(col_drift, "numeric_parseable_mean_curr")

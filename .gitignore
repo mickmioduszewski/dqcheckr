@@ -9,9 +9,10 @@
 *.Rcheck/
 *.tar.gz
 
-# Data directories that dqcheckr may create at runtime
-data/
-reports/
+# Data directories that dqcheckr may create at runtime (top-level only —
+# anchored so they do NOT match inst/demonstrations/data/, a shipped fixture).
+/data/
+/reports/
 
 # macOS
 .DS_Store

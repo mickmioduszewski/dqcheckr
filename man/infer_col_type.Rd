@@ -26,13 +26,16 @@ Classifies a character vector as \code{"date"}, \code{"numeric"},
 Date formats are tried in this fixed precedence order:
 \code{"\%Y-\%m-\%d"}, \code{"\%d/\%m/\%Y"}, \code{"\%m/\%d/\%Y"},
 \code{"\%Y\%m\%d"}, \code{"\%d-\%m-\%Y"}. A column is classified as
-\code{"date"} only when \emph{every} non-empty value parses under one
-format; a single malformed date therefore flips the whole column to
-\code{"numeric"} or \code{"character"} (such flips between deliveries are
-surfaced by check CP-02c). Two caveats follow from the precedence rules:
+\code{"date"} only when \emph{every} non-empty value both matches that
+format's exact character shape and parses as a valid calendar date; a single
+malformed date therefore flips the whole column to \code{"numeric"} or
+\code{"character"} (such flips between deliveries are surfaced by check
+CP-02c). The shape is anchored, so a value with trailing characters
+(\code{"2024-01-15x"}) or extra digits (the 9-digit \code{"202401159"}) is
+\emph{not} treated as a date. Two caveats follow from the precedence rules:
 ambiguous day/month values resolve day-first (\code{"\%d/\%m/\%Y"} is
 tried before \code{"\%m/\%d/\%Y"}), and all-8-digit identifier columns
-whose values happen to parse under \code{"\%Y\%m\%d"} classify as dates.
+whose values happen to be valid \code{"\%Y\%m\%d"} dates classify as dates.
 Pin the type with an entry in the \code{column_types} config map when the
 heuristic gets a column wrong.
 }

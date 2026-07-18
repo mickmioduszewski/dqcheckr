@@ -1,5 +1,45 @@
 
+test_that("list_snapshots() requires an explicit db_path (B-32)", {
+  expect_error(list_snapshots("test_ds"), class = "dqcheckr_invalid_argument")
+})
+
+# -- utc_to_local_display() / drift timestamp (B-43) ---------------------------
+
+test_that("utc_to_local_display() converts stored UTC-ISO to local time (B-43)", {
+  withr::local_envvar(TZ = "Etc/GMT-10")     # fixed UTC+10, no DST
+  expect_equal(dqcheckr:::utc_to_local_display("2026-07-17T10:11:12Z"),
+               "2026-07-17 20:11:12")
+  # A value that does not parse is returned unchanged, never as NA.
+  expect_equal(dqcheckr:::utc_to_local_display("not-a-timestamp"), "not-a-timestamp")
+})
+
+test_that("compare_snapshots() carries a local-time timestamp for the drift report (B-43)", {
+  withr::local_envvar(TZ = "Etc/GMT-10")
+  db      <- make_drift_db(2)                # timestamps stored as ...T09:00:00Z
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("test_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+  expect_equal(drift$snap_prev$run_timestamp_local, "2025-01-01 19:00:00")
+  # The raw UTC field is still present but is not what the template renders.
+  expect_match(drift$snap_prev$run_timestamp, "Z$")
+})
+
 # -- list_snapshots() ----------------------------------------------------------
+
+test_that("list_snapshots() warns instead of silently emptying on a read error (B-07)", {
+  # Valid DB, but the `snapshots` table cannot satisfy the query -- must surface
+  # the failure, not report it as an empty history.
+  bad <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(bad))
+  con <- DBI::dbConnect(RSQLite::SQLite(), bad)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (wrong_col TEXT)")
+  DBI::dbDisconnect(con)
+
+  expect_warning(res <- list_snapshots("ds", db_path = bad),
+                 regexp = "Could not read snapshots")
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 0L)
+})
 
 test_that("list_snapshots returns empty df for non-existent db", {
   result <- list_snapshots(db_path = tempfile(fileext = ".sqlite"))
@@ -68,11 +108,68 @@ test_that("compare_snapshots errors if same ID passed twice", {
 test_that("compare_snapshots() errors when prev ID is greater than curr ID", {
   db      <- make_drift_db(2)
   cfg_dir <- make_drift_config()
+  # Assert the specific ordering-guard class, not the umbrella dqcheckr_error
+  # that three earlier abort sites on this call path also carry (B-49).
   expect_error(
     compare_snapshots("test_ds", snapshot_id_prev = 2L, snapshot_id_curr = 1L,
                       db_path = db, config_dir = cfg_dir, report = FALSE),
-    class = "dqcheckr_error"
+    class = "dqcheckr_invalid_argument", regexp = "older than"
   )
+})
+
+test_that("compare_snapshots() rejects a non-numeric snapshot ID (B-21)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  # A character ID would sort as a string ("10" > "9" is FALSE) past the
+  # ordering guard and then abort untyped inside sprintf("%d", .).
+  expect_error(
+    compare_snapshots("test_ds", snapshot_id_prev = "10", snapshot_id_curr = "9",
+                      db_path = db, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument"
+  )
+  expect_error(
+    compare_snapshots("test_ds", snapshot_id_prev = 1.5, snapshot_id_curr = 2L,
+                      db_path = db, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument"
+  )
+})
+
+test_that("compare_snapshots() raises a typed error for a bad database (B-30)", {
+  cfg_dir <- make_drift_config()
+
+  non_db <- tempfile(fileext = ".sqlite")
+  writeLines("this is not a database", non_db)
+  # RSQLite emits a "couldn't set synchronous mode" warning at connect for a
+  # non-database file; the point of the test is the typed error, not that noise.
+  suppressWarnings(expect_error(
+    compare_snapshots("test_ds", db_path = non_db,
+                      config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_db_error"
+  ))
+
+  no_table <- tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), no_table)
+  DBI::dbExecute(con, "CREATE TABLE other (x TEXT)")
+  DBI::dbDisconnect(con)
+  expect_error(
+    compare_snapshots("test_ds", db_path = no_table,
+                      config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_schema_error"
+  )
+})
+
+test_that("drift between two zero-row snapshots renders no NA in Exceeds (B-44/B-47)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "UPDATE snapshots SET row_count = 0")   # two empty deliveries
+  DBI::dbDisconnect(con)
+
+  drift <- compare_snapshots("test_ds", db_path = db,
+                             config_dir = cfg_dir, report = FALSE)
+  row_row <- drift$table_drift[drift$table_drift$Metric == "Row count", ]
+  expect_equal(row_row$Exceeds, "")          # 0 -> 0 is no change, not NA
+  expect_false(is.na(row_row$Exceeds))
 })
 
 # -- compare_snapshots() default ID selection ----------------------------------
@@ -202,6 +299,89 @@ test_that("distinct_changes filtered to changed columns only", {
   drift   <- compare_snapshots("test_ds", db_path = db,
                                config_dir = cfg_dir, report = FALSE)
   expect_false("status" %in% drift$distinct_changes$Column)
+})
+
+# -- B-44: drift breach direction matches the CP-03/CP-07 checks ---------------
+# Only an *increase* in missing rate (CP-03) or non-numeric rate (CP-07) is a
+# breach; a column that improved must not be flagged. Before the fix drift used
+# abs(), so a large decrease -- an improvement -- read as "Exceeds YES" while
+# the run report passed the same column against the same threshold.
+
+# Two snapshots for one numeric column, with caller-supplied rates.
+make_rate_drift_db <- function(mr_prev, mr_curr, nn_prev, nn_curr) {
+  db  <- tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "PRAGMA foreign_keys = ON")
+  on.exit(DBI::dbDisconnect(con))
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT, run_timestamp TEXT, file_name TEXT,
+      row_count INTEGER, col_count INTEGER,
+      check_pass_count INTEGER, check_warn_count INTEGER,
+      check_fail_count INTEGER, check_info_count INTEGER, overall_status TEXT,
+      new_cols_vs_previous TEXT, missing_cols_vs_previous TEXT,
+      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT,
+      comparison_mode TEXT NOT NULL DEFAULT 'comparison',
+      render_status TEXT NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT)")
+  DBI::dbExecute(con, "
+    CREATE TABLE column_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_id INTEGER NOT NULL REFERENCES snapshots(id),
+      column_name TEXT NOT NULL, dq_check TEXT NOT NULL,
+      value TEXT, threshold TEXT, severity_on_breach TEXT)")
+  rows <- list(c(mr_prev, nn_prev), c(mr_curr, nn_curr))
+  for (i in 1:2) {
+    DBI::dbExecute(con,
+      "INSERT INTO snapshots (dataset_name, run_timestamp, file_name,
+         row_count, col_count, check_pass_count, check_warn_count,
+         check_fail_count, check_info_count, overall_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      list("rate_ds", sprintf("2025-0%d-01T09:00:00Z", i),
+           sprintf("d0%d.csv", i), 1000L, 1L, 1L, 0L, 0L, 0L, "PASS"))
+    sid <- DBI::dbGetQuery(con, "SELECT last_insert_rowid() AS id")$id
+    DBI::dbAppendTable(con, "column_snapshots", data.frame(
+      snapshot_id = sid, column_name = "amt",
+      dq_check = c("inferred_type", "missing_rate", "non_numeric_rate"),
+      value    = c("numeric", as.character(rows[[i]][1]), as.character(rows[[i]][2])),
+      threshold = NA_character_, severity_on_breach = NA_character_,
+      stringsAsFactors = FALSE))
+  }
+  db
+}
+
+test_that("a large decrease in missing / non-numeric rate does not breach (B-44)", {
+  # -9 pp missing, -4.5 pp non-numeric: improvements, well past the thresholds.
+  db      <- make_rate_drift_db(mr_prev = 0.10, mr_curr = 0.01,
+                                nn_prev = 0.05, nn_curr = 0.005)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("rate_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+
+  mr <- drift$missing_rate_changes[drift$missing_rate_changes$Column == "amt", ]
+  expect_lt(mr$missing_rate_change_pp, 0)     # it decreased
+  expect_false(mr$missing_rate_exceeds)       # ...so it must not be flagged
+
+  nn <- drift$non_numeric_changes[drift$non_numeric_changes$Column == "amt", ]
+  expect_lt(nn$non_numeric_rate_change_pp, 0)
+  expect_false(nn$non_numeric_rate_exceeds)
+})
+
+test_that("a large increase in missing / non-numeric rate still breaches (B-44)", {
+  db      <- make_rate_drift_db(mr_prev = 0.01, mr_curr = 0.10,
+                                nn_prev = 0.005, nn_curr = 0.05)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("rate_ds", db_path = db,
+                               config_dir = cfg_dir, report = FALSE)
+
+  mr <- drift$missing_rate_changes[drift$missing_rate_changes$Column == "amt", ]
+  expect_gt(mr$missing_rate_change_pp, 0)
+  expect_true(mr$missing_rate_exceeds)
+
+  nn <- drift$non_numeric_changes[drift$non_numeric_changes$Column == "amt", ]
+  expect_gt(nn$non_numeric_rate_change_pp, 0)
+  expect_true(nn$non_numeric_rate_exceeds)
 })
 
 # -- G-05/G-06: dataset-level threshold override -------------------------------

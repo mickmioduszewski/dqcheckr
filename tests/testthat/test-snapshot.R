@@ -79,6 +79,85 @@ test_that("init_snapshot_db() auto-migrates a 0.1.x database missing new columns
   expect_true("type_changed_cols_vs_previous" %in% cols)
 })
 
+test_that(".sqlite_connect() sets a busy timeout so a concurrent writer waits (B-09)", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  init_snapshot_db(db)
+  con <- dqcheckr:::.sqlite_connect(db)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  # Default RSQLite busy_timeout is 0 (fail instantly). We set 30s.
+  expect_equal(DBI::dbGetQuery(con, "PRAGMA busy_timeout")[[1]], 30000L)
+})
+
+test_that("init_snapshot_db() rejects a foreign 'snapshots' table (S-04)", {
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (foo TEXT, bar INTEGER)")
+  DBI::dbExecute(con, "INSERT INTO snapshots VALUES ('a', 1)")
+  DBI::dbDisconnect(con)
+
+  expect_error(init_snapshot_db(db), class = "dqcheckr_schema_error")
+  # The user's table (and its row) must be left exactly as it was.
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con2), add = TRUE)
+  expect_identical(
+    DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name,
+    c("foo", "bar"))
+  expect_equal(DBI::dbGetQuery(con2, "SELECT COUNT(*) AS n FROM snapshots")$n, 1L)
+})
+
+test_that("init_snapshot_db() migrates case-insensitively (S-04)", {
+  # SQLite column names are case-insensitive; a stored `Report_File` must not be
+  # re-added as `report_file` (SQLite would reject it as a duplicate column).
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL,
+      Report_File TEXT)")
+  DBI::dbDisconnect(con)
+  expect_no_error(init_snapshot_db(db))
+})
+
+test_that("concurrent first-run migrations do not collide (B-10)", {
+  skip_on_cran()
+  skip_on_os(c("windows", "solaris"))       # relies on fork()
+  skip_if_not_installed("parallel")
+
+  # A pre-0.2.3 database still missing all four newer columns.
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL)")
+  DBI::dbDisconnect(con)
+
+  # Two processes racing init_snapshot_db() on the shared DB. Before the fix one
+  # loser dies with 'duplicate column name'; with BEGIN IMMEDIATE both migrate.
+  run_one <- function(i) tryCatch({ dqcheckr:::init_snapshot_db(db); "ok" },
+                                  error = function(e) conditionMessage(e))
+  jobs    <- lapply(1:2, function(i) parallel::mcparallel(run_one(i)))
+  results <- parallel::mccollect(jobs)
+
+  expect_true(all(vapply(results, function(r) identical(r, "ok"), logical(1))),
+              info = paste(unlist(results), collapse = " | "))
+
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con2), add = TRUE)
+  cols <- DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name
+  expect_true(all(c("comparison_mode", "render_status",
+                    "type_changed_cols_vs_previous", "report_file") %in% cols))
+})
+
 test_that("FK enforcement is active on connections opened by .sqlite_connect", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
@@ -163,6 +242,18 @@ test_that(".mark_render_failed() updates render_status to 'failed'", {
   expect_equal(rs, "failed")
 })
 
+test_that(".mark_render_failed() clears report_file so no phantom link survives", {
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  sid <- write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(),
+                        list(), list(), base_config(),
+                        report_file = "ds_20260101_000000.html")
+  dqcheckr:::.mark_render_failed(db, sid)
+  snaps <- read_recent_snapshots(db, "ds")
+  expect_equal(snaps$render_status[1], "failed")
+  expect_true(is.na(snaps$report_file[1]))   # optimistic filename removed
+})
+
 test_that("write_snapshot() stores UTC timestamp in ISO-8601 format", {
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
@@ -242,6 +333,21 @@ test_that("read_recent_snapshots() returns empty data frame when no runs exist",
 
 test_that("read_recent_snapshots() returns empty data frame when db does not exist", {
   res <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "ds")
+  expect_s3_class(res, "data.frame")
+  expect_equal(nrow(res), 0L)
+})
+
+test_that("read_recent_snapshots() warns instead of silently emptying on a read error (B-16)", {
+  # A valid DB whose `snapshots` table cannot satisfy the query (schema mismatch,
+  # like a corrupt/foreign file would produce) must not read as 'no history'.
+  bad <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(bad))
+  con <- DBI::dbConnect(RSQLite::SQLite(), bad)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (wrong_col TEXT)")
+  DBI::dbDisconnect(con)
+
+  expect_warning(res <- read_recent_snapshots(bad, "ds"),
+                 regexp = "Could not read snapshot history")
   expect_s3_class(res, "data.frame")
   expect_equal(nrow(res), 0L)
 })
@@ -346,5 +452,112 @@ test_that("read_recent_snapshots() empty fallback matches the live schema", {
 
 test_that("report_filename() produces the documented slug", {
   rt <- as.POSIXct("2026-07-04 10:11:12", tz = "UTC")
+  # id-less form (default) is the pre-0.2.5 pattern.
   expect_equal(report_filename("mydata", rt), "mydata_20260704_101112.html")
+  # With a snapshot id, it is appended for uniqueness (B-42).
+  expect_equal(report_filename("mydata", rt, 47L), "mydata_20260704_101112_47.html")
+})
+
+# -- read_recent_snapshots() backfill on un-migrated databases (B-01) ------------
+# The tests above all reach the DB through write_snapshot(), which calls
+# init_snapshot_db() and migrates first, so a read against a genuinely old,
+# never-written database is never exercised there. These build the old schema by
+# hand and INSERT directly, so the row is read back WITHOUT any ALTER.
+
+test_that("read_recent_snapshots() backfills columns absent from a 0.1.x database", {
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL
+    )")
+  DBI::dbExecute(con,
+    "INSERT INTO snapshots
+       (dataset_name, run_timestamp, file_name, row_count, col_count, overall_status)
+     VALUES ('old_ds', '2025-01-01T00:00:00Z', 'f.csv', 10, 3, 'PASS')")
+  DBI::dbDisconnect(con)
+
+  # A read must not have mutated the file on disk (read-only shares).
+  con2 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  before <- DBI::dbGetQuery(con2, "SELECT name FROM pragma_table_info('snapshots')")$name
+  DBI::dbDisconnect(con2)
+
+  res <- read_recent_snapshots(db, "old_ds")
+
+  con3 <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con3), add = TRUE)
+  after <- DBI::dbGetQuery(con3, "SELECT name FROM pragma_table_info('snapshots')")$name
+  expect_setequal(before, after)  # read did NOT ALTER the table
+
+  # Frame carries the full 0.2.3 schema, in schema order.
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_equal(nrow(res), 1L)
+
+  # Backfilled values match what ALTER TABLE ... DEFAULT would have written.
+  expect_equal(res$comparison_mode, "comparison")
+  expect_equal(res$render_status, "success")
+  expect_true(is.na(res$report_file))
+  expect_true(is.na(res$type_changed_cols_vs_previous))
+  expect_true(is.na(res$check_pass_count))
+  # Real columns survive untouched.
+  expect_equal(res$dataset_name, "old_ds")
+  expect_equal(res$row_count, 10L)
+})
+
+test_that("read_recent_snapshots() backfills report_file on a 0.2.2 database", {
+  # 0.2.2 (current CRAN) has every column except report_file: 18 vs 19.
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL, col_count INTEGER NOT NULL,
+      check_pass_count INTEGER, check_warn_count INTEGER, check_fail_count INTEGER,
+      check_info_count INTEGER, overall_status TEXT NOT NULL,
+      new_cols_vs_previous TEXT, missing_cols_vs_previous TEXT,
+      new_cols_vs_schema TEXT, missing_cols_vs_schema TEXT,
+      comparison_mode TEXT NOT NULL DEFAULT 'comparison',
+      render_status TEXT NOT NULL DEFAULT 'success',
+      type_changed_cols_vs_previous TEXT
+    )")
+  DBI::dbExecute(con,
+    "INSERT INTO snapshots
+       (dataset_name, run_timestamp, file_name, row_count, col_count, overall_status)
+     VALUES ('v022_ds', '2026-01-01T00:00:00Z', 'f.csv', 7, 2, 'WARN')")
+  DBI::dbDisconnect(con)
+
+  res <- read_recent_snapshots(db, "v022_ds")
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_true("report_file" %in% names(res))
+  expect_true(is.na(res$report_file))
+  expect_equal(res$comparison_mode, "comparison")  # real stored value, still correct
+})
+
+test_that("read_recent_snapshots() backfill keeps a zero-row result correctly typed", {
+  # No matching dataset in an un-migrated DB: the SELECT returns zero rows but
+  # still only the old columns. The backfill must add the rest without erroring.
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "
+    CREATE TABLE snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dataset_name TEXT NOT NULL, run_timestamp TEXT NOT NULL,
+      file_name TEXT NOT NULL, row_count INTEGER NOT NULL,
+      col_count INTEGER NOT NULL, overall_status TEXT NOT NULL
+    )")
+  DBI::dbDisconnect(con)
+
+  res <- read_recent_snapshots(db, "absent_ds")
+  proto <- read_recent_snapshots(tempfile(fileext = ".sqlite"), "nope")
+  expect_equal(names(res), names(proto))
+  expect_equal(nrow(res), 0L)
 })

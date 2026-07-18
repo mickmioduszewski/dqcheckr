@@ -57,9 +57,9 @@ run_dq_check <- function(dataset_name,
   config <- load_config(dataset_name, config_dir)
 
   # Single clock read for the whole run: the snapshot's run_timestamp and the
-  # report filename must come from the same instant, because consumers (the
-  # GUI's history links) reconstruct the report filename from the stored
-  # timestamp.
+  # time portion of the report filename come from the same instant. The filename
+  # also carries the snapshot id (set after the row exists, see below), so it is
+  # unique even across two runs that start in the same second.
   run_time <- Sys.time()
 
   files   <- detect_files(config)
@@ -82,17 +82,19 @@ run_dq_check <- function(dataset_name,
 
   col_stats <- compute_col_stats(df_curr, config, types = types_curr)
 
-  db_path         <- normalizePath(config$snapshot_db %||% "data/snapshots.sqlite",
+  db_path         <- normalizePath(config[["snapshot_db"]] %||% "data/snapshots.sqlite",
                                    mustWork = FALSE)
   comparison_mode <- if (!is.null(df_prev)) "comparison" else "single"
+  # report_file is deliberately not set here: it is written by an UPDATE after a
+  # successful render (below), so the filename can include the snapshot id and
+  # the column never names a report that was not written.
   snapshot_id     <- write_snapshot(
     db_path, dataset_name,
     basename(files$current),
     df_curr, qc_results, cp_results, custom_results, config,
     col_stats       = col_stats,
     comparison_mode = comparison_mode,
-    run_time        = run_time,
-    report_file     = report_filename(dataset_name, run_time)
+    run_time        = run_time
   )
 
   snapshot_history <- read_recent_snapshots(db_path, dataset_name, n = 10)
@@ -109,18 +111,30 @@ run_dq_check <- function(dataset_name,
       snapshot_history = snapshot_history,
       config           = config,
       col_stats        = col_stats,
-      output_dir       = config$report_output_dir %||% "reports/",
+      output_dir       = config[["report_output_dir"]] %||% "reports/",
       open_report      = open_report,
-      run_time         = run_time
+      run_time         = run_time,
+      snapshot_id      = snapshot_id
     ),
     error = function(e) {
-      if (!is.null(snapshot_id)) .mark_render_failed(db_path, snapshot_id)
-      warning(paste0("Report rendering failed (snapshot_id = ", snapshot_id,
-                     " marked as failed). Original error: ", conditionMessage(e)),
+      warning("Report rendering failed. Original error: ", conditionMessage(e),
               call. = FALSE)
       invisible(NULL)
     }
   )
+
+  # Reconcile the snapshot with what the render actually produced. render_report()
+  # returns NULL both when it threw (handled above) and when it was skipped
+  # because the Quarto CLI is absent -- in either case no file was written, so
+  # mark the row render-failed. On success, record the filename that was written
+  # (which carries the snapshot id). When snapshot_id is NULL the write itself
+  # failed and there is no row to touch -- the earlier warning already covers it.
+  if (!is.null(snapshot_id)) {
+    if (is.null(report_path))
+      .mark_render_failed(db_path, snapshot_id)
+    else
+      .set_report_file(db_path, snapshot_id, basename(report_path))
+  }
 
   status <- overall_status(c(qc_results, cp_results, custom_results))
   all_r  <- c(qc_results, cp_results, custom_results)
@@ -128,8 +142,12 @@ run_dq_check <- function(dataset_name,
   n_fail <- sum(vapply(all_r, \(r) r$status == "FAIL", logical(1)))
 
   report_label <- if (!is.null(report_path)) report_path else "(renderer not available)"
-  message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s",
-                  dataset_name, status, n_warn, n_fail, report_label))
+  # write_snapshot() is non-fatal: on failure it warns and returns NULL. Say so
+  # on the result line rather than printing an unqualified success, or the run
+  # reads as fully recorded when its history row was actually lost.
+  snapshot_note <- if (is.null(snapshot_id)) " [snapshot NOT recorded]" else ""
+  message(sprintf("[dqcheckr] %s: %s - %d warning(s), %d failure(s). Report: %s%s",
+                  dataset_name, status, n_warn, n_fail, report_label, snapshot_note))
 
   invisible(list(
     status      = status,

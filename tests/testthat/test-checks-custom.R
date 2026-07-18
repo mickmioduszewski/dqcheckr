@@ -58,3 +58,35 @@ test_that("run_custom_checks() error names the offending element index", {
   expect_error(run_custom_checks(make_accounts_df(), cfg),
                regexp = "result 2")
 })
+
+test_that("run_custom_checks() wraps a runtime error in a typed condition (B-25)", {
+  path <- write_custom_file(c(
+    "custom_checks <- function(df) stop('boom inside custom check')"
+  ))
+  on.exit(unlink(path))
+  cfg <- base_config(list(custom_checks_file = path))
+  expect_error(run_custom_checks(make_accounts_df(), cfg),
+               class = "dqcheckr_custom_check_runtime_error",
+               regexp = "boom inside custom check")
+})
+
+test_that("run_custom_checks() wraps a source/parse failure in a typed condition (B-26)", {
+  path <- write_custom_file(c(
+    "custom_checks <- function(df) {"      # never closed -> parse error on source()
+  ))
+  on.exit(unlink(path))
+  cfg <- base_config(list(custom_checks_file = path))
+  expect_error(run_custom_checks(make_accounts_df(), cfg),
+               class = "dqcheckr_parse_error")
+})
+
+test_that("run_custom_checks() rejects a non-list return value (B-27)", {
+  path <- write_custom_file(c(
+    "custom_checks <- function(df) 'not a list'"
+  ))
+  on.exit(unlink(path))
+  cfg <- base_config(list(custom_checks_file = path))
+  expect_error(run_custom_checks(make_accounts_df(), cfg),
+               class = "dqcheckr_invalid_custom_checks",
+               regexp = "must return a list")
+})
