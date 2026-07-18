@@ -219,15 +219,33 @@ test_that("write_snapshot() stores comparison_mode correctly", {
   expect_equal(mode, "single")
 })
 
-test_that("write_snapshot() stores render_status as 'success' initially", {
+test_that("write_snapshot() stores render_status as 'pending' initially (B-04)", {
+  # The row is committed before the report renders; it must read 'pending' in
+  # that window, not a premature 'success' that a concurrent reader could mistake
+  # for a finished row.
   db <- tempfile(fileext = ".sqlite")
   on.exit(unlink(db))
   write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
                  base_config())
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   on.exit(DBI::dbDisconnect(con), add = TRUE)
-  rs <- DBI::dbGetQuery(con, "SELECT render_status FROM snapshots")$render_status
-  expect_equal(rs, "success")
+  rs <- DBI::dbGetQuery(con,
+    "SELECT render_status, report_file FROM snapshots")
+  expect_equal(rs$render_status, "pending")
+  expect_true(is.na(rs$report_file))
+})
+
+test_that(".set_report_file() flips 'pending' to 'success' and records the filename (B-04)", {
+  db  <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  sid <- write_snapshot(db, "ds", "f.csv", make_snapshot_df(), make_results(), list(), list(),
+                        base_config())
+  dqcheckr:::.set_report_file(db, sid, "ds_20260718_010203_1.html")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  row <- DBI::dbGetQuery(con, "SELECT render_status, report_file FROM snapshots")
+  expect_equal(row$render_status, "success")
+  expect_equal(row$report_file, "ds_20260718_010203_1.html")
 })
 
 test_that(".mark_render_failed() updates render_status to 'failed'", {

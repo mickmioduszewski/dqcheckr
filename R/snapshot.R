@@ -133,11 +133,14 @@ init_snapshot_db <- function(db_path) {
             call. = FALSE))
 }
 
-#' Record the rendered report's filename on its snapshot row
+#' Mark a snapshot's render as succeeded and record the report filename
 #'
-#' Written by a post-render UPDATE (not at INSERT time) so the filename can carry
-#' the snapshot id -- which is only known after the row exists -- and so the
-#' column never names a file that was not actually written. B-42.
+#' The post-render UPDATE for the success path: it flips render_status from the
+#' INSERT-time 'pending' to 'success' and records the filename in one statement.
+#' Both are written here (not at INSERT) so the filename can carry the snapshot
+#' id -- known only after the row exists -- and so the row never advertises
+#' 'success' with a report_file for a report that has not been written yet
+#' (B-42, B-04).
 #' @keywords internal
 #' @noRd
 .set_report_file <- function(db_path, snapshot_id, report_file) {
@@ -145,7 +148,7 @@ init_snapshot_db <- function(db_path) {
     con <- .sqlite_connect(db_path)
     on.exit(DBI::dbDisconnect(con), add = TRUE)
     DBI::dbExecute(con,
-      "UPDATE snapshots SET report_file = ? WHERE id = ?",
+      "UPDATE snapshots SET render_status = 'success', report_file = ? WHERE id = ?",
       list(report_file, snapshot_id))
   }, error = function(e)
     warning("Could not record report filename for snapshot ", snapshot_id,
@@ -307,6 +310,16 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
     # All writes in one transaction: a failure part-way (disk full, malformed
     # value) must not leave a snapshots row without its column_snapshots stats,
     # which would silently poison later drift comparisons.
+    #
+    # render_status is inserted as 'pending', not 'success': the row is committed
+    # here, before the report is rendered, and is only flipped to 'success' by
+    # .set_report_file() once the report is confirmed written (or to 'failed' by
+    # .mark_render_failed()). A concurrent reader during the render window then
+    # sees 'pending' -- distinguishable from a finished row -- instead of a
+    # premature 'success' with a NULL report_file that looks like a completed
+    # pre-0.2.3 row (B-04). The schema DEFAULT stays 'success' because it applies
+    # only to legacy rows backfilled by the ALTER-TABLE migration, which did
+    # render successfully under the old flow.
     DBI::dbWithTransaction(con, {
       DBI::dbExecute(con,
         "INSERT INTO snapshots
@@ -317,7 +330,7 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
           new_cols_vs_schema, missing_cols_vs_schema,
           comparison_mode, render_status, type_changed_cols_vs_previous,
           report_file)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
         list(dataset_name,
              format(run_time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
              file_name,
@@ -392,6 +405,13 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'   \code{render_status}, \code{type_changed_cols_vs_previous}, and
 #'   \code{report_file} (the rendered report's filename, \code{NA} for
 #'   snapshots written before dqcheckr 0.2.3).
+#'   \code{render_status} is one of \code{"pending"} (0.2.5+: the row was written
+#'   but its report has not finished rendering yet -- \code{report_file} is
+#'   \code{NA} in this window), \code{"success"} (report written;
+#'   \code{report_file} names it), or \code{"failed"} (render skipped or errored;
+#'   \code{report_file} is \code{NA}). Consumers linking to a report should treat
+#'   a \code{"pending"} row as not-yet-available rather than reconstructing a
+#'   filename for a report that does not exist.
 #'   Returns an empty data frame with the same columns if the database does
 #'   not exist or contains no records for the dataset. If the database exists
 #'   but cannot be read (corrupt file, permissions, an unresolved lock), it

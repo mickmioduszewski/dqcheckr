@@ -2,6 +2,15 @@
 
 ## Bug fixes
 
+* A snapshot's `render_status` now carries a `"pending"` state while its report
+  is still rendering. The row is written as `"pending"` and only flipped to
+  `"success"` (with `report_file`) once the report is confirmed on disk, or to
+  `"failed"` if the render is skipped or errors. Previously the row was written
+  as `"success"` with a NULL `report_file` before the render finished, which a
+  concurrent reader could not tell apart from a completed pre-0.2.3 row and would
+  turn into a broken report link. Consumers linking to a report should treat a
+  `"pending"` row as not-yet-available rather than reconstructing a filename.
+
 * The drift report no longer silently reports a report that was never written.
   When Quarto returned without error but produced no output file,
   `compare_snapshots()` still announced (and, with `open_report = TRUE`, tried to
