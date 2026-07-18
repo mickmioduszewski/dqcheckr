@@ -153,6 +153,22 @@ init_snapshot_db <- function(db_path) {
             call. = FALSE))
 }
 
+#' Serialise a numeric aggregate for the snapshot DB, mapping non-finite to NA
+#'
+#' The invariant this enforces: no value written to \code{column_snapshots} may
+#' be a non-finite literal ("Inf", "-Inf", "NaN"). Those are read back by the
+#' drift path (\code{.safe_num} in drift.R) and would poison the comparison. A
+#' result can be non-finite from a non-finite \emph{input} (guarded separately by
+#' the \code{is.finite(vals)} filter in \code{compute_col_stats}) OR from
+#' overflow in the aggregate \emph{itself} -- e.g. \code{sd()} of finite but very
+#' large values squares past the double range and returns \code{Inf}. This is the
+#' output-side guard; the input filter is the input-side one. Both are needed.
+#' @keywords internal
+#' @noRd
+.finite_or_na <- function(v) {
+  if (length(v) == 1L && is.finite(v)) as.character(v) else NA_character_
+}
+
 #' Compute per-column statistics for snapshot storage
 #' @keywords internal
 #' @noRd
@@ -183,9 +199,10 @@ compute_col_stats <- function(df, config, types = NULL) {
     if (col_type == "numeric") {
       vals <- suppressWarnings(as.numeric(x))
       # Non-finite parses (Inf/-Inf from a corrupted delivery -- write.csv emits
-      # the literal "Inf") are excluded from the aggregates: mean/sd of a vector
-      # containing them is NaN, which would be stored as the literal string
-      # "NaN" and poison drift arithmetic downstream.
+      # the literal "Inf") are excluded from the aggregates here (input side);
+      # the aggregates themselves are serialised through .finite_or_na (output
+      # side), because sd()/mean() of finite-but-huge values can still overflow
+      # to Inf. A literal "Inf"/"NaN" in the snapshot DB poisons drift arithmetic.
       nn   <- vals[is.finite(vals)]
       nn_count <- sum(!is.na(non_empty) &
                       is.na(suppressWarnings(as.numeric(non_empty))))
@@ -197,10 +214,10 @@ compute_col_stats <- function(df, config, types = NULL) {
                       "numeric_min", "numeric_max",
                       "non_numeric_count", "non_numeric_rate")
       values     <- c(values,
-                      if (length(nn) > 0) as.character(mean(nn)) else NA_character_,
-                      if (length(nn) > 1) as.character(sd(nn))   else NA_character_,
-                      if (length(nn) > 0) as.character(min(nn))  else NA_character_,
-                      if (length(nn) > 0) as.character(max(nn))  else NA_character_,
+                      if (length(nn) > 0) .finite_or_na(mean(nn)) else NA_character_,
+                      if (length(nn) > 1) .finite_or_na(sd(nn))   else NA_character_,
+                      if (length(nn) > 0) .finite_or_na(min(nn))  else NA_character_,
+                      if (length(nn) > 0) .finite_or_na(max(nn))  else NA_character_,
                       as.character(nn_count),
                       as.character(nn_rate))
       thresholds <- c(thresholds,

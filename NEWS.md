@@ -2,6 +2,16 @@
 
 ## Bug fixes
 
+* Column statistics can no longer store a non-finite value even when the
+  aggregate itself overflows. An earlier fix excluded non-finite *inputs*
+  (`Inf`/`-Inf` from a corrupted delivery), but `sd()` of finite-but-very-large
+  values still overflows the double range internally and returned `Inf`, which
+  was stored as the literal string `"Inf"` and poisoned drift arithmetic. Every
+  numeric aggregate is now serialised through a finiteness guard (non-finite ->
+  `NA`), and the drift reader maps any non-finite value parsed from an older
+  database to `NA` as well, so a snapshot written before this fix cannot
+  re-poison a comparison.
+
 * Report filenames now include the snapshot id
   (`dataset_20260718_010203_47.html`), so two runs of one dataset that start in
   the same wall-clock second no longer collide on a single filename. Previously

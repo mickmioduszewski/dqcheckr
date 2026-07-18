@@ -274,7 +274,16 @@ compare_snapshots <- function(dataset_name,
     list(snapshot_id))
 }
 
-.safe_num <- function(x) suppressWarnings(as.numeric(x))
+# Parse a stored stat value to numeric. Non-finite results map to NA: a value a
+# pre-0.2.5 dqcheckr wrote as the literal "Inf"/"-Inf"/"NaN" (before the
+# write-side .finite_or_na guard existed) must not re-enter drift arithmetic as
+# an infinity, where it silently corrupts the comparison (Inf mean -> NaN shift
+# -> the column is dropped). Treat it as missing, like any other absent stat.
+.safe_num <- function(x) {
+  v <- suppressWarnings(as.numeric(x))
+  v[!is.finite(v)] <- NA_real_
+  v
+}
 
 .compute_drift <- function(con, dataset_name, id_prev, id_curr, thresholds) {
   snaps <- DBI::dbGetQuery(con,

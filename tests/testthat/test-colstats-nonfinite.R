@@ -39,6 +39,74 @@ test_that("compute_col_stats() never stores non-finite values in the snapshot DB
               info = paste(stats$dq_check, stats$value, collapse = "; "))
 })
 
+# -- B-01: the invariant holds for aggregate OVERFLOW, not just non-finite inputs -
+
+test_that("compute_col_stats() stores no non-finite literal for any column (property, B-01)", {
+  cfg <- cfg_stats()
+  # Each column is numeric-resolvable and stresses a different non-finite path.
+  cases <- list(
+    inf_inputs       = c("Inf", "-Inf", "5"),          # B-23 input path
+    sd_overflow      = c("1e300", "1.5e300", "2e300"),  # sd() squares past double max
+    two_val_overflow = c("1e300", "2e300"),             # sd overflow with n = 2
+    huge_identical   = c("1e308", "1e308", "1e308"),    # internal overflow, true sd is 0
+    normal           = c("1", "2", "3", "4")
+  )
+  stat_checks <- c("numeric_parseable_mean", "numeric_sd",
+                   "numeric_min", "numeric_max")
+  for (nm in names(cases)) {
+    df <- data.frame(amt = cases[[nm]], stringsAsFactors = FALSE)
+    expect_equal(resolve_col_type("amt", df$amt, cfg), "numeric", info = nm)
+    stats <- compute_col_stats(df, cfg)
+    s <- stats[stats$dq_check %in% stat_checks, ]
+    parsed <- suppressWarnings(as.numeric(s$value))
+    # Every stored numeric aggregate is NA or a finite number -- never the
+    # literal "Inf"/"-Inf"/"NaN" that would poison drift arithmetic.
+    expect_true(all(is.na(s$value) | is.finite(parsed)),
+                info = paste0(nm, ": ", paste(s$dq_check, s$value, collapse = "; ")))
+  }
+})
+
+test_that("compute_col_stats() keeps finite min/max but NAs an overflowing sd (B-01)", {
+  cfg <- cfg_stats()
+  stats <- compute_col_stats(
+    data.frame(amt = c("1e300", "1.5e300", "2e300"), stringsAsFactors = FALSE), cfg)
+  val <- function(chk) stats$value[stats$dq_check == chk]
+  # min/max select existing finite values -- they never overflow, so they persist.
+  expect_equal(val("numeric_min"), "1e+300")
+  expect_equal(val("numeric_max"), "2e+300")
+  # sd overflows the double range -> stored NA, not the literal "Inf".
+  expect_true(is.na(val("numeric_sd")))
+})
+
+# -- B-01 read side: a legacy DB already carrying "Inf" must not re-poison drift --
+
+test_that(".safe_num() maps every non-finite parse to NA (B-01 read side)", {
+  expect_equal(dqcheckr:::.safe_num(c("Inf", "5", "NaN", "-Inf", NA, "2.5")),
+               c(NA, 5, NA, NA, NA, 2.5))
+})
+
+test_that(".compute_drift() treats a pre-fix stored 'Inf' mean as missing, not Inf (B-01)", {
+  db  <- make_drift_db(2)                       # finite means 100 (id1) -> 200 (id2)
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  # Simulate a snapshot written by a pre-0.2.5 dqcheckr before the write guard.
+  DBI::dbExecute(con,
+    "UPDATE column_snapshots SET value = 'Inf'
+     WHERE snapshot_id = 2 AND dq_check = 'numeric_parseable_mean'
+       AND column_name = 'amount'")
+
+  drift <- dqcheckr:::.compute_drift(con, "test_ds", 1, 2, list(
+    max_missing_rate_change_pp = 2.0, max_non_numeric_rate_change_pp = 1.0,
+    max_numeric_mean_shift_pct = 0.20, max_row_count_change_pct = 0.10))
+
+  # The poisoned column drops out of the mean-shift table cleanly (treated as
+  # missing) rather than producing an Inf/NaN row -- no non-finite leaks through.
+  ms <- drift$mean_shifts
+  expect_false(any(is.infinite(ms$numeric_mean_shift_pct)))
+  expect_false(any(is.nan(ms$numeric_mean_shift_pct)))
+  expect_false("amount" %in% ms$Column)
+})
+
 test_that("mean drift away from an Inf-contaminated column is still reported", {
   cfg <- cfg_stats()
   mk  <- function(lines) { f <- tempfile(fileext = ".csv"); writeLines(lines, f); f }
