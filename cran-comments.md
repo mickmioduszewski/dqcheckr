@@ -13,8 +13,10 @@ milestones and were not submitted to CRAN.
 * macOS 15 / aarch64-apple-darwin, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck("dqcheckr_0.2.5.tar.gz", args = "--as-cran")` (local,
   2026-07-19): 0 errors | 0 warnings | 1 note
-* win-builder: R-devel (submitted 2026-07-19): results awaited
-* win-builder: R-release (submitted 2026-07-19): results awaited
+* win-builder: R-devel (R Under development (unstable), 2026-07-17 r90265 ucrt):
+  Status OK — 0 errors | 0 warnings | 0 notes
+* win-builder: R-release (R 4.6.1, 2026-06-24 ucrt):
+  Status OK — 0 errors | 0 warnings | 0 notes
 
 ## Notes
 
