@@ -3,6 +3,9 @@
 ^Meta$
 ^CRAN-SUBMISSION$
 ^docs$
+^\.Rhistory$
+\.DS_Store$
+\.Rcheck$
 ^mick-todo\.md$
 ^_pkgdown\.yml$
 ^\.github$
