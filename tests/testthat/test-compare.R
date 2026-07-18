@@ -324,6 +324,24 @@ test_that("CP-04 emits WARN instead of erroring when the current column has no p
   expect_match(cp04[[1]]$message, "cannot be computed")
 })
 
+# -- CP-04 non-finite literal in a numeric column (B-01) -------------------------
+
+test_that("CP-04 does not crash the run on a literal 'Inf' value", {
+  # as.numeric("Inf") is Inf, not NA, so an Inf-bearing column still classifies
+  # as numeric and reaches compare_numeric_mean(). A non-finite mean used to slip
+  # past the is.nan/==0 guard and make shift_pct NaN, aborting the whole run at
+  # `if (shift_pct > threshold)`. Finite values must be filtered first.
+  prev <- make_accounts_df()
+  curr <- make_accounts_df()
+  prev$account_balance <- c("100", "200", "300", "Inf", "500")
+  cfg  <- base_config(list(column_types = list(account_balance = "numeric")))
+  expect_no_error(res <- run_comparison_checks(curr, prev, cfg))
+  cp04 <- Filter(\(r) r$check_id == "CP-04" &&
+                      !is.na(r$column) && r$column == "account_balance", res)
+  expect_length(cp04, 1)
+  expect_true(cp04[[1]]$status %in% c("PASS", "WARN"))
+})
+
 # -- Precomputed types argument (0.2.3, P-01) -----------------------------------
 
 test_that("run_comparison_checks() with precomputed types matches default behaviour", {

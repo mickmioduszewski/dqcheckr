@@ -394,6 +394,18 @@ test_that("read_recent_snapshots() returns at most n rows", {
   expect_equal(nrow(res), 3L)
 })
 
+test_that("read_recent_snapshots() treats a negative n as zero, not unbounded (B-06)", {
+  # SQLite reads LIMIT -1 as "no limit"; n must be clamped so a negative value
+  # caps at 0 rows rather than dumping the whole history.
+  db <- tempfile(fileext = ".sqlite")
+  on.exit(unlink(db))
+  for (i in 1:5)
+    write_snapshot(db, "ds_a", paste0("f", i, ".csv"), make_snapshot_df(),
+                   make_results(), list(), list(), base_config())
+  res <- read_recent_snapshots(db, "ds_a", n = -1)
+  expect_equal(nrow(res), 0L)
+})
+
 # -- run_time threading (0.2.3, B-04) --------------------------------------------
 
 test_that("write_snapshot() stores the supplied run_time as run_timestamp", {

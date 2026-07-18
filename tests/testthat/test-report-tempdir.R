@@ -37,6 +37,7 @@ test_that("render_report() returns NULL with a warning when Quarto is unavailabl
 })
 
 test_that("render_report() writes output only to output_dir, not CWD", {
+  skip_on_cran()  # renders via Quarto when available -- keep CRAN wall time bounded
   skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
   env   <- make_render_env()
   before_cwd <- list.files(getwd(), pattern = "\\.html$")
@@ -80,6 +81,7 @@ test_that("render_report() errors when Quarto writes no output file (B-09)", {
 })
 
 test_that("render_report() output filename contains dataset_name", {
+  skip_on_cran()  # renders via Quarto when available -- keep CRAN wall time bounded
   skip_if_not(quarto::quarto_available(), "Quarto CLI not available")
   env    <- make_render_env()
   result <- render_report(

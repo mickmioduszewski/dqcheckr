@@ -183,8 +183,18 @@ compare_numeric_mean <- function(df_current, df_previous, config,
   .compact(lapply(common_cols, function(col) {
     if (types_current[[col]]  != "numeric") return(NULL)
     if (types_previous[[col]] != "numeric") return(NULL)
-    mean_curr <- mean(suppressWarnings(as.numeric(df_current[[col]])),  na.rm = TRUE)
-    mean_prev <- mean(suppressWarnings(as.numeric(df_previous[[col]])), na.rm = TRUE)
+    # Drop non-finite parses (Inf/-Inf): as.numeric("Inf") is Inf, not NA, so an
+    # Inf-bearing column still classifies as numeric and reaches here. An Inf mean
+    # then slips past the is.nan/==0 guard below and makes shift_pct NaN, which
+    # aborts the run at `if (shift_pct > threshold)`. Same guard as check_outliers()
+    # and compute_col_stats(); a fully non-finite column collapses to NaN and is
+    # handled by the is.nan() branches, not a crash.
+    vals_curr <- suppressWarnings(as.numeric(df_current[[col]]))
+    vals_prev <- suppressWarnings(as.numeric(df_previous[[col]]))
+    vals_curr <- vals_curr[is.finite(vals_curr)]
+    vals_prev <- vals_prev[is.finite(vals_prev)]
+    mean_curr <- if (length(vals_curr)) mean(vals_curr) else NaN
+    mean_prev <- if (length(vals_prev)) mean(vals_prev) else NaN
     if (is.nan(mean_prev) || mean_prev == 0) return(NULL)
     # mean(numeric(0)) is NaN: the current delivery has no parseable numeric
     # values in a column that resolves as numeric. That is drift worth

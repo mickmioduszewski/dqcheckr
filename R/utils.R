@@ -318,6 +318,44 @@ utc_to_local_display <- function(ts) {
   invisible(TRUE)
 }
 
+#' Render a Quarto template to a destination file
+#'
+#' The shared render-to-temp-dir / verify-output / move-into-place sequence used
+#' by both \code{render_report()} and \code{.write_drift_html_report()}. Rendering
+#' happens in a throwaway temp dir (a copy of the template, so the packaged
+#' template is never touched) and the result is moved to \code{out} only after it
+#' is confirmed on disk. If Quarto returns without raising but leaves no output
+#' file, this aborts with \code{dqcheckr_render_error} rather than letting the
+#' caller name a report that does not exist. \code{what} tags that error message
+#' (e.g. \code{"drift report "}).
+#'
+#' @keywords internal
+#' @noRd
+.quarto_render_to_file <- function(template, rds_path, out, what = "") {
+  fname <- basename(out)
+
+  render_dir <- tempfile()
+  dir.create(render_dir, recursive = TRUE)
+  on.exit(unlink(render_dir, recursive = TRUE), add = TRUE)
+  tmp_template <- file.path(render_dir, basename(template))
+  file.copy(template, tmp_template)
+
+  quarto::quarto_render(
+    input          = tmp_template,
+    output_file    = fname,
+    execute_params = list(rds_path = rds_path),
+    quiet          = TRUE
+  )
+
+  rendered <- file.path(render_dir, fname)
+  if (!file.exists(rendered))
+    rlang::abort(
+      paste0("Quarto rendering produced no output file for ", what, "'", fname, "'."),
+      class = c("dqcheckr_render_error", "dqcheckr_error"))
+  .move_file(rendered, out)
+  invisible(out)
+}
+
 #' Resolve types for every column of a data frame in one pass
 #'
 #' Named character vector of \code{resolve_col_type()} results, computed once

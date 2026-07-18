@@ -423,6 +423,9 @@ write_snapshot <- function(db_path, dataset_name, file_name, df,
 #'
 #' @export
 read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
+  # SQLite treats LIMIT -1 as "no limit", so a negative n would return the whole
+  # history instead of capping it -- the opposite of the documented contract.
+  n <- max(0L, as.integer(n))
   # Kept in sync with the snapshots table schema (init_snapshot_db) so code
   # branching on any column behaves identically on the no-database path.
   empty <- data.frame(

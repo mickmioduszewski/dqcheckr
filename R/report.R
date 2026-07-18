@@ -52,28 +52,10 @@ render_report <- function(dataset_name, file_name, file_path, df,
     overall_status   = overall_status(c(qc_results, cp_results, custom_results))
   ), rds_path)
 
-  render_dir   <- tempfile()
-  dir.create(render_dir, recursive = TRUE)
-  on.exit(unlink(render_dir, recursive = TRUE), add = TRUE)
-  tmp_template <- file.path(render_dir, "report.qmd")
-  file.copy(template, tmp_template)
-
-  quarto::quarto_render(
-    input          = tmp_template,
-    output_file    = fname,
-    execute_params = list(rds_path = rds_path),
-    quiet          = TRUE
-  )
-
-  rendered <- file.path(render_dir, fname)
-  if (!file.exists(rendered))
-    # Quarto returned without raising but left no file (e.g. a template that
-    # produced no output). Returning `out` here would name a report that does
-    # not exist and let run_dq_check() record the run as a success.
-    rlang::abort(
-      paste0("Quarto rendering produced no output file for '", fname, "'."),
-      class = c("dqcheckr_render_error", "dqcheckr_error"))
-  .move_file(rendered, out)
+  # Render in a throwaway dir and move into place only once the file exists; a
+  # no-output render aborts (dqcheckr_render_error) rather than naming a report
+  # that does not exist and letting run_dq_check() record the run as a success.
+  .quarto_render_to_file(template, rds_path, out)
 
   if (open_report && interactive()) utils::browseURL(out)
 

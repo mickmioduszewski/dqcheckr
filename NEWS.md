@@ -1,4 +1,4 @@
-# dqcheckr (development version)
+# dqcheckr 0.2.5
 
 ## Internal
 
@@ -16,6 +16,13 @@
   risk of, for example, the QC report and the drift report applying different
   default thresholds to the same rule after only one copy was edited.
 
+* The shared Quarto render pipeline (render into a temp dir, verify an output
+  file was produced, abort with `dqcheckr_render_error` if not, then move the
+  result into place) is now a single internal helper (`.quarto_render_to_file()`)
+  called by both the main report writer and the drift report writer, instead of
+  being duplicated near-verbatim in each. A future change to the render pipeline
+  now lands in one place rather than needing to be mirrored by hand.
+
 ## Testing
 
 * Added coverage for two previously-untested error paths: an FWF config that
@@ -25,6 +32,25 @@
   exist).
 
 ## Bug fixes
+
+* The CP-04 numeric-mean-shift comparison no longer aborts the whole run when a
+  numeric column contains a literal `Inf`/`-Inf` value. `as.numeric("Inf")` is
+  `Inf` (not `NA`), so such a column still classifies as numeric and reached the
+  mean comparison; a non-finite mean slipped past the guard and made the shift
+  `NaN`, which crashed the pipeline at `if (shift_pct > threshold)`. The check now
+  filters to finite values first (as `check_outliers()` and `compute_col_stats()`
+  already do), so an `Inf`-bearing column is handled as a warning rather than a
+  crash. R's own `write.csv()` emits the literal `Inf`, so this is a realistic
+  corrupted-delivery input.
+
+* `compare_snapshots()` now rejects a `NULL` or empty `dataset_name` with a clear
+  `dqcheckr_invalid_argument` error instead of aborting with an empty message. A
+  `NULL` bound as SQL `NULL` (matching no rows) and the "need 2 snapshots" abort
+  then collapsed to a zero-length, blank-text condition.
+
+* `read_recent_snapshots()` now clamps a negative `n` to `0` rather than returning
+  the entire history. SQLite reads `LIMIT -1` as "no limit", so a negative `n`
+  silently returned every row instead of capping the result as documented.
 
 * `compare_snapshots()` now returns the rendered drift report's path as a
   `report_path` element on its result (`NULL` when no report was written), so a

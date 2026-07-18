@@ -131,6 +131,13 @@ compare_snapshots <- function(dataset_name,
                               config_dir       = ".",
                               report           = TRUE,
                               open_report      = interactive()) {
+  # Validate before it reaches SQL: a NULL/empty dataset_name binds as SQL NULL
+  # (matches no rows), then sprintf("...'%s'...", NULL) collapses to character(0)
+  # and the "need 2 snapshots" abort() below carries an empty message.
+  if (!is.character(dataset_name) || length(dataset_name) != 1L ||
+      is.na(dataset_name) || !nzchar(dataset_name))
+    rlang::abort("`dataset_name` must be a non-empty character string.",
+                 class = c("dqcheckr_invalid_argument", "dqcheckr_error"))
   ds_yml <- file.path(config_dir, paste0(dataset_name, ".yml"))
   thresholds <- if (file.exists(ds_yml)) {
     cfg <- load_config(dataset_name, config_dir)
@@ -488,31 +495,10 @@ compare_snapshots <- function(dataset_name,
   on.exit(unlink(rds_path), add = TRUE)
   saveRDS(list(drift = drift), rds_path)
 
-  render_dir   <- tempfile()
-  dir.create(render_dir, recursive = TRUE)
-  on.exit(unlink(render_dir, recursive = TRUE), add = TRUE)
-  tmp_template <- file.path(render_dir, "drift_report.qmd")
-  file.copy(template, tmp_template)
-
-  quarto::quarto_render(
-    input          = tmp_template,
-    output_file    = basename(outfile),
-    execute_params = list(rds_path = rds_path),
-    quiet          = TRUE
-  )
-
-  rendered <- file.path(render_dir, basename(outfile))
-  if (!file.exists(rendered))
-    # Quarto returned without raising but left no file (e.g. a template that
-    # produced no output). Raise -- mirroring render_report() in report.R -- so
-    # compare_snapshots() cannot name or open a report that does not exist; the
-    # caller downgrades this to a warning and a NULL path (the drift still
-    # returns). Previously this fell through to invisible(outfile), handing back
-    # a phantom path. B-02.
-    rlang::abort(
-      paste0("Quarto rendering produced no output file for drift report '",
-             basename(outfile), "'."),
-      class = c("dqcheckr_render_error", "dqcheckr_error"))
-  .move_file(rendered, outfile)
+  # Render in a throwaway dir and move into place only once the file exists. A
+  # no-output render aborts (dqcheckr_render_error) so compare_snapshots() cannot
+  # name or open a report that does not exist; the caller downgrades that to a
+  # warning and a NULL path (the drift still returns).
+  .quarto_render_to_file(template, rds_path, outfile, what = "drift report ")
   invisible(outfile)
 }

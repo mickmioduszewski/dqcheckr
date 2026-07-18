@@ -76,6 +76,19 @@ test_that("list_snapshots filters by dataset name", {
 
 # -- compare_snapshots() errors ------------------------------------------------
 
+test_that("compare_snapshots() rejects a NULL/empty dataset_name with a clear error (B-05)", {
+  cfg_dir <- make_drift_config()
+  # NULL used to bind as SQL NULL, match no rows, and abort with an empty message.
+  expect_error(
+    compare_snapshots(NULL, config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument", regexp = "non-empty character"
+  )
+  expect_error(
+    compare_snapshots("", config_dir = cfg_dir, report = FALSE),
+    class = "dqcheckr_invalid_argument"
+  )
+})
+
 test_that("compare_snapshots errors if db does not exist", {
   cfg_dir <- make_drift_config()
   expect_error(
