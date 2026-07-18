@@ -91,7 +91,10 @@ list_snapshots <- function(dataset_name = NULL,
 #' @return Invisibly, a named list with elements \code{dataset_name},
 #'   \code{snap_prev}, \code{snap_curr}, \code{table_drift},
 #'   \code{schema_changes}, \code{missing_rate_changes},
-#'   \code{non_numeric_changes}, \code{mean_shifts}, \code{distinct_changes}.
+#'   \code{non_numeric_changes}, \code{mean_shifts}, \code{distinct_changes},
+#'   and \code{report_path} (the full path to the rendered HTML drift report, or
+#'   \code{NULL} when no report was written). Callers should use
+#'   \code{report_path} rather than reconstructing the filename from a pattern.
 #'
 #' @examples
 #' \donttest{
@@ -241,6 +244,14 @@ compare_snapshots <- function(dataset_name,
   if (open_report && report && !is.null(html_path) && interactive())
     utils::browseURL(html_path)
 
+  # Expose the rendered report's path so a caller (e.g. the GUI, which launches
+  # this in a background process) can link to it directly instead of
+  # reconstructing the filename from a slug pattern -- NULL when no report was
+  # written (report = FALSE, Quarto absent, or a render failure). B-01 (GUI
+  # alignment): a re-derived filename is fragile and broke when the drift slug
+  # gained its snapshot ids (B-03). Single-bracket assignment keeps report_path
+  # present as an explicit NULL (drift$report_path <- NULL would drop the element).
+  drift["report_path"] <- list(html_path)
   invisible(drift)
 }
 

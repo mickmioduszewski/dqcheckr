@@ -228,6 +228,39 @@ test_that("drift filenames carry both snapshot ids and don't collide same-second
   expect_true(any(grepl("_1_3\\.html$", files)))
 })
 
+test_that("compare_snapshots() returns the rendered report path (B-01 alignment)", {
+  # Consumers (the GUI, launching this in a background process) should read the
+  # path from the return value rather than reconstructing the filename -- that
+  # reconstruction broke when the drift slug gained its snapshot ids (B-03).
+  db      <- make_drift_db(2)
+  out_dir <- withr::local_tempdir()
+  cfg_dir <- make_drift_config(out_dir)
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) TRUE,
+    quarto_render = function(input, output_file, ...)
+      writeLines("<html>drift</html>", file.path(dirname(input), output_file)),
+    .package = "quarto")
+
+  drift <- compare_snapshots("test_ds", snapshot_id_prev = 1, snapshot_id_curr = 2,
+                             db_path = db, config_dir = cfg_dir,
+                             report = TRUE, open_report = FALSE)
+  expect_true("report_path" %in% names(drift))
+  expect_false(is.null(drift$report_path))
+  expect_true(file.exists(drift$report_path))
+  # It is the file that was actually written.
+  expect_equal(basename(drift$report_path),
+               list.files(out_dir, pattern = "\\.html$"))
+})
+
+test_that("compare_snapshots() report_path is NULL when no report is written (B-01)", {
+  db      <- make_drift_db(2)
+  cfg_dir <- make_drift_config()
+  drift   <- compare_snapshots("test_ds", db_path = db, config_dir = cfg_dir,
+                               report = FALSE)
+  expect_true("report_path" %in% names(drift))
+  expect_null(drift$report_path)
+})
+
 # -- compare_snapshots() default ID selection ----------------------------------
 
 test_that("compare_snapshots defaults to second-latest vs latest", {
@@ -259,7 +292,7 @@ test_that("compare_snapshots returns list with expected elements", {
   expect_named(drift, c("dataset_name", "snap_prev", "snap_curr",
                         "table_drift", "schema_changes",
                         "missing_rate_changes", "non_numeric_changes",
-                        "mean_shifts", "distinct_changes"),
+                        "mean_shifts", "distinct_changes", "report_path"),
                ignore.order = TRUE)
 })
 

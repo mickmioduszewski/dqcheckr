@@ -2,6 +2,12 @@
 
 ## Bug fixes
 
+* `compare_snapshots()` now returns the rendered drift report's path as a
+  `report_path` element on its result (`NULL` when no report was written), so a
+  caller can link to the report directly instead of reconstructing the filename
+  from a slug pattern -- the reconstruction approach is fragile and broke when
+  the drift filename gained its snapshot ids.
+
 * A snapshot's `render_status` now carries a `"pending"` state while its report
   is still rendering. The row is written as `"pending"` and only flipped to
   `"success"` (with `report_file`) once the report is confirmed on disk, or to

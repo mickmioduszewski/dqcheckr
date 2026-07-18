@@ -42,7 +42,10 @@ after rendering (only takes effect in interactive sessions).}
 Invisibly, a named list with elements \code{dataset_name},
   \code{snap_prev}, \code{snap_curr}, \code{table_drift},
   \code{schema_changes}, \code{missing_rate_changes},
-  \code{non_numeric_changes}, \code{mean_shifts}, \code{distinct_changes}.
+  \code{non_numeric_changes}, \code{mean_shifts}, \code{distinct_changes},
+  and \code{report_path} (the full path to the rendered HTML drift report, or
+  \code{NULL} when no report was written). Callers should use
+  \code{report_path} rather than reconstructing the filename from a pattern.
 }
 \description{
 Reads two historical snapshot records (by ID) from the SQLite database and
