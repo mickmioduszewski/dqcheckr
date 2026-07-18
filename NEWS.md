@@ -1,4 +1,4 @@
-# dqcheckr 0.2.5
+# dqcheckr (development version)
 
 ## Bug fixes
 
