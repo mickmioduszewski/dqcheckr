@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckr</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,8 +68,8 @@ Mioduszewski</h4>
 
     
     
-<p><strong>Version</strong>: 0.2.4.9000 <strong>Author</strong>: Mick
-Mioduszewski <strong>Date</strong>: 2026-07-18</p>
+<p><strong>Version</strong>: 0.2.5 <strong>Author</strong>: Mick
+Mioduszewski <strong>Date</strong>: 2026-07-19</p>
 <hr>
 <div class="section level2">
 <h2 id="part-a-purpose-and-intent">Part A — Purpose and Intent<a class="anchor" aria-label="anchor" href="#part-a-purpose-and-intent"></a>
@@ -886,8 +886,11 @@ have no previous)</td>
 <td><code>render_status</code></td>
 <td>TEXT</td>
 <td>
-<code>"success"</code> or <code>"failed"</code> (updated if Quarto
-render fails)</td>
+<code>"pending"</code> at insert, updated to <code>"success"</code>
+(report rendered, <code>report_file</code> set) or <code>"failed"</code>
+(render skipped or failed). Consumers must treat a
+<code>"pending"</code> row as not-yet-available rather than reconstruct
+a filename</td>
 </tr>
 <tr class="even">
 <td><code>type_changed_cols_vs_previous</code></td>
@@ -1044,7 +1047,9 @@ WARN/FAIL, else NULL.</p>
 <span><span class="op">)</span></span>
 <span><span class="co"># Returns invisibly: list(status, report_path, snapshot_id)</span></span></code></pre></div>
 <p>Report filename:
-<code>&lt;dataset_name&gt;_&lt;YYYYMMDD_HHMMSS&gt;.html</code></p>
+<code>&lt;dataset_name&gt;_&lt;YYYYMMDD_HHMMSS&gt;_&lt;snapshot_id&gt;.html</code>
+(the trailing <code>_&lt;snapshot_id&gt;</code> was added in 0.2.5 so
+two same-second runs of one dataset no longer collide)</p>
 <p><strong>Snapshot drift analysis</strong> (compare any two historical
 snapshots):</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">

@@ -1,7 +1,6 @@
 # dqcheckr — Software Specification
 
-**Version**: 0.2.4.9000 **Author**: Mick Mioduszewski **Date**:
-2026-07-18
+**Version**: 0.2.5 **Author**: Mick Mioduszewski **Date**: 2026-07-19
 
 ------------------------------------------------------------------------
 
@@ -456,7 +455,7 @@ Database and tables created automatically on first run via
 | `new_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
 | `missing_cols_vs_schema` | TEXT | Comma-separated; NULL if none or `expected_columns` not set |
 | `comparison_mode` | TEXT | `"comparison"` or `"single"` (single-file runs have no previous) |
-| `render_status` | TEXT | `"success"` or `"failed"` (updated if Quarto render fails) |
+| `render_status` | TEXT | `"pending"` at insert, updated to `"success"` (report rendered, `report_file` set) or `"failed"` (render skipped or failed). Consumers must treat a `"pending"` row as not-yet-available rather than reconstruct a filename |
 | `type_changed_cols_vs_previous` | TEXT | Comma-separated `col (prev->curr)` pairs; NULL if none |
 | `report_file` | TEXT | Filename of the rendered HTML report (added 0.2.3); NULL/NA for older rows and for runs where no report was written |
 
@@ -505,7 +504,9 @@ run_dq_check(
 # Returns invisibly: list(status, report_path, snapshot_id)
 ```
 
-Report filename: `<dataset_name>_<YYYYMMDD_HHMMSS>.html`
+Report filename: `<dataset_name>_<YYYYMMDD_HHMMSS>_<snapshot_id>.html`
+(the trailing `_<snapshot_id>` was added in 0.2.5 so two same-second
+runs of one dataset no longer collide)
 
 **Snapshot drift analysis** (compare any two historical snapshots):
 

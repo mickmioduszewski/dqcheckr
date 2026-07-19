@@ -98,9 +98,9 @@ writeLines(c(
   'delimiter: ","'
 ), ds_yml)
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201046_1.html
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmprqHPHe/starwars_csv_20260719_072134_1.html
 run_dq_check("starwars_csv", config_dir = tmp, open_report = FALSE)
-#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmpbGsL9O/starwars_csv_20260718_201051_2.html
+#> [dqcheckr] starwars_csv: FAIL - 0 warning(s), 2 failure(s). Report: /tmp/RtmprqHPHe/starwars_csv_20260719_072140_2.html
 drift <- compare_snapshots("starwars_csv", config_dir = tmp, report = FALSE)
 #> [dqcheckr] drift: starwars_csv snapshot #1 vs #2
 names(drift)
