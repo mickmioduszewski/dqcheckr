@@ -236,6 +236,125 @@ test_that("generated configs validate with zero findings for every non-packed fi
   }
 })
 
+# ==============================================================================
+# generate_global_config() (plan step 8)
+# ==============================================================================
+
+gcfg_dir <- function() {
+  d <- file.path(tempdir(), paste0("gglob_", sample.int(1e9, 1)))
+  dir.create(d)
+  d
+}
+
+test_that("the generated global config parses with the live defaults and nothing else", {
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  out <- suppressMessages(generate_global_config(config_dir = d))
+  cfg <- yaml::read_yaml(out)
+  expect_equal(cfg$snapshot_db,       .default_paths$snapshot_db)
+  expect_equal(cfg$report_output_dir, .default_paths$report_output_dir)
+  expect_null(cfg$default_rules)              # commented out
+  expect_setequal(names(cfg), c("snapshot_db", "report_output_dir"))
+})
+
+test_that("every global-scope vocabulary key appears exactly once (live xor commented)", {
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  lines <- readLines(suppressMessages(generate_global_config(config_dir = d)))
+  vocab <- .config_vocabulary()
+  for (k in vocab$key[vocab$scope %in% c("global", "both")]) {
+    occ <- key_occurrences(lines, k)
+    expect_equal(sum(occ), 1)
+  }
+})
+
+test_that("the commented default_rules block lists every rules-placement rule with its real default", {
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  lines <- readLines(suppressMessages(generate_global_config(config_dir = d)))
+  rv    <- .rule_vocabulary()
+  rules <- rv[rv$placement %in% c("rules", "both"), , drop = FALSE]
+  for (i in seq_len(nrow(rules))) {
+    k <- rules$key[i]
+    expect_equal(sum(grepl(paste0("^#   ", k, ": "), lines)), 1)
+    if (rules$has_default[i]) {
+      # The emitted value is the runtime default -- built from the constant,
+      # never a restated literal.
+      expect_true(any(grepl(paste0("^#   ", k, ": ",
+                                   .y_scalar(rules$default[[i]])),
+                            lines, fixed = FALSE)))
+    } else {
+      expect_true(any(grepl(paste0("^#   ", k, ": .*unset means the check is off"),
+                            lines)))
+    }
+  }
+  # Column-only rules (pattern etc.) must NOT appear in the global block.
+  for (k in rv$key[rv$placement == "column"])
+    expect_equal(sum(grepl(paste0("^#   ", k, ": "), lines)), 0)
+})
+
+test_that("uncommenting the default_rules block yields valid YAML equal to the defaults", {
+  # The promise 'strip the single leading # to change a rule' must hold for
+  # the whole block at once: uncomment everything and the file still parses,
+  # with every defaulted rule equal to its runtime constant.
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  lines <- readLines(suppressMessages(generate_global_config(config_dir = d)))
+  lines <- sub("^# default_rules:", "default_rules:", lines)  # the block key
+  lines <- sub("^#   (?=[a-z_]+: )", "  ", lines, perl = TRUE) # its entries
+  lines <- lines[!grepl("^#", lines)]                  # drop remaining comments
+  cfg <- yaml::read_yaml(text = paste(lines, collapse = "\n"))
+  rv    <- .rule_vocabulary()
+  rules <- rv[rv$placement %in% c("rules", "both") & rv$has_default, , drop = FALSE]
+  for (i in seq_len(nrow(rules)))
+    expect_equal(cfg$default_rules[[rules$key[i]]], rules$default[[i]])
+})
+
+test_that("the generated global config passes validation with zero global findings", {
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  suppressMessages(generate_global_config(config_dir = d))
+  writeLines(c('dataset_name: "probe"', "format: csv",
+               'current_file: "x.csv"'), file.path(d, "probe.yml"))
+  v <- validate_config("probe", config_dir = d)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings[v$findings$file == "dqcheckr.yml", ]), 0L)
+})
+
+test_that("generate_global_config() is create-only and leaves an existing file byte-identical", {
+  d <- gcfg_dir()
+  on.exit(unlink(d, recursive = TRUE))
+  path <- file.path(d, "dqcheckr.yml")
+  writeLines("snapshot_db: hand-tuned.sqlite", path)
+  before <- readBin(path, "raw", file.size(path))
+  err <- tryCatch(suppressMessages(generate_global_config(config_dir = d)),
+                  error = function(e) e)
+  expect_s3_class(err, "dqcheckr_config_exists")
+  expect_match(conditionMessage(err), "never-overwrite")
+  expect_identical(readBin(path, "raw", file.size(path)), before)
+})
+
+test_that("bootstrap: two generator calls and one run in an empty directory", {
+  # The whole deployment story from nothing: generate global + dataset config,
+  # run, list. Relative infra paths resolve against the deployment root, so
+  # the test works from inside the temp root (the documented convention).
+  root <- file.path(tempdir(), paste0("bootstrap_", sample.int(1e9, 1)))
+  dir.create(root)
+  on.exit({ setwd(old_wd); unlink(root, recursive = TRUE) })
+  old_wd <- setwd(root)
+
+  writeLines(c("id,amount", "A1,10", "A2,20"), "orders.csv")
+  suppressMessages(generate_global_config(config_dir = "config"))
+  suppressMessages(generate_dataset_config("orders.csv", config_dir = "config"))
+
+  expect_true(validate_config("orders", config_dir = "config")$valid)
+  result <- suppressMessages(suppressWarnings(
+    run_dq_check("orders", config_dir = "config", open_report = FALSE)))
+  expect_false(is.null(result$snapshot_id))
+  expect_true(file.exists(file.path("data", "snapshots.sqlite")))
+  expect_equal(nrow(list_runs("orders", config_dir = "config")), 1L)
+})
+
 # -- the full chain ------------------------------------------------------------
 
 test_that("generate -> run_dq_check completes on the fixture with no hand edits", {

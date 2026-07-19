@@ -77,8 +77,14 @@
   run until filled in. Create-only: an existing config aborts with
   `dqcheckr_config_exists` and is never touched (the never-overwrite rule).
 
-* Still to come this release: `generate_global_config()` — the global half of
-  the sniff-to-YAML core replacing the GUI workflow.
+* New `generate_global_config(config_dir)`: writes a fully-optioned
+  `dqcheckr.yml` — the shared infrastructure paths set live to their built-in
+  defaults, and a commented `default_rules` block listing every rule key with
+  its default value and description (rules with no default show an example
+  and a note that unset keeps the check off). Change a threshold by
+  uncommenting one line. Create-only, like the dataset generator. A brand-new
+  deployment now bootstraps with exactly two generator calls and one
+  `run_dq_check()`.
 
 # dqcheckr 0.2.5
 
