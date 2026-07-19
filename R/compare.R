@@ -178,12 +178,16 @@ compare_numeric_mean <- function(df_current, df_previous, config,
                                  types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  threshold   <- config[["rules"]][["max_numeric_mean_shift_pct"]] %||%
-    .default_comparison_rules$max_numeric_mean_shift_pct
   common_cols <- intersect(names(df_current), names(df_previous))
   .compact(lapply(common_cols, function(col) {
     if (types_current[[col]]  != "numeric") return(NULL)
     if (types_previous[[col]] != "numeric") return(NULL)
+    # Per-column threshold: column_rules.<col>.max_numeric_mean_shift_pct wins
+    # over the rules-level value. The GUI has always written the per-column key
+    # (its Step-5 "Max mean shift (%)" editor), but this read was rules-level
+    # only, so the per-column value was silently ignored.
+    threshold <- col_threshold(config, col, "max_numeric_mean_shift_pct",
+                               .default_comparison_rules$max_numeric_mean_shift_pct)
     # Drop non-finite parses (Inf/-Inf): as.numeric("Inf") is Inf, not NA, so an
     # Inf-bearing column still classifies as numeric and reaches here. An Inf mean
     # then slips past the is.nan/==0 guard below and makes shift_pct NaN, which

@@ -132,6 +132,38 @@ test_that("compare_numeric_mean() returns WARN when mean shift exceeds threshold
   expect_equal(bal[[1]]$status, "WARN")
 })
 
+test_that("a per-column max_numeric_mean_shift_pct in column_rules wins over the rules level", {
+  # ~11% shift on account_balance: fails a 5% per-column threshold even though
+  # the rules-level 20% would pass it. The GUI has always written this
+  # per-column key; it used to be silently ignored.
+  curr                 <- make_curr()
+  curr$account_balance <- as.character(
+    as.numeric(make_curr()$account_balance) * 1.11
+  )
+  cfg_loose <- base_config()                       # rules level: 0.20
+  cfg_tight <- base_config(list(
+    column_rules = list(account_balance = list(max_numeric_mean_shift_pct = 0.05))
+  ))
+  bal <- function(res) Filter(\(r) r$column == "account_balance", res)[[1]]
+  expect_equal(bal(compare_numeric_mean(curr, make_prev(), cfg_loose))$status, "PASS")
+  expect_equal(bal(compare_numeric_mean(curr, make_prev(), cfg_tight))$status, "WARN")
+})
+
+test_that("a per-column mean-shift threshold only affects its own column", {
+  # Loosen sat_score's own threshold beyond its shift while account_balance
+  # keeps the rules-level default: the override must not leak across columns.
+  curr                 <- make_curr()
+  curr$account_balance <- as.character(
+    as.numeric(make_curr()$account_balance) * 10   # far past every threshold
+  )
+  cfg <- base_config(list(
+    column_rules = list(account_balance = list(max_numeric_mean_shift_pct = 100))
+  ))
+  res <- compare_numeric_mean(curr, make_prev(), cfg)
+  bal <- Filter(\(r) r$column == "account_balance", res)
+  expect_equal(bal[[1]]$status, "PASS")            # its own loose override
+})
+
 # -- CP-05 New distinct values -------------------------------------------------
 
 test_that("compare_new_values() returns INFO always", {
