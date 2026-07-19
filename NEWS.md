@@ -52,9 +52,22 @@
   `max_missing_rate`'s 0.05 previously lived independently in two files.
   No behaviour change.
 
+* New `sniff_dataset(path)`: pure structure inference over a delivery file —
+  format (CSV vs fixed-width), encoding (the same full-file streamed UTF-8
+  scan and single-byte fallback as `read_dataset()`), delimiter/quote, header
+  presence, column names (duplicate header names renamed positionally with the
+  originals recorded), per-column types via `infer_col_type()` (one
+  implementation — the sniff cannot disagree with run-time classification),
+  and key-column candidates. Fixed-width boundaries come from
+  `readr::fwf_empty()`; a packed file (no blank gutters) is reported with an
+  explicit `fwf_packed` marker rather than a wrong confident guess. No side
+  effects; each headline field's origin is recorded as
+  detected/default/generated. This is the detection half of the config
+  generator.
+
 * Still to come this release: config generators (`generate_dataset_config()`,
-  `generate_global_config()`) and `validate_config()` — the sniff-to-YAML core
-  replacing the GUI workflow.
+  `generate_global_config()`) — the sniff-to-YAML core replacing the GUI
+  workflow.
 
 # dqcheckr 0.2.5
 
