@@ -22,7 +22,8 @@
 #' @export
 check_missing_rate <- function(df, config) {
   lapply(names(df), function(col) {
-    threshold     <- col_threshold(config, col, "max_missing_rate", 0.05)
+    threshold     <- col_threshold(config, col, "max_missing_rate",
+                                   .default_qc_rules$max_missing_rate)
     missing_count <- sum(.missing_vals(df[[col]]))
     # 0/0 would be NaN and poison the threshold comparison; an empty file is
     # reported as a FAIL by QC-14 ("Empty file"), so rates are defined as 0.
@@ -481,8 +482,10 @@ check_non_numeric <- function(df, config, types = NULL) {
     bad  <- non_empty[is.na(suppressWarnings(as.numeric(non_empty)))]
     rate <- length(bad) / length(non_empty)
 
-    fail_threshold <- col_threshold(config, col, "max_non_numeric_rate", 0.01)
-    warn_threshold <- col_threshold(config, col, "warn_non_numeric_rate", 0.0)
+    fail_threshold <- col_threshold(config, col, "max_non_numeric_rate",
+                                    .default_qc_rules$max_non_numeric_rate)
+    warn_threshold <- col_threshold(config, col, "warn_non_numeric_rate",
+                                    .default_qc_rules$warn_non_numeric_rate)
 
     status <- if (rate > fail_threshold) "FAIL" else if (rate > warn_threshold) "WARN" else "PASS"
 
@@ -730,7 +733,8 @@ check_min_row_count <- function(df, config, file_path = NULL) {
     }
   }
 
-  min_rc <- table_threshold(config, "min_row_count", 0)
+  min_rc <- table_threshold(config, "min_row_count",
+                            .default_qc_rules$min_row_count)
   if (min_rc > 0) {
     status <- if (nrow(df) < min_rc) "FAIL" else "PASS"
     results <- c(results, list(dq_result(

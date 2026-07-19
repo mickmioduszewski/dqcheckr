@@ -59,9 +59,9 @@ compare_schema <- function(df_current, df_previous, config,
                            types_current = NULL, types_previous = NULL) {
   types_current  <- types_current  %||% resolve_col_types(df_current,  config)
   types_previous <- types_previous %||% resolve_col_types(df_previous, config)
-  flag_new   <- isTRUE(config[["rules"]][["flag_new_columns"]]     %||% TRUE)
-  flag_drop  <- isTRUE(config[["rules"]][["flag_dropped_columns"]] %||% TRUE)
-  flag_type  <- isTRUE(config[["rules"]][["flag_type_changes"]]    %||% TRUE)
+  flag_new   <- isTRUE(config[["rules"]][["flag_new_columns"]]     %||% .default_qc_rules$flag_new_columns)
+  flag_drop  <- isTRUE(config[["rules"]][["flag_dropped_columns"]] %||% .default_qc_rules$flag_dropped_columns)
+  flag_type  <- isTRUE(config[["rules"]][["flag_type_changes"]]    %||% .default_qc_rules$flag_type_changes)
 
   new_cols     <- setdiff(names(df_current),  names(df_previous))
   dropped_cols <- setdiff(names(df_previous), names(df_current))
@@ -146,7 +146,8 @@ compare_schema <- function(df_current, df_previous, config,
 compare_missing_rate <- function(df_current, df_previous, config) {
   max_change_pp <- config[["rules"]][["max_missing_rate_change_pp"]] %||%
     .default_comparison_rules$max_missing_rate_change_pp
-  severity      <- tolower(config[["rules"]][["missing_rate_change_severity"]] %||% "warn")
+  severity      <- tolower(config[["rules"]][["missing_rate_change_severity"]] %||%
+                             .default_qc_rules$missing_rate_change_severity)
   breach_status <- if (severity == "fail") "FAIL" else "WARN"
   common_cols   <- intersect(names(df_current), names(df_previous))
   lapply(common_cols, function(col) {
@@ -334,7 +335,8 @@ compare_non_numeric_rate <- function(df_current, df_previous, config,
 #' @keywords internal
 #' @noRd
 compare_column_order <- function(df_current, df_previous, config) {
-  if (!isTRUE(config[["rules"]][["flag_column_order_change"]] %||% TRUE)) return(list())
+  if (!isTRUE(config[["rules"]][["flag_column_order_change"]] %||%
+                .default_qc_rules$flag_column_order_change)) return(list())
   fmt        <- tolower(config[["format"]] %||% "csv")
   curr_names <- names(df_current)
   prev_names <- names(df_previous)

@@ -189,7 +189,8 @@ compute_col_stats <- function(df, config, types = NULL) {
     miss_rate  <- if (nrow(df) > 0) miss_count / nrow(df) else 0
     dist_count <- length(unique(non_empty))
 
-    miss_threshold <- col_threshold(config, col, "max_missing_rate", 0.05)
+    miss_threshold <- col_threshold(config, col, "max_missing_rate",
+                                    .default_qc_rules$max_missing_rate)
 
     # Parallel vectors, one data.frame per column -- not one per stat row.
     checks     <- c("inferred_type", "missing_count", "missing_rate",
@@ -211,7 +212,8 @@ compute_col_stats <- function(df, config, types = NULL) {
       nn_count <- sum(!is.na(non_empty) &
                       is.na(suppressWarnings(as.numeric(non_empty))))
       nn_rate  <- if (length(non_empty) > 0) nn_count / length(non_empty) else 0
-      nn_threshold <- col_threshold(config, col, "max_non_numeric_rate", 0.01)
+      nn_threshold <- col_threshold(config, col, "max_non_numeric_rate",
+                                    .default_qc_rules$max_non_numeric_rate)
 
       checks     <- c(checks,
                       "numeric_parseable_mean", "numeric_sd",

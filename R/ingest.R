@@ -221,8 +221,8 @@ scan_file_encoding <- function(path, chunk_size = 64L * 1024L * 1024L) {
 #'
 #' @export
 read_dataset <- function(path, config) {
-  fmt <- tolower(config[["format"]] %||% "csv")
-  enc <- normalise_encoding(config[["encoding"]] %||% "UTF-8")
+  fmt <- tolower(config[["format"]] %||% .default_read$format)
+  enc <- normalise_encoding(config[["encoding"]] %||% .default_read$encoding)
 
   enc_class <- .encoding_class(enc)
   enc_info <- list(declared = config[["encoding"]] %||% "UTF-8", used = enc,
@@ -250,14 +250,14 @@ read_dataset <- function(path, config) {
   }
 
   if (fmt == "csv") {
-    delim <- config[["delimiter"]] %||% ","
+    delim <- config[["delimiter"]] %||% .default_read$delimiter
     df <- tryCatch(
       readr::read_delim(
         path,
         delim      = delim,
         col_names  = config[["col_names"]]  %||% TRUE,
-        skip       = config[["csv_skip"]]   %||% 0L,
-        quote      = config[["quote_char"]] %||% '"',
+        skip       = config[["csv_skip"]]   %||% .default_read$csv_skip,
+        quote      = config[["quote_char"]] %||% .default_read$quote_char,
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),
         show_col_types = FALSE
@@ -279,7 +279,7 @@ read_dataset <- function(path, config) {
         ),
         col_types  = readr::cols(.default = "c"),
         locale     = readr::locale(encoding = enc),
-        skip       = config[["fwf_skip"]] %||% 0L,
+        skip       = config[["fwf_skip"]] %||% .default_read$fwf_skip,
         show_col_types = FALSE
       ),
       error = function(e) rlang::abort(paste0("Failed to parse file '", path, "': ", conditionMessage(e)),

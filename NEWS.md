@@ -7,6 +7,15 @@
   names — the returned `id` column is what `compare_snapshots()` takes to
   compare a specific pair of runs.
 
+* Internal: a config vocabulary (`R/vocabulary.R`) now records every YAML key
+  the package consumes — scope, type, default, positional flag, description —
+  as the single source of truth the upcoming validator checks against and the
+  config generators emit from. In support, the per-site default literals were
+  consolidated into shared constants (`.default_read`, `.default_qc_rules`,
+  joining the existing `.default_paths`/`.default_comparison_rules`):
+  `max_missing_rate`'s 0.05 previously lived independently in two files.
+  No behaviour change.
+
 * Still to come this release: config generators (`generate_dataset_config()`,
   `generate_global_config()`) and `validate_config()` — the sniff-to-YAML core
   replacing the GUI workflow.

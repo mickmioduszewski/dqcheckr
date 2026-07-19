@@ -54,6 +54,47 @@
   report_output_dir = "reports/"
 )
 
+#' Default file-reading options
+#'
+#' Single source of the per-key fallbacks \code{read_dataset()} applies when a
+#' config omits them. Previously inlined at each \code{%||%} site in
+#' \code{ingest.R}; one constant makes the reader and the config vocabulary
+#' (\code{vocabulary.R}) provably agree.
+#' @keywords internal
+#' @noRd
+.default_read <- list(
+  format     = "csv",
+  encoding   = "UTF-8",
+  delimiter  = ",",
+  quote_char = '"',
+  csv_skip   = 0L,
+  fwf_skip   = 0L
+)
+
+#' Default QC-rule thresholds and behaviour flags
+#'
+#' Single source of the rule defaults applied when neither the global
+#' \code{default_rules} nor a dataset's \code{rule_overrides}/\code{column_rules}
+#' sets a value. Previously inlined at each call site -- max_missing_rate's 0.05
+#' lived independently in \code{checks_generic.R} and \code{snapshot.R}, an
+#' invitation to drift. Rules whose absence means "check not run" (max_z_score,
+#' iqr_fence_multiplier, max_row_count, max_file_size_mb, column_order_severity)
+#' deliberately have no entry here.
+#' @keywords internal
+#' @noRd
+.default_qc_rules <- list(
+  max_missing_rate             = 0.05,
+  max_non_numeric_rate         = 0.01,
+  warn_non_numeric_rate        = 0.0,
+  min_row_count                = 0,
+  type_inference_threshold     = 0.90,
+  missing_rate_change_severity = "warn",
+  flag_new_columns             = TRUE,
+  flag_dropped_columns         = TRUE,
+  flag_type_changes            = TRUE,
+  flag_column_order_change     = TRUE
+)
+
 #' Construct a data quality result object
 #'
 #' Creates the atomic result unit returned by every check function.
@@ -275,7 +316,8 @@ infer_col_type <- function(x, threshold = 0.90) {
 resolve_col_type <- function(col, x, config) {
   override <- (config[["column_types"]] %||% list())[[col]]
   if (!is.null(override)) return(override)
-  infer_col_type(x, config[["rules"]][["type_inference_threshold"]] %||% 0.90)
+  infer_col_type(x, config[["rules"]][["type_inference_threshold"]] %||%
+                   .default_qc_rules$type_inference_threshold)
 }
 
 #' Canonical report filename for a run
