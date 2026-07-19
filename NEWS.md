@@ -1,5 +1,22 @@
 # dqcheckr 0.3.0 (development)
 
+* New `validate_config(dataset_name, config_dir)`: config-only validation of
+  the global and dataset YAML against the config vocabulary. Reports every
+  finding in one pass (severities error/warning/note) instead of aborting on
+  the first: unknown keys get a did-you-mean suggestion and are tolerated as
+  warnings so hand-kept extra keys round-trip; wrong types/ranges, misplaced
+  rule keys (rules-level vs per-column), `fwf_col_names`/`fwf_widths` length
+  mismatches, duplicate output column names, unresolved `TODO` width
+  placeholders, and a missing file source are errors. Unreadable config files
+  abort with distinct classes: `dqcheckr_missing_file`,
+  `dqcheckr_empty_config`, `dqcheckr_config_parse_error`,
+  `dqcheckr_invalid_config`.
+
+* CP-04 (numeric mean shift) now honours a per-column
+  `max_numeric_mean_shift_pct` set in `column_rules`, which the GUI has always
+  written but the check silently ignored — the read goes through the same
+  column > rules > default resolution as every other per-column threshold.
+
 * New `list_runs(dataset_name, config_dir, n)`: name-based run history. Resolves
   the snapshot database from the dataset's merged configuration exactly as
   `run_dq_check()` does and returns the recent-runs data frame from
