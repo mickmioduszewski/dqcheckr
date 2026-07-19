@@ -142,8 +142,8 @@ compare_snapshots <- function(dataset_name,
   thresholds <- if (file.exists(ds_yml)) {
     cfg <- load_config(dataset_name, config_dir)
     list(
-      snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
-      report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+      snapshot_db                    = cfg[["snapshot_db"]] %||% .default_paths$snapshot_db,
+      report_output_dir              = cfg[["report_output_dir"]] %||% .default_paths$report_output_dir,
       max_missing_rate_change_pp     = cfg[["rules"]][["max_missing_rate_change_pp"]]     %||% .default_comparison_rules$max_missing_rate_change_pp,
       max_numeric_mean_shift_pct     = cfg[["rules"]][["max_numeric_mean_shift_pct"]]     %||% .default_comparison_rules$max_numeric_mean_shift_pct,
       max_non_numeric_rate_change_pp = cfg[["rules"]][["max_non_numeric_rate_change_pp"]] %||% .default_comparison_rules$max_non_numeric_rate_change_pp,
@@ -288,8 +288,8 @@ compare_snapshots <- function(dataset_name,
   dr  <- cfg[["default_rules"]] %||% list()
 
   list(
-    snapshot_db                    = cfg[["snapshot_db"]] %||% "data/snapshots.sqlite",
-    report_output_dir              = cfg[["report_output_dir"]] %||% "reports/",
+    snapshot_db                    = cfg[["snapshot_db"]] %||% .default_paths$snapshot_db,
+    report_output_dir              = cfg[["report_output_dir"]] %||% .default_paths$report_output_dir,
     max_missing_rate_change_pp     = dr[["max_missing_rate_change_pp"]]     %||% .default_comparison_rules$max_missing_rate_change_pp,
     max_numeric_mean_shift_pct     = dr[["max_numeric_mean_shift_pct"]]     %||% .default_comparison_rules$max_numeric_mean_shift_pct,
     max_non_numeric_rate_change_pp = dr[["max_non_numeric_rate_change_pp"]] %||% .default_comparison_rules$max_non_numeric_rate_change_pp,

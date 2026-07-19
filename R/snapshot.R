@@ -518,7 +518,7 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
 #' @export
 list_runs <- function(dataset_name, config_dir = ".", n = 10) {
   config  <- load_config(dataset_name, config_dir)
-  db_path <- normalizePath(config[["snapshot_db"]] %||% "data/snapshots.sqlite",
+  db_path <- normalizePath(config[["snapshot_db"]] %||% .default_paths$snapshot_db,
                            mustWork = FALSE)
   read_recent_snapshots(db_path, dataset_name, n = n)
 }

@@ -187,6 +187,14 @@ test_that("list_runs() sees the row written by a full run_dq_check()", {
   expect_equal(res$id, result$snapshot_id)
 })
 
+test_that(".default_paths is the single source of both path defaults", {
+  # The documented defaults, pinned: changing them must be a conscious act that
+  # touches this test, and every resolution site reads this constant (no
+  # re-hardcoded literals -- the pre-0.3.0 state had four independent copies).
+  expect_equal(.default_paths$snapshot_db,       "data/snapshots.sqlite")
+  expect_equal(.default_paths$report_output_dir, "reports/")
+})
+
 # -- failure modes of the config-resolution step -------------------------------
 
 test_that("missing dataset config aborts with dqcheckr_missing_file", {

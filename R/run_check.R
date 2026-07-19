@@ -82,7 +82,7 @@ run_dq_check <- function(dataset_name,
 
   col_stats <- compute_col_stats(df_curr, config, types = types_curr)
 
-  db_path         <- normalizePath(config[["snapshot_db"]] %||% "data/snapshots.sqlite",
+  db_path         <- normalizePath(config[["snapshot_db"]] %||% .default_paths$snapshot_db,
                                    mustWork = FALSE)
   comparison_mode <- if (!is.null(df_prev)) "comparison" else "single"
   # report_file is deliberately not set here: it is written by an UPDATE after a
@@ -111,7 +111,7 @@ run_dq_check <- function(dataset_name,
       snapshot_history = snapshot_history,
       config           = config,
       col_stats        = col_stats,
-      output_dir       = config[["report_output_dir"]] %||% "reports/",
+      output_dir       = config[["report_output_dir"]] %||% .default_paths$report_output_dir,
       open_report      = open_report,
       run_time         = run_time,
       snapshot_id      = snapshot_id

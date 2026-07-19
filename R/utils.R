@@ -39,6 +39,21 @@
   max_non_numeric_rate_change_pp = 1.0
 )
 
+#' Default infrastructure paths
+#'
+#' Single source of the two path defaults, read via \code{%||%} wherever a
+#' config omits \code{snapshot_db} or \code{report_output_dir}
+#' (\code{run_dq_check()}, \code{list_runs()}, and both drift threshold
+#' loaders). Repeating the literals at each site let them drift independently;
+#' one constant makes divergence impossible. Relative values resolve against
+#' the working directory (the deployment root by convention).
+#' @keywords internal
+#' @noRd
+.default_paths <- list(
+  snapshot_db       = "data/snapshots.sqlite",
+  report_output_dir = "reports/"
+)
+
 #' Construct a data quality result object
 #'
 #' Creates the atomic result unit returned by every check function.
