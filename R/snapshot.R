@@ -480,3 +480,45 @@ read_recent_snapshots <- function(db_path, dataset_name, n = 10) {
     empty
   })
 }
+
+#' List recent runs for a dataset by name
+#'
+#' Name-based wrapper around \code{\link{read_recent_snapshots}}: resolves the
+#' snapshot database from the dataset's configuration exactly as
+#' \code{\link{run_dq_check}} does (the merged global + dataset config's
+#' \code{snapshot_db}, defaulting to \code{"data/snapshots.sqlite"}), so the
+#' whole workflow can be driven by dataset names without ever hand-typing a
+#' database path. The returned \code{id} column is the snapshot id that
+#' \code{\link{compare_snapshots}} takes to compare a specific pair of runs.
+#'
+#' @param dataset_name Character. Dataset name; must match
+#'   \code{<dataset_name>.yml} in \code{config_dir}.
+#' @param config_dir Character. Path to the directory containing
+#'   \code{dqcheckr.yml} and the dataset YAML file. Defaults to \code{"."}.
+#' @param n Integer. Maximum number of records to return. Defaults to 10.
+#'
+#' @return The data frame documented in \code{\link{read_recent_snapshots}}:
+#'   one row per run, most recent first, empty (with the full column schema)
+#'   when the database does not exist or holds no rows for the dataset.
+#'
+#' @note As with \code{\link{run_dq_check}}, a relative \code{snapshot_db}
+#'   resolves against the R process's \emph{working directory}, not against
+#'   \code{config_dir}. Call from the deployment root or use an absolute path
+#'   in the config, or the lookup will (like a run started from the wrong
+#'   directory) point at a database that isn't the deployment's.
+#'
+#' @examples
+#' tmp <- gsub("\\\\", "/", tempdir())
+#' writeLines(paste0('snapshot_db: "', tmp, '/snap.sqlite"'),
+#'            file.path(tmp, "dqcheckr.yml"))
+#' writeLines(c('dataset_name: "demo"', 'format: csv'),
+#'            file.path(tmp, "demo.yml"))
+#' list_runs("demo", config_dir = tmp)   # empty frame: no runs recorded yet
+#'
+#' @export
+list_runs <- function(dataset_name, config_dir = ".", n = 10) {
+  config  <- load_config(dataset_name, config_dir)
+  db_path <- normalizePath(config[["snapshot_db"]] %||% "data/snapshots.sqlite",
+                           mustWork = FALSE)
+  read_recent_snapshots(db_path, dataset_name, n = n)
+}

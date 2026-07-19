@@ -1,8 +1,15 @@
 # dqcheckr 0.3.0 (development)
 
-* Config generators (`generate_dataset_config()`, `generate_global_config()`),
-  `validate_config()`, and `list_runs()` — the sniff-to-YAML core replacing the
-  GUI workflow (in progress).
+* New `list_runs(dataset_name, config_dir, n)`: name-based run history. Resolves
+  the snapshot database from the dataset's merged configuration exactly as
+  `run_dq_check()` does and returns the recent-runs data frame from
+  `read_recent_snapshots()`, so the workflow can be driven end to end by dataset
+  names — the returned `id` column is what `compare_snapshots()` takes to
+  compare a specific pair of runs.
+
+* Still to come this release: config generators (`generate_dataset_config()`,
+  `generate_global_config()`) and `validate_config()` — the sniff-to-YAML core
+  replacing the GUI workflow.
 
 # dqcheckr 0.2.5
 
