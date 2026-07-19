@@ -17,8 +17,10 @@ validate_config(dataset_name, config_dir = ".")
 An object of class \code{dqcheckr_validation}: a list with
   \code{dataset_name}, \code{config_dir}, \code{findings} (a data frame
   with columns \code{file}, \code{key}, \code{severity}, \code{message}),
-  \code{tier} (\code{"config-only"}), and \code{valid} (\code{TRUE} when
-  no error-severity findings exist).
+  \code{tier} (\code{"config+header"} when Tier 2 ran, else
+  \code{"config-only"}), \code{tier2_skipped} (\code{NULL}, or the reason
+  Tier 2 did not run), and \code{valid} (\code{TRUE} when no
+  error-severity findings exist).
 }
 \description{
 Checks the global \code{dqcheckr.yml} and the dataset's YAML against the
@@ -31,7 +33,20 @@ pass -- nothing aborts on the first problem -- so a hand-edited config can
 be fixed in one round trip.
 }
 \details{
-This is the config-only tier: it reads nothing but the two YAML files.
+Validation runs in two tiers. \strong{Tier 1 (config-only)} reads nothing
+but the two YAML files and always runs. \strong{Tier 2 (header cross-check)}
+additionally opens just the first line(s) of the delivery the config points
+at -- never the file body, so it is cheap even for multi-GB files on a
+network share -- and verifies the config against reality:
+\code{col_names} length vs the physical column count,
+\code{key_columns}/\code{expected_columns}/\code{column_types}/
+\code{column_rules} naming columns that exist, and \code{fwf_widths}
+summing to the record length. When no delivery file is resolvable (config
+written ahead of the first delivery, empty folder, unreadable header),
+Tier 2 is skipped and the skip is \emph{stated} in the result
+(\code{tier2_skipped}) and by \code{print()} -- a verdict always says
+which tier it reached.
+
 Findings have three severities: \code{"error"} (the run would misbehave or
 abort), \code{"warning"} (suspicious but survivable, e.g. an unknown key,
 which is tolerated so hand-kept extra keys round-trip), and \code{"note"}

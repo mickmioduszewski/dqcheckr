@@ -342,6 +342,248 @@ test_that("YAML that is not a key map aborts with dqcheckr_invalid_config", {
                class = "dqcheckr_invalid_config")
 })
 
+# ==============================================================================
+# Tier 2: header-only cross-check against the delivery file
+# ==============================================================================
+
+# A config dir whose dataset config points at a real delivery file written
+# from `content` lines. Extra dataset YAML lines via `dataset`.
+vcfg2 <- function(content, dataset = character(), format = "csv",
+                  file_ext = ".csv") {
+  data_file <- tempfile(fileext = file_ext)
+  writeLines(content, data_file)
+  dir <- vcfg(dataset = c('dataset_name: "demo"',
+                          sprintf("format: %s", format),
+                          sprintf('current_file: "%s"',
+                                  gsub("\\\\", "/", data_file)),
+                          dataset))
+  attr(dir, "data_file") <- data_file
+  dir
+}
+cleanup2 <- function(dir) unlink(c(attr(dir, "data_file"), dir), recursive = TRUE)
+
+test_that("a matched CSV fixture passes tier 2 with zero findings and tier config+header", {
+  dir <- vcfg2("id,amount,status", dataset = c(
+    "expected_columns: [id, amount, status]", "key_columns: [id]",
+    "column_types:", "  amount: numeric",
+    "column_rules:", "  amount:", "    min_value: 0"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+  expect_equal(v$tier, "config+header")
+  expect_null(v$tier2_skipped)
+})
+
+test_that("col_names shorter than the delivery is an error naming both counts", {
+  dir <- vcfg2(c("Date,Amount,Currency,Amount,Status", "1,2,3,4,5"),
+               dataset = c("col_names: [date, amount, currency, status]",
+                           "csv_skip: 1"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_false(v$valid)
+  expect_equal(sev_of(v, "col_names"), "error")
+  expect_match(msgs_of(v, "col_names"), "4 name")
+  expect_match(msgs_of(v, "col_names"), "5 column")
+  expect_match(msgs_of(v, "col_names"), "commented out")
+})
+
+test_that("col_names longer than the delivery is also an error", {
+  dir <- vcfg2("a,b", dataset = "col_names: [x, y, z]")
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_equal(sev_of(v, "col_names"), "error")
+  expect_match(msgs_of(v, "col_names"), "3 name")
+  expect_match(msgs_of(v, "col_names"), "2 column")
+})
+
+test_that("csv_skip + col_names counts against the first data line, not the replaced header", {
+  # Physical line 1 (old header) has 5 fields and is skipped; the matching
+  # col_names list of 5 must validate clean.
+  dir <- vcfg2(c("Date,Amount,Currency,Amount,Status", "1,2,3,4,5"),
+               dataset = c("col_names: [date, amt_gross, ccy, amt_ref, status]",
+                           "csv_skip: 1"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+})
+
+test_that("each name cross-check fires individually with its severity", {
+  dir <- vcfg2("id,amount", dataset = "key_columns: [custid]")
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_false(v$valid)                       # key_columns: error
+  expect_equal(sev_of(v, "key_columns"), "error")
+  expect_match(msgs_of(v, "key_columns"), "custid")
+
+  dir2 <- vcfg2("id,amount", dataset = "expected_columns: [id, amount, ref]")
+  on.exit(cleanup2(dir2), add = TRUE)
+  v2 <- validate_config("demo", config_dir = dir2)
+  expect_true(v2$valid)                       # expected_columns: warning only
+  expect_equal(sev_of(v2, "expected_columns"), "warning")
+  expect_match(msgs_of(v2, "expected_columns"), "ref")
+
+  dir3 <- vcfg2("id,amount", dataset = c("column_types:", "  ghost: numeric"))
+  on.exit(cleanup2(dir3), add = TRUE)
+  v3 <- validate_config("demo", config_dir = dir3)
+  expect_equal(sev_of(v3, "column_types"), "warning")
+
+  dir4 <- vcfg2("id,amount",
+                dataset = c("column_rules:", "  ghost:", "    min_value: 0"))
+  on.exit(cleanup2(dir4), add = TRUE)
+  v4 <- validate_config("demo", config_dir = dir4)
+  expect_equal(sev_of(v4, "column_rules"), "warning")
+})
+
+test_that("name checks use col_names as the effective set when supplied", {
+  # File header says A,B but col_names renames to id,amount: key_columns must
+  # be checked against the renamed set, not the raw header.
+  dir <- vcfg2(c("A,B", "1,2"),
+               dataset = c("col_names: [id, amount]", "csv_skip: 1",
+                           "key_columns: [id]"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+})
+
+test_that("the header parse honours a non-default delimiter and quote", {
+  # ';'-separated with a quoted field containing ';' -- a comma-parse or
+  # quote-blind parse would get the column count wrong.
+  dir <- vcfg2("'id;x';amount;status",
+               dataset = c('delimiter: ";"', "quote_char: \"'\"",
+                           "expected_columns: [\"id;x\", amount, status]"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+})
+
+test_that("a UTF-8 BOM does not corrupt the first column's name", {
+  data_file <- tempfile(fileext = ".csv")
+  writeBin(c(charToRaw("\xEF\xBB\xBF"), charToRaw("id,amount\n1,2\n")), data_file)
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: csv",
+                          sprintf('current_file: "%s"',
+                                  gsub("\\\\", "/", data_file)),
+                          "key_columns: [id]"))
+  on.exit(unlink(c(data_file, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)                        # BOM stripped: 'id' matches
+  expect_equal(nrow(v$findings), 0L)
+})
+
+test_that("folder mode resolves the newest file for the header check", {
+  folder <- file.path(tempdir(), paste0("t2_folder_", sample.int(1e9, 1)))
+  dir.create(folder)
+  old <- file.path(folder, "old.csv"); new <- file.path(folder, "new.csv")
+  writeLines("a,b",    old)                   # 2 columns
+  writeLines("a,b,c",  new)                   # 3 columns -- the newest
+  Sys.setFileTime(old, Sys.time() - 3600)
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: csv",
+                          sprintf('folder: "%s"', gsub("\\\\", "/", folder)),
+                          "col_names: [x, y, z]"))   # matches new.csv only
+  on.exit(unlink(c(folder, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+})
+
+# -- FWF record length ---------------------------------------------------------
+
+test_that("fwf widths summing over the record length is an error; under is a warning", {
+  dir <- vcfg2("AB12XY", format = "fwf", file_ext = ".txt",
+               dataset = "fwf_widths: [2, 2, 4]")     # sum 8 > 6
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_false(v$valid)
+  expect_match(msgs_of(v, "fwf_widths"), "sum \\(8\\) exceeds the record length \\(6\\)")
+
+  dir2 <- vcfg2("AB12XY", format = "fwf", file_ext = ".txt",
+                dataset = "fwf_widths: [2, 2]")       # sum 4 < 6
+  on.exit(cleanup2(dir2), add = TRUE)
+  v2 <- validate_config("demo", config_dir = dir2)
+  expect_true(v2$valid)
+  expect_equal(sev_of(v2, "fwf_widths"), "warning")
+  expect_match(msgs_of(v2, "fwf_widths"), "short of the record length \\(6\\)")
+})
+
+test_that("an exact fwf width sum is clean, and CRLF line endings do not skew it", {
+  data_file <- tempfile(fileext = ".txt")
+  writeBin(charToRaw("AB12XY\r\nCD34ZW\r\n"), data_file)  # CRLF: record is 6, not 7
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: fwf",
+                          sprintf('current_file: "%s"',
+                                  gsub("\\\\", "/", data_file)),
+                          "fwf_widths: [2, 2, 2]",
+                          "fwf_col_names: [a, n, z]",
+                          "key_columns: [a]"))
+  on.exit(unlink(c(data_file, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+  expect_equal(v$tier, "config+header")
+})
+
+test_that("fwf_skip is honoured before measuring the record", {
+  dir <- vcfg2(c("REPORT HEADER LINE LONGER THAN DATA", "AB12"),
+               format = "fwf", file_ext = ".txt",
+               dataset = c("fwf_widths: [2, 2]", "fwf_skip: 1"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)                        # measured against "AB12", not the banner
+  expect_equal(nrow(v$findings), 0L)
+})
+
+test_that("FWF without fwf_col_names skips name checks rather than misfiring", {
+  dir <- vcfg2("AB12", format = "fwf", file_ext = ".txt",
+               dataset = c("fwf_widths: [2, 2]", "key_columns: [id]"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  # Effective names unknown: the key_columns cross-check cannot run, and must
+  # not produce a false finding.
+  expect_length(sev_of(v, "key_columns"), 0)
+})
+
+# -- skip semantics ------------------------------------------------------------
+
+test_that("an unresolvable delivery skips tier 2 with a stated reason, not an error", {
+  dir <- vcfg()                               # current_file: "x.csv" (absent)
+  on.exit(unlink(dir, recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(v$tier, "config-only")
+  expect_match(v$tier2_skipped, "x.csv")
+  out <- capture.output(print(v))
+  expect_true(any(grepl("Header cross-check skipped", out)))
+})
+
+test_that("an empty folder skips tier 2 with a stated reason", {
+  folder <- file.path(tempdir(), paste0("t2_empty_", sample.int(1e9, 1)))
+  dir.create(folder)
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: csv",
+                          sprintf('folder: "%s"', gsub("\\\\", "/", folder))))
+  on.exit(unlink(c(folder, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_equal(v$tier, "config-only")
+  expect_match(v$tier2_skipped, "No files")
+})
+
+# -- boundedness ---------------------------------------------------------------
+
+test_that("tier 2 reads only the head: a malformed multi-thousand-line body is never parsed", {
+  # Body lines carry unclosed quotes and ragged fields that a whole-file parse
+  # would choke on (or at least slow down); only the header line is read, so
+  # validation stays clean and instant.
+  dir <- vcfg2(c("id,amount",
+                 rep('"unclosed,quote,and,ragged,fields,,,,x', 5000)),
+               dataset = "key_columns: [id]")
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+  expect_equal(v$tier, "config+header")
+})
+
 # -- checker-registry completeness ---------------------------------------------
 
 test_that("every vocabulary key has a type checker, both tables", {

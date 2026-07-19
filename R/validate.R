@@ -305,6 +305,139 @@
   do.call(rbind, c(list(.no_findings()), .compact(findings)))
 }
 
+# -- Tier 2: header-only cross-check against the delivery file -----------------
+
+# Read the first n lines of a file honouring the config's encoding, with a
+# UTF-8 BOM stripped. Bounded by construction: readLines(n) never touches the
+# body of a multi-GB delivery.
+.read_head_lines <- function(path, n, encoding) {
+  con <- file(path, open = "r", encoding = encoding)
+  on.exit(close(con), add = TRUE)
+  lines <- readLines(con, n = n, warn = FALSE)
+  if (length(lines) > 0) lines[1] <- sub("^\ufeff", "", lines[1])
+  # A CRLF file read under an encoding that bypasses text-mode translation
+  # leaves a trailing \r; strip so FWF record lengths are byte-honest.
+  sub("\r$", "", lines)
+}
+
+# Split one delimited line into fields, honouring the quote character.
+.split_fields <- function(line, delim, quote) {
+  scan(text = line, what = character(), sep = delim, quote = quote,
+       quiet = TRUE, strip.white = FALSE, blank.lines.skip = FALSE)
+}
+
+# Columns-exist checks shared by CSV and FWF: `names` is the effective column
+# set, or NULL when unknown (e.g. FWF without fwf_col_names) -- then nothing
+# to check. Severities: key_columns error (runtime FAILs every run on a typo'd
+# key -- a config mistake, best caught pre-run); expected_columns warning (a
+# mismatch is a legitimate runtime schema-drift finding, not always a config
+# error); column_types / column_rules warning (entries for absent columns are
+# silently inert).
+.tier2_name_findings <- function(cfg, names, file) {
+  if (is.null(names)) return(.no_findings())
+  findings <- list()
+  add <- function(key, severity, what, missing)
+    findings[[length(findings) + 1]] <<- .vfinding(
+      file, key, severity,
+      paste0("'", key, "' ", what, " column(s) not in the delivery: ",
+             paste(missing, collapse = ", "), "."))
+  miss <- function(x) setdiff(.as_vec(x), names)
+
+  if (!is.null(cfg[["key_columns"]])) {
+    m <- miss(cfg[["key_columns"]])
+    if (length(m)) add("key_columns", "error", "names", m)
+  }
+  if (!is.null(cfg[["expected_columns"]])) {
+    m <- miss(cfg[["expected_columns"]])
+    if (length(m)) add("expected_columns", "warning", "expects", m)
+  }
+  if (.is_named_map(cfg[["column_types"]])) {
+    m <- setdiff(names(cfg[["column_types"]]), names)
+    if (length(m)) add("column_types", "warning", "types", m)
+  }
+  if (.is_named_map(cfg[["column_rules"]])) {
+    m <- setdiff(names(cfg[["column_rules"]]), names)
+    if (length(m)) add("column_rules", "warning", "has rules for", m)
+  }
+  do.call(rbind, c(list(.no_findings()), findings))
+}
+
+# Runs the header-only cross-check. Returns list(findings=..., skipped=NULL)
+# on success, or list(findings=empty, skipped="reason") when the delivery is
+# not resolvable/readable -- skipping is a stated outcome, never silent.
+.validate_tier2 <- function(cfg, file) {
+  files <- tryCatch(detect_files(cfg), error = function(e) e)
+  if (inherits(files, "error"))
+    return(list(findings = .no_findings(), skipped = conditionMessage(files)))
+
+  fmt <- tolower(cfg[["format"]] %||% .default_read$format)
+  enc <- normalise_encoding(cfg[["encoding"]] %||% .default_read$encoding)
+
+  head_read <- tryCatch({
+    if (fmt == "fwf") {
+      skip  <- cfg[["fwf_skip"]] %||% .default_read$fwf_skip
+      lines <- .read_head_lines(files$current, skip + 1, enc)
+      if (length(lines) < skip + 1) stop("file has no data line to inspect")
+      record <- lines[skip + 1]
+
+      findings <- list()
+      widths <- .as_vec(cfg[["fwf_widths"]])
+      if (is.numeric(widths) && length(widths) > 0 && !anyNA(widths)) {
+        total <- sum(widths)
+        # Overshoot is an error: the reader runs out of characters and the
+        # trailing columns come back NA/garbage. Undershoot is a warning: a
+        # trailing field trimmed of padding is plausible, but worth eyes.
+        if (total > nchar(record))
+          findings <- c(findings, list(.vfinding(
+            file, "fwf_widths", "error",
+            sprintf("'fwf_widths' sum (%d) exceeds the record length (%d).",
+                    total, nchar(record)))))
+        else if (total < nchar(record))
+          findings <- c(findings, list(.vfinding(
+            file, "fwf_widths", "warning",
+            sprintf("'fwf_widths' sum (%d) is short of the record length (%d).",
+                    total, nchar(record)))))
+      }
+      eff_names <- if (!is.null(cfg[["fwf_col_names"]]))
+        .as_vec(cfg[["fwf_col_names"]]) else NULL
+      findings <- c(findings, list(.tier2_name_findings(cfg, eff_names, file)))
+      do.call(rbind, c(list(.no_findings()), findings))
+    } else {
+      skip  <- cfg[["csv_skip"]] %||% .default_read$csv_skip
+      lines <- .read_head_lines(files$current, skip + 1, enc)
+      if (length(lines) < skip + 1) stop("file has no line to inspect after csv_skip")
+      # After skipping, the first remaining line is the header (no col_names)
+      # or the first data record (col_names supplied) -- its field count is
+      # the physical column count either way.
+      fields  <- .split_fields(lines[skip + 1],
+                               cfg[["delimiter"]]  %||% .default_read$delimiter,
+                               cfg[["quote_char"]] %||% .default_read$quote_char)
+      n_file  <- length(fields)
+
+      findings <- list()
+      eff_names <- fields
+      if (!is.null(cfg[["col_names"]])) {
+        eff_names <- .as_vec(cfg[["col_names"]])
+        if (length(eff_names) != n_file)
+          findings <- c(findings, list(.vfinding(
+            file, "col_names", "error",
+            sprintf(paste0("'col_names' has %d name(s) but the delivery has %d ",
+                           "column(s). Positional lists must cover every physical ",
+                           "column -- was an entry commented out?"),
+                    length(eff_names), n_file))))
+      }
+      findings <- c(findings, list(.tier2_name_findings(cfg, eff_names, file)))
+      do.call(rbind, c(list(.no_findings()), findings))
+    }
+  }, error = function(e) e)
+
+  if (inherits(head_read, "error"))
+    return(list(findings = .no_findings(),
+                skipped  = paste0("could not read the delivery header: ",
+                                  conditionMessage(head_read))))
+  list(findings = head_read, skipped = NULL)
+}
+
 # -- public API ----------------------------------------------------------------
 
 #' Validate a dataset's configuration
@@ -318,7 +451,20 @@
 #' pass -- nothing aborts on the first problem -- so a hand-edited config can
 #' be fixed in one round trip.
 #'
-#' This is the config-only tier: it reads nothing but the two YAML files.
+#' Validation runs in two tiers. \strong{Tier 1 (config-only)} reads nothing
+#' but the two YAML files and always runs. \strong{Tier 2 (header cross-check)}
+#' additionally opens just the first line(s) of the delivery the config points
+#' at -- never the file body, so it is cheap even for multi-GB files on a
+#' network share -- and verifies the config against reality:
+#' \code{col_names} length vs the physical column count,
+#' \code{key_columns}/\code{expected_columns}/\code{column_types}/
+#' \code{column_rules} naming columns that exist, and \code{fwf_widths}
+#' summing to the record length. When no delivery file is resolvable (config
+#' written ahead of the first delivery, empty folder, unreadable header),
+#' Tier 2 is skipped and the skip is \emph{stated} in the result
+#' (\code{tier2_skipped}) and by \code{print()} -- a verdict always says
+#' which tier it reached.
+#'
 #' Findings have three severities: \code{"error"} (the run would misbehave or
 #' abort), \code{"warning"} (suspicious but survivable, e.g. an unknown key,
 #' which is tolerated so hand-kept extra keys round-trip), and \code{"note"}
@@ -337,8 +483,10 @@
 #' @return An object of class \code{dqcheckr_validation}: a list with
 #'   \code{dataset_name}, \code{config_dir}, \code{findings} (a data frame
 #'   with columns \code{file}, \code{key}, \code{severity}, \code{message}),
-#'   \code{tier} (\code{"config-only"}), and \code{valid} (\code{TRUE} when
-#'   no error-severity findings exist).
+#'   \code{tier} (\code{"config+header"} when Tier 2 ran, else
+#'   \code{"config-only"}), \code{tier2_skipped} (\code{NULL}, or the reason
+#'   Tier 2 did not run), and \code{valid} (\code{TRUE} when no
+#'   error-severity findings exist).
 #'
 #' @examples
 #' tmp <- gsub("\\\\", "/", tempdir())
@@ -361,14 +509,18 @@ validate_config <- function(dataset_name, config_dir = ".") {
     .validate_one_config(dataset_cfg, "dataset", basename(dataset_path),
                          dataset_name = dataset_name)
   )
+
+  tier2    <- .validate_tier2(dataset_cfg, basename(dataset_path))
+  findings <- rbind(findings, tier2$findings)
   rownames(findings) <- NULL
 
   structure(
-    list(dataset_name = dataset_name,
-         config_dir   = config_dir,
-         findings     = findings,
-         tier         = "config-only",
-         valid        = !any(findings$severity == "error")),
+    list(dataset_name  = dataset_name,
+         config_dir    = config_dir,
+         findings      = findings,
+         tier          = if (is.null(tier2$skipped)) "config+header" else "config-only",
+         tier2_skipped = tier2$skipped,
+         valid         = !any(findings$severity == "error")),
     class = "dqcheckr_validation"
   )
 }
@@ -377,6 +529,8 @@ validate_config <- function(dataset_name, config_dir = ".") {
 print.dqcheckr_validation <- function(x, ...) {
   cat(sprintf("dqcheckr config validation: %s -- %s (tier: %s)\n",
               x$dataset_name, if (x$valid) "VALID" else "INVALID", x$tier))
+  if (!is.null(x$tier2_skipped))
+    cat(sprintf("  Header cross-check skipped: %s\n", x$tier2_skipped))
   if (nrow(x$findings) == 0) {
     cat("No findings.\n")
   } else {

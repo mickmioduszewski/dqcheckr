@@ -12,6 +12,16 @@
   `dqcheckr_empty_config`, `dqcheckr_config_parse_error`,
   `dqcheckr_invalid_config`.
 
+  When the delivery file the config points at is resolvable, validation
+  additionally cross-checks the config against the file's *header only* (never
+  the body — cheap even for multi-GB files on a network share): `col_names`
+  length vs the physical column count, `key_columns` (error) and
+  `expected_columns`/`column_types`/`column_rules` (warning) naming columns
+  that exist, and `fwf_widths` summing to the record length (over: error;
+  under: warning). When no delivery is resolvable the header tier is skipped
+  with the reason stated in the result and by `print()` — a verdict always
+  says which tier it reached.
+
 * CP-04 (numeric mean shift) now honours a per-column
   `max_numeric_mean_shift_pct` set in `column_rules`, which the GUI has always
   written but the check silently ignored — the read goes through the same
