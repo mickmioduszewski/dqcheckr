@@ -93,6 +93,7 @@
 # key has an entry.
 .key_checkers <- list(
   dataset_name  = function(x) if (!.is_string(x)) "must be a non-empty string.",
+  description   = function(x) if (!.is_string(x)) "must be a non-empty string.",
   format        = function(x) {
     if (!.is_string(x) || !tolower(x) %in% c("csv", "fwf"))
       "must be \"csv\" or \"fwf\"."

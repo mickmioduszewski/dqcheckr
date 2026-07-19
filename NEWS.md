@@ -22,6 +22,15 @@
   with the reason stated in the result and by `print()` — a verdict always
   says which tier it reached.
 
+  `run_dq_check()` now validates first, before any other work: error-severity
+  findings abort with a `dqcheckr_validation_error` whose message lists every
+  finding, and **no snapshot row is written** — an unrunnable config can no
+  longer leave a `pending` orphan in the database. Warning-severity findings
+  are reported via `message()` and the run proceeds. A corrupt, empty, or
+  non-map config file now aborts the run with the typed classes above instead
+  of the YAML parser's raw error. The `description` key the GUI wizard writes
+  is part of the config vocabulary (never read by the checks).
+
 * CP-04 (numeric mean shift) now honours a per-column
   `max_numeric_mean_shift_pct` set in `column_rules`, which the GUI has always
   written but the check silently ignored — the read goes through the same

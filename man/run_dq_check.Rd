@@ -28,9 +28,18 @@ Invisibly, a named list with:
   }
 }
 \description{
-Orchestrates the complete dqcheckr pipeline: loads configuration, detects
-files, runs QC and comparison checks, writes a snapshot to SQLite, and
-renders an HTML report.
+Orchestrates the complete dqcheckr pipeline: validates the configuration,
+loads it, detects files, runs QC and comparison checks, writes a snapshot
+to SQLite, and renders an HTML report.
+}
+\details{
+Validation (\code{\link{validate_config}}) runs first, before any other
+work: error-severity findings abort with a
+\code{dqcheckr_validation_error} condition whose message lists every
+finding, and no snapshot row is written. Warning-severity findings are
+reported via \code{message()} and the run proceeds. Run
+\code{validate_config()} standalone to see all findings after editing a
+config without starting a run.
 }
 \note{
 Relative \code{snapshot_db} and \code{report_output_dir} config

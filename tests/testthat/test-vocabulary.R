@@ -22,7 +22,8 @@ consumed_top_level <- c(
 
 # Keys in the vocabulary that no R code reads directly, with the reason.
 documented_exceptions <- c(
-  dataset_name = "identity key: matched to the config filename; read as a function argument, not from the parsed YAML"
+  dataset_name = "identity key: matched to the config filename; read as a function argument, not from the parsed YAML",
+  description  = "human-facing free text; written by the GUI wizard and kept self-documenting, never read by the checks"
 )
 
 # The explicit walk of every rule key the package consumes.

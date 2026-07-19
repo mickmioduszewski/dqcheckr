@@ -33,6 +33,8 @@
   rbind(
     .vocab_row("dataset_name", "dataset", "string", "no", FALSE, NULL,
       "Identity of the dataset. Written into every config by convention; dqcheckr itself takes the name as a function argument and matches it to the config filename."),
+    .vocab_row("description", "dataset", "string", "no", FALSE, NULL,
+      "Free-text description of the dataset, for humans reading the config. Not read by the checks; the GUI wizard has always written it."),
     .vocab_row("format", "dataset", "string: \"csv\" or \"fwf\"", "no", FALSE,
       .default_read$format,
       "File format of the delivery. Defaults to CSV; \"fwf\" switches to the fixed-width reader and makes fwf_widths required."),

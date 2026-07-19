@@ -49,7 +49,8 @@ test_that("a config exercising EVERY vocabulary key validates clean", {
     global  = c('snapshot_db: "snap.sqlite"', 'report_output_dir: "reports/"',
                 "default_rules:", rules_yaml),
     dataset = c(
-      'dataset_name: "demo"', "format: csv", 'encoding: "UTF-8"',
+      'dataset_name: "demo"', 'description: "exercises every key"',
+      "format: csv", 'encoding: "UTF-8"',
       'delimiter: ","', "quote_char: \"'\"",
       "col_names: [id, amount, status]", "csv_skip: 1",
       'current_file: "x.csv"', 'previous_file: "y.csv"',

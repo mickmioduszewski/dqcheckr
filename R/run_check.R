@@ -1,8 +1,16 @@
 #' Run a full data quality check pipeline
 #'
-#' Orchestrates the complete dqcheckr pipeline: loads configuration, detects
-#' files, runs QC and comparison checks, writes a snapshot to SQLite, and
-#' renders an HTML report.
+#' Orchestrates the complete dqcheckr pipeline: validates the configuration,
+#' loads it, detects files, runs QC and comparison checks, writes a snapshot
+#' to SQLite, and renders an HTML report.
+#'
+#' Validation (\code{\link{validate_config}}) runs first, before any other
+#' work: error-severity findings abort with a
+#' \code{dqcheckr_validation_error} condition whose message lists every
+#' finding, and no snapshot row is written. Warning-severity findings are
+#' reported via \code{message()} and the run proceeds. Run
+#' \code{validate_config()} standalone to see all findings after editing a
+#' config without starting a run.
 #'
 #' @param dataset_name Character. Name of the dataset; must match a YAML config
 #'   file \code{<dataset_name>.yml} in \code{config_dir}.
@@ -54,6 +62,24 @@
 run_dq_check <- function(dataset_name,
                          config_dir   = ".",
                          open_report  = TRUE) {
+  # Validate before any work: an error-severity finding aborts here, BEFORE a
+  # snapshot row exists, so an unrunnable config can never leave a 'pending'
+  # orphan in the database. Same implementation as the standalone
+  # validate_config() -- the two cannot drift. This also runs the typed
+  # read-failure conditions (dqcheckr_config_parse_error etc.) ahead of
+  # load_config()'s raw yaml errors.
+  validation <- validate_config(dataset_name, config_dir)
+  errs <- validation$findings[validation$findings$severity == "error", , drop = FALSE]
+  if (nrow(errs) > 0)
+    rlang::abort(
+      paste0("Configuration for '", dataset_name, "' failed validation:\n",
+             paste0("  - [", errs$file, "] ", errs$message, collapse = "\n")),
+      class = c("dqcheckr_validation_error", "dqcheckr_error"))
+  warns <- validation$findings[validation$findings$severity == "warning", , drop = FALSE]
+  if (nrow(warns) > 0)
+    message("[dqcheckr] Config validation warnings for '", dataset_name, "':\n",
+            paste0("  - [", warns$file, "] ", warns$message, collapse = "\n"))
+
   config <- load_config(dataset_name, config_dir)
 
   # Single clock read for the whole run: the snapshot's run_timestamp and the
