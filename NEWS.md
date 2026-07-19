@@ -1,5 +1,14 @@
 # dqcheckr 0.3.0 (development)
 
+* New vignette *"The dqcheckr workflow: generate, edit, validate, run"* — a
+  fully executed walk-through of the whole loop on a bundled example:
+  bootstrap a deployment with the two generators, read the generated
+  self-documenting YAML (including the duplicate-header rename and the
+  positional-list warning), edit a rule, validate (including the did-you-mean
+  typo path), run, list the history, compare two deliveries, and the
+  packed-FWF `TODO` and never-overwrite special cases. Because it executes,
+  `R CMD check` runs the entire chain as a living test.
+
 * New `validate_config(dataset_name, config_dir)`: config-only validation of
   the global and dataset YAML against the config vocabulary. Reports every
   finding in one pass (severities error/warning/note) instead of aborting on

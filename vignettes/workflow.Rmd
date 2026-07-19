@@ -1,0 +1,223 @@
+---
+title: "The dqcheckr workflow: generate, edit, validate, run"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The dqcheckr workflow: generate, edit, validate, run}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, collapse = TRUE, comment = "#>")
+# The whole demo lives in a throwaway deployment root under tempdir(); every
+# chunk below runs from there, exactly as a real deployment runs from its
+# own root.
+demo_root <- file.path(tempdir(), "dq-demo")
+dir.create(demo_root, showWarnings = FALSE)
+knitr::opts_knit$set(root.dir = demo_root)
+```
+
+dqcheckr checks recurring data deliveries: each time a file arrives, one
+function call verifies it against a per-dataset configuration, records a
+snapshot, and renders an HTML report. The workflow is deliberately plain:
+
+* **configs are files** — generated once, then owned by your hand edits;
+* **running is code** — one R call per action, no application to operate;
+* **outputs are files** — self-contained HTML reports you open from disk,
+  plus a SQLite snapshot history.
+
+This vignette walks the whole loop on a small example: generate the configs,
+read what was generated, edit a rule, validate, run, list the history, and
+compare two deliveries.
+
+## A delivery arrives
+
+Our example delivery has a wrinkle that real files often have: the header
+repeats a column name (`Amount` appears twice).
+
+```{r delivery}
+writeLines(c(
+  "Date,Amount,Currency,Amount,Status",
+  "2026-07-01,100.00,AUD,15.00,settled",
+  "2026-07-02,250.50,AUD,0.00,settled",
+  "2026-07-03,80.25,NZD,8.10,pending"
+), "orders.csv")
+```
+
+## Bootstrap: two generator calls
+
+A brand-new deployment needs exactly two calls: one for the shared global
+options, one per dataset. Both are **create-only** — they will never
+overwrite a config that already exists.
+
+```{r generate}
+library(dqcheckr)
+generate_global_config(config_dir = "config")
+generate_dataset_config("orders.csv", config_dir = "config")
+```
+
+## Read what was generated
+
+The dataset config is fully-optioned and self-documenting: every key the
+package understands appears exactly once — detected values live, optional
+settings commented out with their defaults — each with the same description
+the validator uses. Note three things as you read it:
+
+* the duplicated `Amount` arrived **renamed positionally** (`Amount_2`, with a
+  `# was "Amount"` note), and `csv_skip: 1` drops the file's own header so the
+  renamed list replaces it;
+* the `col_names` list sits under a warning: it is **positional**, so you must
+  never comment out a single entry — every entry below it would shift onto the
+  wrong column;
+* the sniffer proposes `key_columns` candidates **commented out** — columns
+  unique in the sample, for you to confirm, never enforced silently.
+
+```{r show-config}
+writeLines(readLines(file.path("config", "orders.yml")))
+```
+
+## Edit a rule
+
+Editing a config is editing a text file. Here we do with code what you would
+do in an editor: uncomment the `rule_overrides` block and require at least
+one data row.
+
+```{r edit}
+cfg_path <- file.path("config", "orders.yml")
+lines <- readLines(cfg_path)
+lines <- sub("^# rule_overrides:", "rule_overrides:", lines)
+lines <- sub("^#   min_row_count: 1", "  min_row_count: 1", lines)
+writeLines(lines, cfg_path)
+```
+
+## Validate after every edit
+
+`validate_config()` reports **all** findings in one pass — vocabulary,
+types and ranges, positional-list consistency — and, when the delivery file
+is reachable, cross-checks the config against the file's header (never its
+body, so this is cheap even for very large files).
+
+```{r validate-clean}
+validate_config("orders", config_dir = "config")
+```
+
+Typos get a suggestion rather than a silent no-op. Watch what happens if we
+misspell a key:
+
+```{r validate-typo}
+writeLines(c(lines, 'delimitter: ";"'), cfg_path)
+validate_config("orders", config_dir = "config")
+writeLines(lines, cfg_path)   # undo
+```
+
+Unknown keys are tolerated as warnings (your own annotations round-trip
+safely); genuine mistakes — a wrong type, a broken positional list, a key
+column that does not exist in the file — are errors, and `run_dq_check()`
+refuses to start while any error stands.
+
+## Run the check
+
+```{r run}
+result <- run_dq_check("orders", config_dir = "config", open_report = FALSE)
+result$status
+```
+
+Each run appends a snapshot to the SQLite database and renders a
+self-contained HTML report into `reports/` (when the Quarto CLI is
+available; `open_report = TRUE`, the default, opens it for you in
+interactive use). The report is a plain file — open it from the file
+manager, mail it, archive it.
+
+## The run history
+
+The history is one call away, newest first. The `id` column is what the
+drift comparison takes.
+
+```{r list-runs}
+runs <- list_runs("orders", config_dir = "config")
+runs[, c("id", "run_timestamp", "overall_status",
+         "check_pass_count", "check_warn_count", "check_fail_count")]
+```
+
+## A second delivery, and drift
+
+The next delivery arrives — with a suspiciously changed `Amount` profile and
+a missing status. Run the check again, then compare the two snapshots.
+
+```{r second-delivery}
+writeLines(c(
+  "Date,Amount,Currency,Amount,Status",
+  "2026-08-01,900.00,AUD,15.00,settled",
+  "2026-08-02,1250.50,AUD,0.00,",
+  "2026-08-03,880.25,NZD,8.10,pending"
+), "orders.csv")
+result2 <- run_dq_check("orders", config_dir = "config", open_report = FALSE)
+```
+
+`compare_snapshots()` defaults to the two most recent runs; pass two `id`s
+from `list_runs()` to compare any historical pair. With `report = TRUE` (the
+default) it renders a drift report HTML like the run report; here we just
+compute.
+
+```{r drift}
+cmp <- compare_snapshots("orders", config_dir = "config",
+                         report = FALSE, open_report = FALSE)
+names(cmp)
+```
+
+## Special cases worth knowing
+
+**Fixed-width files.** The sniffer guesses column boundaries from blank
+gutters and always emits a character-position **ruler comment** above
+`fwf_widths` so you can correct a mis-split by counting. A *packed* file —
+columns touching, no gutters — gets explicit `TODO` widths that validation
+refuses to run until you fill them in against the ruler:
+
+```{r fwf-packed}
+writeLines(c("AB12XY0099QQWW2026",
+             "CD34ZW0100RRTT2026"), "ledger.txt")
+generate_dataset_config("ledger.txt", config_dir = "config")
+validate_config("ledger", config_dir = "config")
+```
+
+**The never-overwrite rule.** Generators create; humans edit. Re-running a
+generator against an existing config is refused, and the file is untouched —
+your hand-tuning can never be silently clobbered:
+
+```{r never-overwrite, error=TRUE}
+generate_dataset_config("orders.csv", config_dir = "config")
+```
+
+To re-sniff a structurally changed delivery, generate under another name (or
+into a scratch directory) and diff.
+
+## Where everything lives
+
+```
+deployment-root/
+├── config/            # one YAML per dataset + dqcheckr.yml -- the dataset list
+├── data/
+│   └── snapshots.sqlite
+├── reports/           # one self-contained HTML per run
+└── orders.csv         # deliveries (or point configs at their real location)
+```
+
+The `config/` folder **is** the dataset list: add a dataset by generating a
+config, remove one by deleting its file, inspect one by opening it. The whole
+workflow is these calls:
+
+| Action        | Call |
+|---------------|------|
+| New deployment | `generate_global_config("config")` |
+| New dataset    | `generate_dataset_config("file.csv", config_dir = "config")` |
+| Check an edit  | `validate_config("name", config_dir = "config")` |
+| Run            | `run_dq_check("name", config_dir = "config")` |
+| History        | `list_runs("name", config_dir = "config")` |
+| Drift          | `compare_snapshots("name", config_dir = "config")` |
+
+```{r cleanup, include=FALSE}
+# Remove the demo's contents but keep the directory itself: it is knitr's
+# working directory for this document, and the session tempdir is removed on
+# exit anyway.
+unlink(list.files(demo_root, full.names = TRUE), recursive = TRUE)
+```
