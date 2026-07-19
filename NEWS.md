@@ -1,3 +1,9 @@
+# dqcheckr 0.3.0 (development)
+
+* Config generators (`generate_dataset_config()`, `generate_global_config()`),
+  `validate_config()`, and `list_runs()` — the sniff-to-YAML core replacing the
+  GUI workflow (in progress).
+
 # dqcheckr 0.2.5
 
 ## Internal
