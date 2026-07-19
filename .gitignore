@@ -26,3 +26,4 @@ build/
 inst/doc/
 /doc/
 /Meta/
+tests/testthat/_problems/
