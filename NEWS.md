@@ -65,9 +65,20 @@
   detected/default/generated. This is the detection half of the config
   generator.
 
-* Still to come this release: config generators (`generate_dataset_config()`,
-  `generate_global_config()`) — the sniff-to-YAML core replacing the GUI
-  workflow.
+* New `generate_dataset_config(path, config_dir, dataset_name)`: sniffs a
+  delivery and writes a fully-optioned, self-documenting YAML config. Every
+  config key appears exactly once — detected values live, optional settings
+  commented out with their defaults — and each key carries the same
+  description the validator's vocabulary uses. Duplicate header names are
+  renamed positionally with `# was "..."` annotations and `csv_skip: 1`;
+  positional lists are always emitted complete under a do-not-comment
+  warning; fixed-width files get a character-position ruler comment, and a
+  packed file gets explicit `TODO` widths that `validate_config()` refuses to
+  run until filled in. Create-only: an existing config aborts with
+  `dqcheckr_config_exists` and is never touched (the never-overwrite rule).
+
+* Still to come this release: `generate_global_config()` — the global half of
+  the sniff-to-YAML core replacing the GUI workflow.
 
 # dqcheckr 0.2.5
 

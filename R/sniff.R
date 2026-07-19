@@ -157,19 +157,33 @@ sniff_dataset <- function(path) {
 
   delim <- .sniff_delimiter(lines)
 
-  if (is.null(delim) && length(lines) >= 2 &&
-      length(unique(nchar(lines))) == 1) {
-    # -- fixed width: equal-length records that no delimiter splits ------------
-    res$format <- "fwf"
+  # Minimum record length for the packed-FWF conclusion. Equal-length lines
+  # that no delimiter splits are EITHER a packed fixed-width file OR a
+  # single-column CSV whose values happen to be the same width ("A1", "B2",
+  # ...) -- indistinguishable from bytes alone. Packed mainframe-style records
+  # are characteristically long, single-column values short, so short records
+  # classify as CSV rather than demanding TODO widths for a file that most
+  # likely has only one column.
+  packed_min_len <- 16L
+
+  fwf_attempt <- is.null(delim) && length(lines) >= 2 &&
+    length(unique(nchar(lines))) == 1
+  if (fwf_attempt) {
     record_len <- nchar(lines[1])
     pos <- tryCatch(readr::fwf_empty(path, n = min(length(lines), 100L)),
                     error = function(e) NULL)
     if (is.null(pos) || length(pos$begin) <= 1) {
-      # Packed: no blank gutters to detect. An explicit marker, never a wrong
-      # confident guess -- the generator emits TODO widths from this.
-      res$fwf_packed <- TRUE
-      res$provenance[["col_names"]] <- "generated"
+      if (record_len >= packed_min_len) {
+        # Packed: no blank gutters to detect. An explicit marker, never a
+        # wrong confident guess -- the generator emits TODO widths from this.
+        res$format <- "fwf"
+        res$fwf_packed <- TRUE
+        res$provenance[["col_names"]] <- "generated"
+        return(res)
+      }
+      # Short records: fall through to the single-column CSV path below.
     } else {
+      res$format <- "fwf"
       widths <- diff(c(pos$begin, record_len))   # contiguous cover incl. gutters
       res$fwf_widths    <- as.integer(widths)
       res$fwf_col_names <- paste0("col_", seq_along(widths))
@@ -183,7 +197,8 @@ sniff_dataset <- function(path) {
       res$expected_columns      <- res$fwf_col_names
       res$n_sample_rows         <- length(lines)
     }
-    return(res)
+    if (res$format == "fwf") return(res)
+    # else: short undelimited equal-length records -- treat as CSV below.
   }
 
   # -- CSV (delimited, possibly single-column) ---------------------------------

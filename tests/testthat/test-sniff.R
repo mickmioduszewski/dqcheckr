@@ -225,13 +225,29 @@ test_that("a gutter-separated FWF file gets widths from fwf_empty, contiguous co
 })
 
 test_that("a packed FWF file sets the packed marker and never a confident wrong guess", {
-  f <- sniff_file(c("AB12XY", "CD34ZW", "EF56QQ"), ext = ".txt")
+  # Long, equal-length, undelimited, gutterless records: mainframe-style.
+  f <- sniff_file(c("AB12XY0099QQWW2026",
+                    "CD34ZW0100RRTT2026",
+                    "EF56QQ0101SSUU2026"), ext = ".txt")
   on.exit(unlink(f))
   s <- sniff_dataset(f)
   expect_equal(s$format, "fwf")
   expect_true(s$fwf_packed)
   expect_null(s$fwf_widths)
   expect_null(s$fwf_col_names)
+})
+
+test_that("short equal-length undelimited lines are single-column CSV, not packed FWF", {
+  # "id"/"A1"/"A2" are all width 2: byte-indistinguishable from a packed file,
+  # but packed mainframe records are characteristically long -- short records
+  # classify as the far more likely single-column CSV.
+  f <- sniff_file(c("id", "A1", "A2"))
+  on.exit(unlink(f))
+  s <- sniff_dataset(f)
+  expect_equal(s$format, "csv")
+  expect_false(s$fwf_packed)
+  expect_equal(s$col_names, "id")
+  expect_equal(s$header, TRUE)
 })
 
 test_that("varied-length lines without a delimiter stay csv, not fwf", {
