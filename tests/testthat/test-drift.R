@@ -522,7 +522,18 @@ test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)"
 
 test_that("malformed column_rules never crash drift: atomic entries skip, bad values warn + fall back", {
   # compare_snapshots() runs no validation, so it must tolerate any shape.
-  expect_length(.column_mean_shift_overrides(list(amount = 0.05)), 0)   # atomic entry
+  expect_warning(
+    a <- .column_mean_shift_overrides(list(amount = 0.05)),   # atomic entry
+    regexp = "entry for 'amount' is not a map")
+  expect_length(a, 0)
+  # Unnamed (YAML-sequence) and blank-named maps warn once, never crash.
+  expect_warning(u <- .column_mean_shift_overrides(list(0.1, 0.2)),
+                 regexp = "not a named map")
+  expect_length(u, 0)
+  expect_warning(b <- .column_mean_shift_overrides(
+    setNames(list(list(max_numeric_mean_shift_pct = 0.1)), "")),
+    regexp = "not a named map")
+  expect_length(b, 0)
   expect_length(.column_mean_shift_overrides(list(amount = list())), 0) # no override
   expect_warning(
     ov <- .column_mean_shift_overrides(

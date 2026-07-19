@@ -79,12 +79,23 @@ test_that("warning-severity findings message() and the run completes with a snap
   expect_equal(result$status, "WARN")
   runs <- list_runs("demo", config_dir = fx$root)
   expect_gte(runs$check_warn_count, 1L)
+  # This test is the designated render guard for VC-01 rows: render failures
+  # downgrade to warnings (suppressed above), so without these assertions a
+  # template regression on VC-01 rows would pass the suite silently.
+  skip_if_not_installed("quarto")
+  expect_false(is.null(result$report_path))
+  expect_equal(runs$render_status, "success")
 })
 
 test_that("shape drift invisible to the runtime checks still yields a recorded WARN, not a silent PASS", {
   # col_names one short of the delivery, with NO expected_columns/key_columns:
   # readr silently auto-names the surplus column, so without persisted
   # validation findings this run would PASS with no trace of the drift.
+  # Quarto is mocked: every assertion is about status/counts, and the
+  # warning-persistence test above is the designated VC-01 render guard.
+  testthat::local_mocked_bindings(
+    quarto_available = function(...) FALSE,
+    .package = "quarto")
   fx <- make_run_fixture("col_names: [id]")   # file has id,amount
   on.exit(unlink(fx$root, recursive = TRUE))
   result <- suppressMessages(suppressWarnings(
@@ -106,8 +117,8 @@ test_that("a clean config runs with no validation message at all", {
 # -- typed read-failure conditions now guard the run path ----------------------
 
 test_that("a corrupt dataset YAML aborts the run with dqcheckr_config_parse_error", {
-  # Closes the step-1 finding: this used to propagate yaml's raw untyped error
-  # out of load_config().
+  # Validation reads the raw YAML before load_config(), so the run path gets a
+  # typed condition here instead of the yaml parser's raw error.
   fx <- make_run_fixture()
   on.exit(unlink(fx$root, recursive = TRUE))
   writeLines("format: [unclosed", file.path(fx$root, "demo.yml"))

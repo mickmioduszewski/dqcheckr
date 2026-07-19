@@ -595,6 +595,38 @@ test_that("FWF width check measures BYTES, so multibyte text with correct widths
   expect_match(msgs_of(v2, "fwf_widths"), "11.*7 bytes")
 })
 
+test_that(".head_record_bytes is exact across terminator and BOM shapes", {
+  probe <- function(bytes, skip = 0L) {
+    f <- tempfile()
+    on.exit(unlink(f))
+    writeBin(charToRaw(bytes), f)
+    .head_record_bytes(f, skip)
+  }
+  expect_equal(probe("AB12XY\nCD\n"),          6L)   # LF
+  expect_equal(probe("AB12XY\r\nCD\r\n"),      6L)   # CRLF
+  expect_equal(probe("AB12XY"),                6L)   # no trailing newline
+  expect_equal(probe("AB12XY\nCD34", skip = 1L), 4L) # last record, no EOL
+  expect_equal(probe("\xef\xbb\xbfAB12\n"),    4L)   # UTF-8 BOM excluded
+  expect_equal(probe("caf\xc3\xa9\n"),         5L)   # multibyte counted as bytes
+  expect_equal(probe("AB\n", skip = 5L), NA_integer_) # skip past EOF
+  # A record whose CRLF straddles the old 8192-byte chunk boundary: the
+  # replaced hand-rolled scanner returned 8192 here (off by one).
+  expect_equal(probe(paste0(strrep("x", 8191), "\r\nnext\r\n")), 8191L)
+})
+
+test_that("the FWF width check is skipped for encodings where bytes are not the unit", {
+  data_file <- tempfile(fileext = ".txt")
+  writeLines(c("AB12", "CD34"), data_file)
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: fwf",
+                          'encoding: "UTF-16LE"',
+                          sprintf('current_file: "%s"',
+                                  gsub("\\\\", "/", data_file)),
+                          "fwf_widths: [2, 9]"))     # would mismatch if compared
+  on.exit(unlink(c(data_file, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_length(sev_of(v, "fwf_widths"), 0)          # gated, not garbage-compared
+})
+
 test_that("fwf_skip is honoured before measuring the record", {
   dir <- vcfg2(c("REPORT HEADER LINE LONGER THAN DATA", "AB12"),
                format = "fwf", file_ext = ".txt",
@@ -684,12 +716,12 @@ test_that("weird value shapes across keys produce findings, never validator cras
 })
 
 test_that("the tier-2 boundary structurally clamps any error to warning", {
-  # The policy must hold even for a future check that hands in "error":
-  # simulate one by clamping a hand-built frame through the boundary logic.
-  f <- rbind(.vfinding("d.yml", "key_columns", "error", "x"),
-             .vfinding("d.yml", "col_names",   "warning", "y"))
-  f$severity[f$severity == "error"] <- "warning"   # the clamp's contract
+  # The policy must hold even for a future check that hands in "error": feed
+  # the REAL clamp an error-severity frame.
+  f <- .clamp_tier2(rbind(.vfinding("d.yml", "key_columns", "error", "x"),
+                          .vfinding("d.yml", "col_names",   "warning", "y")))
   expect_true(all(f$severity == "warning"))
+  expect_equal(nrow(.clamp_tier2(.no_findings())), 0L)   # empty frame safe
   # And end-to-end: no tier-2 code path can produce an error finding today.
   dir <- vcfg2("id,amount", dataset = c("key_columns: [ghost]",
                                         "col_names: [only_one]"))

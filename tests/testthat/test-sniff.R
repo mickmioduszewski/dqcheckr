@@ -128,6 +128,14 @@ test_that("a trailing-delimiter header generates a config that validates green",
   expect_equal(nrow(v$findings), 0L)
 })
 
+test_that("a column literally named NA survives as the string, and never crashes the sniffer", {
+  f <- sniff_file(c("id,NA,amount", "A1,x,10", "A2,y,20"))
+  on.exit(unlink(f))
+  s <- sniff_dataset(f)                       # used to die: if (NA) in the rename diff
+  expect_equal(s$col_names, c("id", "NA", "amount"))
+  expect_null(s$renamed_from)                 # nothing renamed: "NA" is a real name
+})
+
 test_that("a rename never collides with a name already in the header", {
   # "Amount,Amount,Amount_2": the naive _2 suffix for the second column would
   # collide with the genuine third column -- it must bump to a free name.

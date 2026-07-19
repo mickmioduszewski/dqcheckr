@@ -85,7 +85,8 @@
 # with length 2 is a base R error), so they proceed as if the default.
 .safe_format <- function(cfg) {
   f <- cfg[["format"]]
-  if (.is_string(f)) tolower(f) else .default_read$format
+  if (.is_string(f) && tolower(f) %in% c("csv", "fwf")) tolower(f)
+  else .default_read$format
 }
 # YAML sequences arrive as an atomic vector (uniform) or a list; normalise.
 .as_vec     <- function(x) if (is.list(x)) unlist(x, use.names = FALSE) else x
@@ -358,41 +359,32 @@
   sub("\r$", "", lines)
 }
 
-# Byte length of the first record after `skip` lines, read RAW (no decoding):
-# the unit read_fwf actually slices by. A trailing \r (CRLF) is excluded.
-# NA when the file has no such record.
+# Byte length of the record after `skip` lines, read on a BINARY connection so
+# no re-encoding happens: readLines on "rb" preserves each line's raw bytes
+# (as-if latin1) and strips LF/CRLF/CR terminators itself, so
+# nchar(type = "bytes") is the true on-disk record length -- with none of the
+# chunk-boundary bookkeeping a hand-rolled scanner needs. A UTF-8 BOM is
+# excluded from record 1. NA when the file has no such record. Only meaningful
+# for UTF-8/single-byte encodings; the caller gates on .encoding_class().
 .head_record_bytes <- function(path, skip) {
   con <- file(path, open = "rb")
   on.exit(close(con), add = TRUE)
-  line_i <- 0L
-  bytes  <- 0L
-  repeat {
-    chunk <- readBin(con, "raw", 8192L)
-    if (length(chunk) == 0L)
-      return(if (line_i == skip && bytes > 0L) bytes else NA_integer_)
-    nl <- which(chunk == as.raw(0x0A))
-    from <- 1L
-    for (pos in nl) {
-      seg <- pos - from                       # bytes before this newline
-      if (line_i == skip) {
-        n <- bytes + seg
-        # exclude a CR immediately before the LF
-        if (seg > 0L && chunk[pos - 1L] == as.raw(0x0D)) n <- n - 1L
-        else if (seg == 0L && bytes > 0L) n <- n  # CR would have been counted; rare split -- accept
-        return(n)
-      }
-      line_i <- line_i + 1L
-      bytes  <- 0L
-      from   <- pos + 1L
-    }
-    bytes <- bytes + (length(chunk) - from + 1L)
-  }
+  l <- suppressWarnings(readLines(con, n = skip + 1L))  # warns on missing final EOL
+  if (length(l) < skip + 1L) return(NA_integer_)
+  rec <- l[skip + 1L]
+  if (skip == 0L) rec <- sub("^\xef\xbb\xbf", "", rec, useBytes = TRUE)
+  nchar(rec, type = "bytes")
 }
 
 # Split one delimited line into fields, honouring the quote character.
+# na.strings is emptied: scan()'s default turns a field spelled 'NA' into
+# NA_character_, but a header/record field is text -- a column literally named
+# NA must survive as the string "NA" (an NA here crashed the sniffer's rename
+# comparison and drew spurious not-in-the-delivery warnings in Tier 2).
 .split_fields <- function(line, delim, quote) {
   scan(text = line, what = character(), sep = delim, quote = quote,
-       quiet = TRUE, strip.white = FALSE, blank.lines.skip = FALSE)
+       quiet = TRUE, strip.white = FALSE, blank.lines.skip = FALSE,
+       na.strings = character(0))
 }
 
 # Columns-exist checks shared by CSV and FWF: `names` is the effective column
@@ -446,8 +438,11 @@
   head_read <- tryCatch({
     if (fmt == "fwf") {
       skip  <- cfg[["fwf_skip"]] %||% .default_read$fwf_skip
-      lines <- .read_head_lines(files$current, skip + 1, enc)
-      if (length(lines) < skip + 1) stop("file has no data line to inspect")
+      # The byte read below is the branch's ONLY file access: after the
+      # bytes-vs-bytes rewrite, a decoded head read here had no remaining
+      # consumer -- the name checks work from the config alone.
+      rec_bytes <- .head_record_bytes(files$current, skip)
+      if (is.na(rec_bytes)) stop("file has no data line to inspect")
 
       findings <- list()
       widths <- .as_vec(cfg[["fwf_widths"]])
@@ -455,11 +450,12 @@
         total <- sum(widths)
         # The comparison is BYTES vs bytes: read_fwf slices records by byte
         # position, so measuring the decoded line in characters would flag a
-        # multibyte delivery (accented UTF-8/latin1 text) with perfectly
-        # correct widths on every run. Both directions stay warnings (Tier-2
-        # policy): a record-length change can be delivery drift.
-        rec_bytes <- .head_record_bytes(files$current, skip)
-        if (!is.na(rec_bytes)) {
+        # multibyte UTF-8 delivery with perfectly correct widths on every
+        # run. Only meaningful when bytes are the record's unit -- for
+        # UTF-16/32-class encodings the raw scan would be garbage, so the
+        # check is skipped rather than wrong. Both directions stay warnings
+        # (Tier-2 policy): a record-length change can be delivery drift.
+        if (.encoding_class(enc) != "other") {
           if (total > rec_bytes)
             findings <- c(findings, list(.vfinding(
               file, "fwf_widths", "warning",
@@ -511,12 +507,17 @@
     return(list(findings = .no_findings(),
                 skipped  = paste0("could not read the delivery header: ",
                                   conditionMessage(head_read))))
-  # STRUCTURAL clamp of the tier policy: no Tier-2 finding may block a run,
-  # whatever severity a future check hands in. Delivery-facing cross-checks
-  # can always mean drift, and drift must reach a recorded run.
-  if (nrow(head_read) > 0)
-    head_read$severity[head_read$severity == "error"] <- "warning"
-  list(findings = head_read, skipped = NULL)
+  list(findings = .clamp_tier2(head_read), skipped = NULL)
+}
+
+# STRUCTURAL clamp of the tier policy: no Tier-2 finding may block a run,
+# whatever severity a future check hands in. Delivery-facing cross-checks can
+# always mean drift, and drift must reach a recorded run. Named (not inlined)
+# so the guard itself is testable against an error-severity frame.
+.clamp_tier2 <- function(findings) {
+  if (nrow(findings) > 0)
+    findings$severity[findings$severity == "error"] <- "warning"
+  findings
 }
 
 # -- public API ----------------------------------------------------------------

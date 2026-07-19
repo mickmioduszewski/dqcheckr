@@ -289,9 +289,24 @@ compare_snapshots <- function(dataset_name,
 # falls back to the rules-level threshold, never a silent divergence.
 .column_mean_shift_overrides <- function(column_rules) {
   if (!is.list(column_rules) || length(column_rules) == 0) return(numeric(0))
+  if (is.null(names(column_rules)) || any(!nzchar(names(column_rules)))) {
+    # A YAML sequence (unnamed) or blank-named entry: nothing addressable by
+    # column -- say so rather than dropping every override without a trace.
+    warning("column_rules is not a named map of column -> rules; per-column ",
+            "thresholds are ignored and the rules-level values apply.",
+            call. = FALSE)
+    return(numeric(0))
+  }
   vals <- vapply(names(column_rules), function(col) {
     r <- column_rules[[col]]
-    if (!is.list(r)) return(NA_real_)          # value where a rule map belongs
+    if (!is.list(r)) {
+      # A bare value where a rule map belongs is a plausible attempt AT this
+      # very threshold -- never skip it silently.
+      warning("column_rules entry for '", col, "' is not a map of rules; ",
+              "it is ignored and the rules-level thresholds apply.",
+              call. = FALSE)
+      return(NA_real_)
+    }
     v <- r[["max_numeric_mean_shift_pct"]]
     if (is.null(v)) return(NA_real_)           # no override set: normal case
     if (is.numeric(v) && length(v) == 1 && !is.na(v)) return(as.numeric(v))

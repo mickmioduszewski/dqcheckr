@@ -45,15 +45,14 @@
 # a name gets a _2/_3 suffix, bumped further if that name is itself taken --
 # the header "Amount,Amount,Amount_2" must not rename its second column to the
 # third's genuine name (the suffix candidate is checked against every original
-# header name AND every name already assigned). Returns list(names=...,
-# renamed_from=...) where renamed_from maps new name -> original (NULL when
-# nothing was renamed).
+# header name AND every name already assigned). Returns the deduplicated
+# character vector; which slots changed (and from what) is the CALLER's
+# accounting, done positionally against the pre-fill original header.
 .dedupe_names <- function(nms) {
-  if (!anyDuplicated(nms)) return(list(names = nms, renamed_from = NULL))
+  if (!anyDuplicated(nms)) return(nms)
   taken <- nms                      # originals all reserve their spellings
   seen  <- new.env(parent = emptyenv())
   out   <- character(length(nms))
-  from  <- character(0)
   for (i in seq_along(nms)) {
     n   <- nms[i]
     cnt <- (get0(n, envir = seen, ifnotfound = 0L)) + 1L
@@ -64,10 +63,9 @@
       while (cand %in% taken || cand %in% out)
         cand <- paste0(n, "_", (cnt <- cnt + 1L))
       out[i] <- cand
-      from[cand] <- n
     }
   }
-  list(names = out, renamed_from = from)
+  out
 }
 
 # Per-column types over sampled cell matrix (columns as list of character
@@ -239,16 +237,21 @@ sniff_dataset <- function(path) {
     # Left as "" they would flow into expected_columns/column_types and make
     # the generated config fail its own validator.
     nms   <- first
+    # Belt to .split_fields' na.strings fix: should an NA ever arrive by
+    # another path, treat it as a blank slot rather than poisoning the
+    # rename comparison below (NA != x is NA, and if (NA) crashes).
+    nms[is.na(nms)]   <- ""
+    first[is.na(first)] <- ""
     blank <- !nzchar(trimws(nms))
     if (any(blank)) nms[blank] <- paste0("col_", which(blank))
-    dd <- .dedupe_names(nms)     # also resolves blank-fill vs header collisions
-    res$col_names <- dd$names
+    final <- .dedupe_names(nms)  # also resolves blank-fill vs header collisions
+    res$col_names <- final
     # One positional comparison records every changed slot (blank or
     # duplicate) against the file's original header spelling.
-    changed <- dd$names != first
+    changed <- final != first
     if (any(changed)) {
       rf <- first[changed]
-      names(rf) <- dd$names[changed]
+      names(rf) <- final[changed]
       res$renamed_from <- rf
       res$csv_skip     <- 1L
     }
