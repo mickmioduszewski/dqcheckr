@@ -14,14 +14,20 @@
 #   empty          -> dqcheckr_empty_config
 #   unparseable    -> dqcheckr_config_parse_error
 #   not a key map  -> dqcheckr_invalid_config
-.read_config_file <- function(path) {
+# allow_empty: the GLOBAL config may legitimately be empty or comments-only --
+# every key defaults, and load_config() has always tolerated it -- so it reads
+# as an empty map rather than blocking every run in the deployment. A dataset
+# config, by contrast, cannot run empty, so the strict aborts stand there.
+.read_config_file <- function(path, allow_empty = FALSE) {
   if (!file.exists(path))
     rlang::abort(paste0("Config file not found: ", path),
                  class = c("dqcheckr_missing_file", "dqcheckr_error"))
   raw <- readLines(path, warn = FALSE)
-  if (length(raw) == 0 || !any(nzchar(trimws(raw))))
+  if (length(raw) == 0 || !any(nzchar(trimws(raw)))) {
+    if (allow_empty) return(structure(list(), empty_config = TRUE))
     rlang::abort(paste0("Config file is empty: ", path),
                  class = c("dqcheckr_empty_config", "dqcheckr_error"))
+  }
   cfg <- tryCatch(
     yaml::read_yaml(path),
     error = function(e) rlang::abort(
@@ -29,6 +35,8 @@
              conditionMessage(e)),
       class = c("dqcheckr_config_parse_error", "dqcheckr_error"))
   )
+  if (is.null(cfg) && allow_empty)          # comments-only: parses to NULL
+    return(structure(list(), empty_config = TRUE))
   if (!is.list(cfg) || is.null(names(cfg)) || any(!nzchar(names(cfg))))
     rlang::abort(
       paste0("Config file must be a YAML map of keys to values: ", path),
@@ -68,6 +76,8 @@
 .is_number  <- function(x) is.numeric(x) && length(x) == 1 && !is.na(x) && is.finite(x)
 .is_frac    <- function(x) .is_number(x) && x >= 0 && x <= 1
 .is_flag    <- function(x) is.logical(x) && length(x) == 1 && !is.na(x)
+# A checker message carrying warning (not error) severity.
+.warn_msg   <- function(m) structure(m, severity = "warning")
 # YAML sequences arrive as an atomic vector (uniform) or a list; normalise.
 .as_vec     <- function(x) if (is.list(x)) unlist(x, use.names = FALSE) else x
 .is_str_vec <- function(x) {
@@ -153,9 +163,22 @@
   min_row_count                  = function(x) if (!.is_count(x))  "must be an integer >= 0.",
   max_row_count                  = function(x) if (!.is_count(x))  "must be an integer >= 0.",
   max_file_size_mb               = function(x) if (!.is_number(x) || x <= 0) "must be a positive number.",
-  max_row_count_change_pct       = function(x) if (!.is_frac(x))   "must be a fraction in [0, 1].",
+  # The two change-thresholds bound an UNBOUNDED relative change (a row count
+  # can more than double; a mean can shift 300%), so values > 1 are legal and
+  # deployed GUI-written configs carry them -- only negatives are errors. A
+  # value > 5 is almost certainly a raw percentage (20 meaning 20%) that would
+  # silently disable the check, so it draws a warning, not a block.
+  max_row_count_change_pct       = function(x) {
+    if (!.is_number(x) || x < 0)
+      return("must be a number >= 0 (a fraction: 0.2 = 20%).")
+    if (x > 5) .warn_msg("looks like a raw percentage -- fractions are expected (0.2 = 20%), so this value would tolerate almost any change.")
+  },
   max_missing_rate_change_pp     = function(x) if (!.is_number(x) || x < 0) "must be a number >= 0 (percentage points).",
-  max_numeric_mean_shift_pct     = function(x) if (!.is_frac(x))   "must be a fraction in [0, 1] (e.g. 0.2 for 20%).",
+  max_numeric_mean_shift_pct     = function(x) {
+    if (!.is_number(x) || x < 0)
+      return("must be a number >= 0 (a fraction: 0.2 = 20%).")
+    if (x > 5) .warn_msg("looks like a raw percentage -- fractions are expected (0.2 = 20%), so this value would tolerate almost any shift.")
+  },
   max_non_numeric_rate_change_pp = function(x) if (!.is_number(x) || x < 0) "must be a number >= 0 (percentage points).",
   type_inference_threshold       = function(x) if (!.is_frac(x) || x == 0) "must be a number in (0, 1].",
   flag_new_columns               = function(x) if (!.is_flag(x))   "must be true or false.",
@@ -201,7 +224,8 @@
                        paste0("Rule '", k, "' is not valid in ", where, ".")))
     msg <- .rule_checkers[[k]](rules[[k]])
     if (!is.null(msg))
-      return(.vfinding(file, k, "error", paste0("Rule '", k, "' in ", where, " ", msg)))
+      return(.vfinding(file, k, attr(msg, "severity") %||% "error",
+                       paste0("Rule '", k, "' in ", where, " ", msg)))
     NULL
   })
   do.call(rbind, c(list(.no_findings()), .compact(findings)))
@@ -329,11 +353,12 @@
 
 # Columns-exist checks shared by CSV and FWF: `names` is the effective column
 # set, or NULL when unknown (e.g. FWF without fwf_col_names) -- then nothing
-# to check. Severities: key_columns error (runtime FAILs every run on a typo'd
-# key -- a config mistake, best caught pre-run); expected_columns warning (a
-# mismatch is a legitimate runtime schema-drift finding, not always a config
-# error); column_types / column_rules warning (entries for absent columns are
-# silently inert).
+# to check. ALL Tier-2 findings carry warning severity, never error: a
+# cross-check against the delivery can fail because of delivery DRIFT (the
+# supplier renames or drops a column), not only a config mistake, and drift
+# must produce a recorded FAIL run (QC-12, the schema checks) with a snapshot
+# and report -- not a pre-snapshot abort that leaves no history row. Only
+# Tier-1 (config-only) errors block a run.
 .tier2_name_findings <- function(cfg, names, file) {
   if (is.null(names)) return(.no_findings())
   findings <- list()
@@ -346,7 +371,7 @@
 
   if (!is.null(cfg[["key_columns"]])) {
     m <- miss(cfg[["key_columns"]])
-    if (length(m)) add("key_columns", "error", "names", m)
+    if (length(m)) add("key_columns", "warning", "names", m)
   }
   if (!is.null(cfg[["expected_columns"]])) {
     m <- miss(cfg[["expected_columns"]])
@@ -385,12 +410,13 @@
       widths <- .as_vec(cfg[["fwf_widths"]])
       if (is.numeric(widths) && length(widths) > 0 && !anyNA(widths)) {
         total <- sum(widths)
-        # Overshoot is an error: the reader runs out of characters and the
-        # trailing columns come back NA/garbage. Undershoot is a warning: a
-        # trailing field trimmed of padding is plausible, but worth eyes.
+        # Both directions are warnings (Tier-2 policy): a record-length change
+        # can be delivery drift, which must reach the runtime checks and be
+        # recorded, not abort pre-snapshot. Overshoot still reads as the more
+        # serious message (the reader runs out of characters).
         if (total > nchar(record))
           findings <- c(findings, list(.vfinding(
-            file, "fwf_widths", "error",
+            file, "fwf_widths", "warning",
             sprintf("'fwf_widths' sum (%d) exceeds the record length (%d).",
                     total, nchar(record)))))
         else if (total < nchar(record))
@@ -421,10 +447,11 @@
         eff_names <- .as_vec(cfg[["col_names"]])
         if (length(eff_names) != n_file)
           findings <- c(findings, list(.vfinding(
-            file, "col_names", "error",
+            file, "col_names", "warning",
             sprintf(paste0("'col_names' has %d name(s) but the delivery has %d ",
                            "column(s). Positional lists must cover every physical ",
-                           "column -- was an entry commented out?"),
+                           "column -- was an entry commented out, or has the ",
+                           "delivery changed shape?"),
                     length(eff_names), n_file))))
       }
       findings <- c(findings, list(.tier2_name_findings(cfg, eff_names, file)))
@@ -502,10 +529,14 @@ validate_config <- function(dataset_name, config_dir = ".") {
   global_path  <- file.path(config_dir, "dqcheckr.yml")
   dataset_path <- file.path(config_dir, paste0(dataset_name, ".yml"))
 
-  global_cfg  <- .read_config_file(global_path)
+  global_cfg  <- .read_config_file(global_path, allow_empty = TRUE)
   dataset_cfg <- .read_config_file(dataset_path)
 
   findings <- rbind(
+    if (isTRUE(attr(global_cfg, "empty_config")))
+      .vfinding(basename(global_path), "(file)", "warning",
+                "Global config is empty or comments-only; all defaults apply.")
+    else .no_findings(),
     .validate_one_config(global_cfg,  "global",  basename(global_path)),
     .validate_one_config(dataset_cfg, "dataset", basename(dataset_path),
                          dataset_name = dataset_name)

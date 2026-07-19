@@ -147,7 +147,8 @@ compare_snapshots <- function(dataset_name,
       max_missing_rate_change_pp     = cfg[["rules"]][["max_missing_rate_change_pp"]]     %||% .default_comparison_rules$max_missing_rate_change_pp,
       max_numeric_mean_shift_pct     = cfg[["rules"]][["max_numeric_mean_shift_pct"]]     %||% .default_comparison_rules$max_numeric_mean_shift_pct,
       max_non_numeric_rate_change_pp = cfg[["rules"]][["max_non_numeric_rate_change_pp"]] %||% .default_comparison_rules$max_non_numeric_rate_change_pp,
-      max_row_count_change_pct       = cfg[["rules"]][["max_row_count_change_pct"]]       %||% .default_comparison_rules$max_row_count_change_pct
+      max_row_count_change_pct       = cfg[["rules"]][["max_row_count_change_pct"]]       %||% .default_comparison_rules$max_row_count_change_pct,
+      column_mean_shift_overrides    = .column_mean_shift_overrides(cfg[["column_rules"]])
     )
   } else {
     .load_drift_thresholds(config_dir)
@@ -278,6 +279,19 @@ compare_snapshots <- function(dataset_name,
   as.integer(x)
 }
 
+# Per-column mean-shift thresholds from a dataset's column_rules. CP-04
+# (compare.R) resolves these via col_threshold(); the drift report must apply
+# the same per-column values or the two surfaces contradict each other on the
+# same snapshot pair. Returns a named numeric vector (possibly empty).
+.column_mean_shift_overrides <- function(column_rules) {
+  if (!is.list(column_rules) || length(column_rules) == 0) return(numeric(0))
+  vals <- vapply(column_rules, function(r) {
+    v <- r[["max_numeric_mean_shift_pct"]]
+    if (is.numeric(v) && length(v) == 1 && !is.na(v)) as.numeric(v) else NA_real_
+  }, numeric(1))
+  vals[!is.na(vals)]
+}
+
 .load_drift_thresholds <- function(config_dir = ".") {
   cfg_file <- file.path(config_dir, "dqcheckr.yml")
   if (!file.exists(cfg_file))
@@ -293,7 +307,10 @@ compare_snapshots <- function(dataset_name,
     max_missing_rate_change_pp     = dr[["max_missing_rate_change_pp"]]     %||% .default_comparison_rules$max_missing_rate_change_pp,
     max_numeric_mean_shift_pct     = dr[["max_numeric_mean_shift_pct"]]     %||% .default_comparison_rules$max_numeric_mean_shift_pct,
     max_non_numeric_rate_change_pp = dr[["max_non_numeric_rate_change_pp"]] %||% .default_comparison_rules$max_non_numeric_rate_change_pp,
-    max_row_count_change_pct       = dr[["max_row_count_change_pct"]]       %||% .default_comparison_rules$max_row_count_change_pct
+    max_row_count_change_pct       = dr[["max_row_count_change_pct"]]       %||% .default_comparison_rules$max_row_count_change_pct,
+    # Global config carries no column_rules (dataset scope), so no per-column
+    # overrides are available on this path.
+    column_mean_shift_overrides    = numeric(0)
   )
 }
 
@@ -438,8 +455,18 @@ compare_snapshots <- function(dataset_name,
     (dd$numeric_mean_curr - dd$numeric_mean_prev) / abs(dd$numeric_mean_prev),
     NA_real_
   )
+  # Per-column overrides win over the rules-level threshold, exactly as CP-04
+  # resolves them via col_threshold() -- both surfaces must read it the same
+  # way or the run report and the drift report contradict each other on the
+  # same snapshot pair.
+  ov  <- thresholds$column_mean_shift_overrides %||% numeric(0)
+  eff <- rep(thresholds$max_numeric_mean_shift_pct, nrow(dd))
+  if (length(ov)) {
+    m <- match(dd$Column, names(ov))
+    eff[!is.na(m)] <- ov[m[!is.na(m)]]
+  }
   dd$numeric_mean_exceeds   <- !is.na(dd$numeric_mean_shift_pct) &
-    abs(dd$numeric_mean_shift_pct) > thresholds$max_numeric_mean_shift_pct
+    abs(dd$numeric_mean_shift_pct) > eff
 
   dd$distinct_count_prev       <- .col(col_drift, "distinct_count_prev")
   dd$distinct_count_curr       <- .col(col_drift, "distinct_count_curr")

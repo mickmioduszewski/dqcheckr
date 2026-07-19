@@ -520,6 +520,51 @@ test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)"
                                 "numeric_mean_exceeds"])
 })
 
+test_that("drift applies per-column max_numeric_mean_shift_pct like CP-04 (run/drift parity)", {
+  # The fixture's `amount` mean shifts 100% between snapshots: flagged at the
+  # rules-level 0.20, but a per-column override of 2.0 (tolerate 200%) must
+  # unflag it -- the same resolution CP-04 uses via col_threshold(), so the
+  # run report and drift report cannot contradict each other.
+  tmp_cfg     <- withr::local_tempdir()
+  db          <- make_drift_db(2)
+  db_fwd      <- normalizePath(db,      winslash = "/", mustWork = FALSE)
+  tmp_cfg_fwd <- normalizePath(tmp_cfg, winslash = "/", mustWork = FALSE)
+  writeLines(sprintf('snapshot_db: "%s"', db_fwd), file.path(tmp_cfg, "dqcheckr.yml"))
+  writeLines(c(
+    'dataset_name: "test_ds"',
+    'format: csv',
+    sprintf('snapshot_db: "%s"', db_fwd),
+    sprintf('report_output_dir: "%s"', tmp_cfg_fwd),
+    'rule_overrides:',
+    '  max_numeric_mean_shift_pct: 0.20',
+    'column_rules:',
+    '  amount:',
+    '    max_numeric_mean_shift_pct: 2.0'
+  ), file.path(tmp_cfg, "test_ds.yml"))
+
+  drift <- compare_snapshots("test_ds", db_path = db,
+                             config_dir = tmp_cfg, report = FALSE)
+  ms <- drift$mean_shifts
+  expect_false(ms[ms$Column == "amount", "numeric_mean_exceeds"])
+
+  # And with a tighter per-column value than rules level, it flags.
+  writeLines(c(
+    'dataset_name: "test_ds"',
+    'format: csv',
+    sprintf('snapshot_db: "%s"', db_fwd),
+    sprintf('report_output_dir: "%s"', tmp_cfg_fwd),
+    'rule_overrides:',
+    '  max_numeric_mean_shift_pct: 2.0',
+    'column_rules:',
+    '  amount:',
+    '    max_numeric_mean_shift_pct: 0.10'
+  ), file.path(tmp_cfg, "test_ds.yml"))
+  drift2 <- compare_snapshots("test_ds", db_path = db,
+                              config_dir = tmp_cfg, report = FALSE)
+  ms2 <- drift2$mean_shifts
+  expect_true(ms2[ms2$Column == "amount", "numeric_mean_exceeds"])
+})
+
 
 # -- Snapshot IDs validated against the dataset (0.2.3, L-04) ---------------------
 

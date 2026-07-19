@@ -42,10 +42,15 @@
 }
 
 # Rename duplicate header names positionally: the 2nd, 3rd, ... occurrence of
-# a name gets a _2/_3 suffix. Returns list(names=..., renamed_from=...) where
-# renamed_from maps new name -> original (NULL when nothing was renamed).
+# a name gets a _2/_3 suffix, bumped further if that name is itself taken --
+# the header "Amount,Amount,Amount_2" must not rename its second column to the
+# third's genuine name (the suffix candidate is checked against every original
+# header name AND every name already assigned). Returns list(names=...,
+# renamed_from=...) where renamed_from maps new name -> original (NULL when
+# nothing was renamed).
 .dedupe_names <- function(nms) {
   if (!anyDuplicated(nms)) return(list(names = nms, renamed_from = NULL))
+  taken <- nms                      # originals all reserve their spellings
   seen  <- new.env(parent = emptyenv())
   out   <- character(length(nms))
   from  <- character(0)
@@ -55,8 +60,11 @@
     assign(n, cnt, envir = seen)
     if (cnt == 1L) out[i] <- n
     else {
-      out[i] <- paste0(n, "_", cnt)
-      from[out[i]] <- n
+      cand <- paste0(n, "_", cnt)
+      while (cand %in% taken || cand %in% out)
+        cand <- paste0(n, "_", (cnt <- cnt + 1L))
+      out[i] <- cand
+      from[cand] <- n
     }
   }
   list(names = out, renamed_from = from)

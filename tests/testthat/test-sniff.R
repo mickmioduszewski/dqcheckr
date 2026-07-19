@@ -98,6 +98,25 @@ test_that("duplicate header names get positional renames, originals recorded, cs
   expect_equal(s$csv_skip, 1L)               # col_names will replace the header
 })
 
+test_that("a rename never collides with a name already in the header", {
+  # "Amount,Amount,Amount_2": the naive _2 suffix for the second column would
+  # collide with the genuine third column -- it must bump to a free name.
+  f <- sniff_file(c("Amount,Amount,Amount_2", "1,2,3"))
+  on.exit(unlink(f))
+  s <- sniff_dataset(f)
+  expect_equal(s$col_names, c("Amount", "Amount_3", "Amount_2"))
+  expect_false(anyDuplicated(s$col_names) > 0)
+  expect_equal(s$renamed_from, c(Amount_3 = "Amount"))
+  # And a generated config from such a header validates clean end to end.
+  d <- file.path(tempdir(), paste0("dedupe_", sample.int(1e9, 1)))
+  dir.create(d)
+  on.exit(unlink(d, recursive = TRUE), add = TRUE)
+  file.copy(f, file.path(d, "clash.csv"))
+  writeLines('snapshot_db: "snap.sqlite"', file.path(d, "dqcheckr.yml"))
+  suppressMessages(generate_dataset_config(file.path(d, "clash.csv"), config_dir = d))
+  expect_true(validate_config("clash", config_dir = d)$valid)
+})
+
 test_that("triple duplicates number 2 and 3; unique headers rename nothing", {
   f <- sniff_file(c("x,x,x", "1,2,3"))
   on.exit(unlink(f))

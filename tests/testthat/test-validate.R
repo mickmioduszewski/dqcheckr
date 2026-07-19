@@ -150,6 +150,38 @@ test_that("rule value violations are error findings (range, enum, bad regex)", {
   expect_match(msgs_of(v, "pattern"), "not a valid regular expression")
 })
 
+test_that("change-thresholds accept legacy >1 values; suspicious raw-percent values warn; negatives error", {
+  # 1.5 = tolerate +150%: legal, GUI-written, must validate clean.
+  dir <- vcfg(dataset = c('dataset_name: "demo"', 'format: csv',
+                          'current_file: "x.csv"',
+                          "rule_overrides:",
+                          "  max_numeric_mean_shift_pct: 1.5",
+                          "  max_row_count_change_pct: 2"))
+  on.exit(unlink(dir, recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
+
+  # 20 is almost certainly a raw percentage: warning, not a block.
+  dir2 <- vcfg(dataset = c('dataset_name: "demo"', 'format: csv',
+                           'current_file: "x.csv"',
+                           "rule_overrides:", "  max_numeric_mean_shift_pct: 20"))
+  on.exit(unlink(dir2, recursive = TRUE), add = TRUE)
+  v2 <- validate_config("demo", config_dir = dir2)
+  expect_true(v2$valid)
+  expect_equal(sev_of(v2, "max_numeric_mean_shift_pct"), "warning")
+  expect_match(msgs_of(v2, "max_numeric_mean_shift_pct"), "raw percentage")
+
+  # Negative is a genuine error.
+  dir3 <- vcfg(dataset = c('dataset_name: "demo"', 'format: csv',
+                           'current_file: "x.csv"',
+                           "rule_overrides:", "  max_row_count_change_pct: -0.1"))
+  on.exit(unlink(dir3, recursive = TRUE), add = TRUE)
+  v3 <- validate_config("demo", config_dir = dir3)
+  expect_false(v3$valid)
+  expect_equal(sev_of(v3, "max_row_count_change_pct"), "error")
+})
+
 test_that("a rules-only key inside column_rules is an error (placement)", {
   dir <- vcfg(dataset = c('dataset_name: "demo"', 'format: csv',
                           'current_file: "x.csv"',
@@ -319,12 +351,27 @@ test_that("missing files abort with dqcheckr_missing_file", {
                class = "dqcheckr_missing_file")
 })
 
-test_that("an empty config file aborts with dqcheckr_empty_config", {
+test_that("an empty DATASET config aborts with dqcheckr_empty_config", {
   dir <- vcfg()
   on.exit(unlink(dir, recursive = TRUE))
   writeLines(c("", "   "), file.path(dir, "demo.yml"))
   expect_error(validate_config("demo", config_dir = dir),
                class = "dqcheckr_empty_config")
+})
+
+test_that("an empty or comments-only GLOBAL config is tolerated with a warning (all defaults)", {
+  # load_config() has always tolerated this (every key defaults); validation
+  # must not turn a working deployment into one that cannot run at all.
+  for (content in list(character(0), c("# all defaults", "# nothing set"))) {
+    dir <- vcfg()
+    writeLines(content, file.path(dir, "dqcheckr.yml"))
+    v <- validate_config("demo", config_dir = dir)
+    expect_true(v$valid)
+    expect_equal(sum(grepl("empty or comments-only", v$findings$message)), 1)
+    expect_equal(v$findings$severity[grepl("empty or comments-only",
+                                           v$findings$message)], "warning")
+    unlink(dir, recursive = TRUE)
+  }
 })
 
 test_that("unparseable YAML aborts with dqcheckr_config_parse_error", {
@@ -376,24 +423,24 @@ test_that("a matched CSV fixture passes tier 2 with zero findings and tier confi
   expect_null(v$tier2_skipped)
 })
 
-test_that("col_names shorter than the delivery is an error naming both counts", {
+test_that("col_names shorter than the delivery warns naming both counts (drift must still run)", {
   dir <- vcfg2(c("Date,Amount,Currency,Amount,Status", "1,2,3,4,5"),
                dataset = c("col_names: [date, amount, currency, status]",
                            "csv_skip: 1"))
   on.exit(cleanup2(dir))
   v <- validate_config("demo", config_dir = dir)
-  expect_false(v$valid)
-  expect_equal(sev_of(v, "col_names"), "error")
+  expect_true(v$valid)                       # Tier-2 policy: warn, never block
+  expect_equal(sev_of(v, "col_names"), "warning")
   expect_match(msgs_of(v, "col_names"), "4 name")
   expect_match(msgs_of(v, "col_names"), "5 column")
   expect_match(msgs_of(v, "col_names"), "commented out")
 })
 
-test_that("col_names longer than the delivery is also an error", {
+test_that("col_names longer than the delivery also warns", {
   dir <- vcfg2("a,b", dataset = "col_names: [x, y, z]")
   on.exit(cleanup2(dir))
   v <- validate_config("demo", config_dir = dir)
-  expect_equal(sev_of(v, "col_names"), "error")
+  expect_equal(sev_of(v, "col_names"), "warning")
   expect_match(msgs_of(v, "col_names"), "3 name")
   expect_match(msgs_of(v, "col_names"), "2 column")
 })
@@ -414,8 +461,8 @@ test_that("each name cross-check fires individually with its severity", {
   dir <- vcfg2("id,amount", dataset = "key_columns: [custid]")
   on.exit(cleanup2(dir))
   v <- validate_config("demo", config_dir = dir)
-  expect_false(v$valid)                       # key_columns: error
-  expect_equal(sev_of(v, "key_columns"), "error")
+  expect_true(v$valid)                        # Tier-2 policy: warn, never block
+  expect_equal(sev_of(v, "key_columns"), "warning")
   expect_match(msgs_of(v, "key_columns"), "custid")
 
   dir2 <- vcfg2("id,amount", dataset = "expected_columns: [id, amount, ref]")
@@ -492,12 +539,13 @@ test_that("folder mode resolves the newest file for the header check", {
 
 # -- FWF record length ---------------------------------------------------------
 
-test_that("fwf widths summing over the record length is an error; under is a warning", {
+test_that("fwf widths summing over or under the record length warns (Tier-2 policy)", {
   dir <- vcfg2("AB12XY", format = "fwf", file_ext = ".txt",
                dataset = "fwf_widths: [2, 2, 4]")     # sum 8 > 6
   on.exit(cleanup2(dir))
   v <- validate_config("demo", config_dir = dir)
-  expect_false(v$valid)
+  expect_true(v$valid)
+  expect_equal(sev_of(v, "fwf_widths"), "warning")
   expect_match(msgs_of(v, "fwf_widths"), "sum \\(8\\) exceeds the record length \\(6\\)")
 
   dir2 <- vcfg2("AB12XY", format = "fwf", file_ext = ".txt",

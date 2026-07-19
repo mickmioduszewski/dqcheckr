@@ -107,6 +107,18 @@ test_that("an empty dataset YAML aborts the run with dqcheckr_empty_config", {
     class = "dqcheckr_empty_config")
 })
 
+test_that("delivery drift (missing key column) still produces a recorded FAIL run, not an abort", {
+  # Tier-2 policy: cross-checks against the delivery warn, never block. A
+  # supplier dropping the key column must yield a completed run with a QC-12
+  # FAIL snapshot and history row -- the outcome dqcheckr exists to record.
+  fx <- make_run_fixture("key_columns: [customer_key]")   # not in the file
+  on.exit(unlink(fx$root, recursive = TRUE))
+  result <- suppressMessages(suppressWarnings(
+    run_dq_check("demo", config_dir = fx$root, open_report = FALSE)))
+  expect_equal(result$status, "FAIL")
+  expect_equal(snapshot_rows(fx$db), 1L)                  # history row exists
+})
+
 # -- precedence: validation wins over later pipeline aborts --------------------
 
 test_that("a validation error wins over a missing delivery file", {

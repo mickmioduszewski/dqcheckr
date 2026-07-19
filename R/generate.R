@@ -10,7 +10,13 @@
 
 # -- YAML formatting helpers (shared with the global generator, step 8) --------
 
-.y_quote <- function(s) paste0('"', gsub('"', '\\\\"', s), '"')
+# Backslashes must be escaped BEFORE quotes: in a YAML double-quoted scalar a
+# bare backslash starts an escape sequence, so an unescaped Windows path either
+# fails the scanner (\d) or silently corrupts (\n, \t become control chars).
+.y_quote <- function(s) {
+  s <- gsub("\\", "\\\\", s, fixed = TRUE)
+  paste0('"', gsub('"', '\\"', s, fixed = TRUE), '"')
+}
 
 .y_scalar <- function(v) {
   if (is.logical(v))   return(tolower(as.character(v)))
@@ -166,9 +172,13 @@
                                      "   # candidates unique in the sample -- confirm before uncommenting")
               else 'key_columns: ["id"]',
               live = FALSE))
+  # Keys through .y_quote like every other emitted name: a header field such
+  # as "Price: USD" (or one starting with # / [ / & / *) would otherwise
+  # produce an unparseable or silently corrupted map line.
   ct_lines <- if (types_known)
-    c("column_types:", paste0("  ", names(s$column_types), ": ",
-                              unname(s$column_types)))
+    c("column_types:", paste0("  ", vapply(names(s$column_types), .y_quote,
+                                           character(1)),
+                              ": ", unname(s$column_types)))
   else
     c("column_types:", "  some_column: character")
   lines <- c(lines, .emit_key("column_types", ct_lines, live = types_known))
@@ -312,6 +322,11 @@ generate_global_config <- function(config_dir = ".") {
 #' @export
 generate_dataset_config <- function(path, config_dir = ".", dataset_name = NULL) {
   s <- sniff_dataset(path)
+  # Emit the path in forward-slash form: valid on every platform R supports,
+  # and far cleaner to hand-edit than a backslash-escaped Windows path.
+  # chartr, not normalizePath: a relative path must STAY relative (deployments
+  # sync across machines and rely on relative paths resolving per machine).
+  s$path <- chartr("\\", "/", s$path)
 
   dataset_name <- dataset_name %||%
     gsub("[^A-Za-z0-9_-]", "_", tools::file_path_sans_ext(basename(path)))

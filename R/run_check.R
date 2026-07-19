@@ -71,6 +71,9 @@ run_dq_check <- function(dataset_name,
   validation <- validate_config(dataset_name, config_dir)
   errs <- validation$findings[validation$findings$severity == "error", , drop = FALSE]
   if (nrow(errs) > 0)
+    # Abort BEFORE any warning output: the GUI reports a failed run from the
+    # last non-blank log line, so anything printed here would shadow the real
+    # error (which reaches callers only via this condition's message).
     rlang::abort(
       paste0("Configuration for '", dataset_name, "' failed validation:\n",
              paste0("  - [", errs$file, "] ", errs$message, collapse = "\n")),

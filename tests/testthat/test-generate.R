@@ -97,6 +97,33 @@ test_that("every key's doc comment is the vocabulary description (single source)
   }
 })
 
+test_that("punctuation in header names survives into a valid generated config", {
+  fx <- gen_fixture(c("Price: USD,id", "10.5,A1", "11.0,A2"))
+  on.exit(unlink(fx$root, recursive = TRUE))
+  cfg <- yaml::read_yaml(gen(fx))               # parses: keys are quoted
+  expect_true("Price: USD" %in% names(cfg$column_types))
+  expect_equal(cfg$column_types[["Price: USD"]], "numeric")
+  v <- validate_config("gen_ds", config_dir = fx$root)
+  expect_true(v$valid)
+})
+
+test_that(".y_quote escapes backslashes so any emitted value survives a YAML round-trip", {
+  # A Windows path with segments that form valid AND invalid YAML escapes:
+  # unescaped, \n and \t silently corrupt and \d fails the scanner.
+  for (v in c("C:\\new\\table.csv", "C:\\deliveries\\orders.csv", 'a"b\\c')) {
+    parsed <- yaml::yaml.load(paste0("x: ", .y_quote(v)))$x
+    expect_identical(parsed, v)
+  }
+})
+
+test_that("generated configs emit forward-slash paths, keeping relative paths relative", {
+  fx <- gen_fixture(c("id,amount", "A1,10"))
+  on.exit(unlink(fx$root, recursive = TRUE))
+  cfg <- yaml::read_yaml(gen(fx))
+  expect_false(grepl("\\\\", cfg$current_file))     # no backslashes emitted
+  expect_identical(cfg$current_file, chartr("\\", "/", fx$data_file))
+})
+
 # -- duplicate header names, end to end ----------------------------------------
 
 test_that("the duplicate-Amount fixture generates live col_names + csv_skip 1 with was-comments", {
