@@ -1,7 +1,7 @@
 # sniff_dataset(): pure inference over a delivery file -- the detection half
-# of the config generator (plan step 6). No side effects: it reads the file
+# of the config generator. No side effects: it reads the file
 # (full-file streamed encoding scan, then a bounded head sample) and returns a
-# plain list the writer (generate_dataset_config, step 7) turns into YAML.
+# plain list the writer (generate_dataset_config) turns into YAML.
 # Detection REUSES the package's existing single sources of truth --
 # scan_file_encoding()/normalise_encoding() for encoding and infer_col_type()
 # for types -- never a parallel implementation (the GUI's divergence bug class
@@ -233,11 +233,23 @@ sniff_dataset <- function(path) {
 
   n_cols <- length(first)
   if (res$header) {
-    dd <- .dedupe_names(first)
+    # Empty header slots (a trailing delimiter, a blank field) are real
+    # physical columns, and col_names is positional -- so they are NAMED, not
+    # dropped, via the same replace-the-header mechanism as duplicate names.
+    # Left as "" they would flow into expected_columns/column_types and make
+    # the generated config fail its own validator.
+    nms   <- first
+    blank <- !nzchar(trimws(nms))
+    if (any(blank)) nms[blank] <- paste0("col_", which(blank))
+    dd <- .dedupe_names(nms)     # also resolves blank-fill vs header collisions
     res$col_names <- dd$names
-    # list-element <- NULL would DELETE the field; keep it present-but-NULL.
-    if (!is.null(dd$renamed_from)) {
-      res$renamed_from <- dd$renamed_from
+    # One positional comparison records every changed slot (blank or
+    # duplicate) against the file's original header spelling.
+    changed <- dd$names != first
+    if (any(changed)) {
+      rf <- first[changed]
+      names(rf) <- dd$names[changed]
+      res$renamed_from <- rf
       res$csv_skip     <- 1L
     }
     data_rows <- fields_by_line[-1]

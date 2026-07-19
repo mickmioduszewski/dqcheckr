@@ -47,15 +47,22 @@ Tier 2 is skipped and the skip is \emph{stated} in the result
 (\code{tier2_skipped}) and by \code{print()} -- a verdict always says
 which tier it reached.
 
-Findings have three severities: \code{"error"} (the run would misbehave or
-abort), \code{"warning"} (suspicious but survivable, e.g. an unknown key,
-which is tolerated so hand-kept extra keys round-trip), and \code{"note"}
-(informational).
+Findings have three severities, split by one rule: \strong{config mistakes
+are errors} (wrong types, broken positional lists, misplaced rule keys, a
+missing file source — things only an edit can cause) and \strong{
+delivery-facing findings are warnings} (a key column absent from the file,
+a column-count mismatch — these can equally mean the supplier changed the
+delivery, and drift must be recorded by a completed run, not abort it).
+\code{"note"} is informational. Unknown keys warn, so hand-kept extra keys
+round-trip. All Tier-2 findings are therefore warnings by construction.
 
-A config file that cannot be read at all aborts with a typed condition
-rather than returning findings: \code{dqcheckr_missing_file},
+A \emph{dataset} config file that cannot be read at all aborts with a typed
+condition rather than returning findings: \code{dqcheckr_missing_file},
 \code{dqcheckr_empty_config}, \code{dqcheckr_config_parse_error}, or
-\code{dqcheckr_invalid_config} (not a YAML key map).
+\code{dqcheckr_invalid_config} (not a YAML key map). An empty or
+comments-only \emph{global} \code{dqcheckr.yml} is tolerated as
+all-defaults with a warning finding, matching how the package has always
+run such deployments.
 }
 \examples{
 tmp <- gsub("\\\\\\\\", "/", tempdir())

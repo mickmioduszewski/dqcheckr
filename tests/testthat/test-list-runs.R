@@ -222,9 +222,10 @@ test_that("corrupt dataset YAML surfaces a parse error rather than an empty resu
   on.exit(unlink(cfg, recursive = TRUE))
   writeLines(c("dataset_name: \"demo\"", "format: [unclosed"),
              file.path(cfg, "demo.yml"))
-  # load_config() lets the yaml parser's error propagate today; the typed
-  # wrapping arrives with validate_config() (plan step 3). What matters here is
-  # that the failure is loud, not silently mapped to "no runs".
+  # list_runs() reads via load_config(), which lets the yaml parser's error
+  # propagate raw -- unlike the run path, which validates first and aborts
+  # typed. What matters here is that the failure is loud, not silently mapped
+  # to "no runs".
   expect_error(list_runs("demo", config_dir = cfg), regexp = "Parser|Scanner|yaml")
 })
 

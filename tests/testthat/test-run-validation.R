@@ -1,4 +1,4 @@
-# run_dq_check() validation wiring (plan step 5): error findings abort with
+# run_dq_check() validation wiring: error findings abort with
 # dqcheckr_validation_error BEFORE any snapshot row exists; warnings surface
 # via message() and the run proceeds; read-failure conditions are typed; the
 # validation abort wins deterministically over later pipeline aborts.
@@ -74,6 +74,24 @@ test_that("warning-severity findings message() and the run completes with a snap
     regexp = "validation warnings.*some_custom_note")
   expect_equal(snapshot_rows(fx$db), 1L)
   expect_false(is.null(result$snapshot_id))
+  # Persisted, not just logged: the warning lands as a VC-01 WARN in the run's
+  # recorded outcome and the snapshot counts.
+  expect_equal(result$status, "WARN")
+  runs <- list_runs("demo", config_dir = fx$root)
+  expect_gte(runs$check_warn_count, 1L)
+})
+
+test_that("shape drift invisible to the runtime checks still yields a recorded WARN, not a silent PASS", {
+  # col_names one short of the delivery, with NO expected_columns/key_columns:
+  # readr silently auto-names the surplus column, so without persisted
+  # validation findings this run would PASS with no trace of the drift.
+  fx <- make_run_fixture("col_names: [id]")   # file has id,amount
+  on.exit(unlink(fx$root, recursive = TRUE))
+  result <- suppressMessages(suppressWarnings(
+    run_dq_check("demo", config_dir = fx$root, open_report = FALSE)))
+  expect_equal(result$status, "WARN")
+  runs <- list_runs("demo", config_dir = fx$root)
+  expect_gte(runs$check_warn_count, 1L)
 })
 
 test_that("a clean config runs with no validation message at all", {

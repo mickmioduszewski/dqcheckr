@@ -1,4 +1,4 @@
-# sniff_dataset(): pure inference (plan step 6). Field-by-field expect_equal
+# sniff_dataset(): pure inference. Field-by-field expect_equal
 # on the returned list -- the design's stated test style for this function.
 
 sniff_file <- function(lines, ext = ".csv") {
@@ -96,6 +96,36 @@ test_that("duplicate header names get positional renames, originals recorded, cs
   expect_equal(s$col_names, c("Date", "Amount", "Currency", "Amount_2", "Status"))
   expect_equal(s$renamed_from, c(Amount_2 = "Amount"))
   expect_equal(s$csv_skip, 1L)               # col_names will replace the header
+})
+
+test_that("empty header fields are named positionally, not kept as empty strings", {
+  # Trailing delimiter -- the everyday case: 'id,amount,' has a real third
+  # column that every data row populates (or leaves blank).
+  f <- sniff_file(c("id,amount,", "A1,10,x", "A2,20,y"))
+  on.exit(unlink(f))
+  s <- sniff_dataset(f)
+  expect_equal(s$col_names, c("id", "amount", "col_3"))
+  expect_equal(s$renamed_from, c(col_3 = ""))
+  expect_equal(s$csv_skip, 1L)                # col_names replaces the header
+
+  # A blank-filled name colliding with a genuine header name bumps via dedupe.
+  g <- sniff_file(c("col_3,x,", "1,2,3"))
+  on.exit(unlink(g), add = TRUE)
+  s2 <- sniff_dataset(g)
+  expect_false(anyDuplicated(s2$col_names) > 0)
+  expect_false(any(!nzchar(s2$col_names)))
+})
+
+test_that("a trailing-delimiter header generates a config that validates green", {
+  d <- file.path(tempdir(), paste0("blankhdr_", sample.int(1e9, 1)))
+  dir.create(d)
+  on.exit(unlink(d, recursive = TRUE))
+  writeLines(c("id,amount,", "A1,10,", "A2,20,"), file.path(d, "orders.csv"))
+  writeLines('snapshot_db: "snap.sqlite"', file.path(d, "dqcheckr.yml"))
+  suppressMessages(generate_dataset_config(file.path(d, "orders.csv"), config_dir = d))
+  v <- validate_config("orders", config_dir = d)
+  expect_true(v$valid)
+  expect_equal(nrow(v$findings), 0L)
 })
 
 test_that("a rename never collides with a name already in the header", {

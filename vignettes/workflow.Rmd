@@ -110,10 +110,21 @@ validate_config("orders", config_dir = "config")
 writeLines(lines, cfg_path)   # undo
 ```
 
-Unknown keys are tolerated as warnings (your own annotations round-trip
-safely); genuine mistakes — a wrong type, a broken positional list, a key
-column that does not exist in the file — are errors, and `run_dq_check()`
-refuses to start while any error stands.
+Findings follow one rule worth understanding, because it decides what can
+stop a run:
+
+* **Config mistakes are errors, and errors block.** A wrong value type, a
+  broken positional list, a missing file source — things only an edit can
+  cause — abort `run_dq_check()` before any snapshot is written. You cannot
+  accidentally run an unrunnable config.
+* **Delivery-facing findings are warnings, and warnings are recorded.**
+  A key column absent from the file, a `col_names` count that no longer
+  matches — these can mean a config typo *or* the supplier changed the
+  delivery, and drift must be *recorded*, not crash the run. The run
+  proceeds, and each warning is persisted into the run's results as a
+  `VC-01` check — visible in the report, the WARN counts, and the history —
+  as well as printed to the console. Unknown keys (your own annotations
+  round-trip safely) are warnings too.
 
 ## Run the check
 

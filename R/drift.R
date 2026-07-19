@@ -283,11 +283,22 @@ compare_snapshots <- function(dataset_name,
 # (compare.R) resolves these via col_threshold(); the drift report must apply
 # the same per-column values or the two surfaces contradict each other on the
 # same snapshot pair. Returns a named numeric vector (possibly empty).
+# Tolerant of ANY config shape: compare_snapshots() runs no validation, so a
+# hand-edit slip (an atomic value where a rule map belongs, a quoted "0.2")
+# must not crash the comparison -- it draws a warning naming the column and
+# falls back to the rules-level threshold, never a silent divergence.
 .column_mean_shift_overrides <- function(column_rules) {
   if (!is.list(column_rules) || length(column_rules) == 0) return(numeric(0))
-  vals <- vapply(column_rules, function(r) {
+  vals <- vapply(names(column_rules), function(col) {
+    r <- column_rules[[col]]
+    if (!is.list(r)) return(NA_real_)          # value where a rule map belongs
     v <- r[["max_numeric_mean_shift_pct"]]
-    if (is.numeric(v) && length(v) == 1 && !is.na(v)) as.numeric(v) else NA_real_
+    if (is.null(v)) return(NA_real_)           # no override set: normal case
+    if (is.numeric(v) && length(v) == 1 && !is.na(v)) return(as.numeric(v))
+    warning("Ignoring malformed per-column max_numeric_mean_shift_pct for '",
+            col, "' (must be a single number); the rules-level threshold ",
+            "applies.", call. = FALSE)
+    NA_real_
   }, numeric(1))
   vals[!is.na(vals)]
 }

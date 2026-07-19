@@ -520,6 +520,20 @@ test_that("compare_snapshots() applies dataset-level threshold overrides (G-05)"
                                 "numeric_mean_exceeds"])
 })
 
+test_that("malformed column_rules never crash drift: atomic entries skip, bad values warn + fall back", {
+  # compare_snapshots() runs no validation, so it must tolerate any shape.
+  expect_length(.column_mean_shift_overrides(list(amount = 0.05)), 0)   # atomic entry
+  expect_length(.column_mean_shift_overrides(list(amount = list())), 0) # no override
+  expect_warning(
+    ov <- .column_mean_shift_overrides(
+      list(amount = list(max_numeric_mean_shift_pct = "0.2"))),
+    regexp = "malformed per-column.*amount")
+  expect_length(ov, 0)                                                  # falls back
+  # Well-formed still extracts.
+  expect_equal(.column_mean_shift_overrides(
+    list(amount = list(max_numeric_mean_shift_pct = 0.5))), c(amount = 0.5))
+})
+
 test_that("drift applies per-column max_numeric_mean_shift_pct like CP-04 (run/drift parity)", {
   # The fixture's `amount` mean shifts 100% between snapshots: flagged at the
   # rules-level 0.20, but a per-column override of 2.0 (tolerate 200%) must

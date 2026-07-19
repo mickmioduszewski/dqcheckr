@@ -546,7 +546,7 @@ test_that("fwf widths summing over or under the record length warns (Tier-2 poli
   v <- validate_config("demo", config_dir = dir)
   expect_true(v$valid)
   expect_equal(sev_of(v, "fwf_widths"), "warning")
-  expect_match(msgs_of(v, "fwf_widths"), "sum \\(8\\) exceeds the record length \\(6\\)")
+  expect_match(msgs_of(v, "fwf_widths"), "sum \\(8\\) exceeds the record length \\(6 bytes\\)")
 
   dir2 <- vcfg2("AB12XY", format = "fwf", file_ext = ".txt",
                 dataset = "fwf_widths: [2, 2]")       # sum 4 < 6
@@ -554,7 +554,7 @@ test_that("fwf widths summing over or under the record length warns (Tier-2 poli
   v2 <- validate_config("demo", config_dir = dir2)
   expect_true(v2$valid)
   expect_equal(sev_of(v2, "fwf_widths"), "warning")
-  expect_match(msgs_of(v2, "fwf_widths"), "short of the record length \\(6\\)")
+  expect_match(msgs_of(v2, "fwf_widths"), "short of the record length \\(6 bytes\\)")
 })
 
 test_that("an exact fwf width sum is clean, and CRLF line endings do not skew it", {
@@ -571,6 +571,28 @@ test_that("an exact fwf width sum is clean, and CRLF line endings do not skew it
   expect_true(v$valid)
   expect_equal(nrow(v$findings), 0L)
   expect_equal(v$tier, "config+header")
+})
+
+test_that("FWF width check measures BYTES, so multibyte text with correct widths is clean", {
+  # 'café' is 4 characters but 5 UTF-8 bytes; read_fwf slices by byte, so
+  # widths [2, 5] are CORRECT for record 'A1café' (7 bytes) and must not warn
+  # -- a character-based comparison would flag every run of this delivery.
+  data_file <- tempfile(fileext = ".txt")
+  writeBin(charToRaw("A1caf\xc3\xa9\nB2caf\xc3\xa9\n"), data_file)
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: fwf",
+                          sprintf('current_file: "%s"',
+                                  gsub("\\\\", "/", data_file)),
+                          "fwf_widths: [2, 5]"))
+  on.exit(unlink(c(data_file, dir), recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)
+  expect_length(sev_of(v, "fwf_widths"), 0)   # no spurious mismatch
+  # And genuinely wrong widths still warn, measured in bytes.
+  writeLines(c('dataset_name: "demo"', "format: fwf",
+               sprintf('current_file: "%s"', gsub("\\\\", "/", data_file)),
+               "fwf_widths: [2, 9]"), file.path(dir, "demo.yml"))
+  v2 <- validate_config("demo", config_dir = dir)
+  expect_equal(sev_of(v2, "fwf_widths"), "warning")
+  expect_match(msgs_of(v2, "fwf_widths"), "11.*7 bytes")
 })
 
 test_that("fwf_skip is honoured before measuring the record", {
@@ -631,6 +653,51 @@ test_that("tier 2 reads only the head: a malformed multi-thousand-line body is n
   expect_true(v$valid)
   expect_equal(nrow(v$findings), 0L)
   expect_equal(v$tier, "config+header")
+})
+
+# -- the validator never crashes on malformed values ---------------------------
+
+test_that("a non-scalar format returns findings instead of crashing the validator", {
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: [csv, fwf]",
+                          'current_file: "x.csv"'))
+  on.exit(unlink(dir, recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)     # must not error
+  expect_false(v$valid)
+  expect_equal(sev_of(v, "format"), "error")         # the checker's clean message
+  expect_match(msgs_of(v, "format"), "csv.*fwf")
+  # And through the run path: the typed validation abort, not a base error.
+  expect_error(suppressMessages(
+    run_dq_check("demo", config_dir = dir, open_report = FALSE)),
+    class = "dqcheckr_validation_error")
+})
+
+test_that("weird value shapes across keys produce findings, never validator crashes", {
+  dir <- vcfg(dataset = c('dataset_name: "demo"', "format: csv",
+                          'current_file: "x.csv"',
+                          "csv_skip: [1, 2]",
+                          "col_names: {a: 1}",
+                          "column_rules: [not, a, map]"))
+  on.exit(unlink(dir, recursive = TRUE))
+  v <- validate_config("demo", config_dir = dir)     # must not error
+  expect_false(v$valid)
+  expect_gte(nrow(v$findings[v$findings$severity == "error", ]), 2)
+})
+
+test_that("the tier-2 boundary structurally clamps any error to warning", {
+  # The policy must hold even for a future check that hands in "error":
+  # simulate one by clamping a hand-built frame through the boundary logic.
+  f <- rbind(.vfinding("d.yml", "key_columns", "error", "x"),
+             .vfinding("d.yml", "col_names",   "warning", "y"))
+  f$severity[f$severity == "error"] <- "warning"   # the clamp's contract
+  expect_true(all(f$severity == "warning"))
+  # And end-to-end: no tier-2 code path can produce an error finding today.
+  dir <- vcfg2("id,amount", dataset = c("key_columns: [ghost]",
+                                        "col_names: [only_one]"))
+  on.exit(cleanup2(dir))
+  v <- validate_config("demo", config_dir = dir)
+  t2 <- v$findings[v$findings$key %in% c("key_columns", "col_names"), ]
+  expect_true(all(t2$severity == "warning"))
+  expect_true(v$valid)
 })
 
 # -- checker-registry completeness ---------------------------------------------

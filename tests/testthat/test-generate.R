@@ -1,4 +1,4 @@
-# generate_dataset_config() (plan step 7): sniff + write. Properties under
+# generate_dataset_config(): sniff + write. Properties under
 # test: generated YAML parses and round-trips the sniffed values; every
 # vocabulary key appears exactly once (live xor commented); commented keys are
 # absent from the parse but present with defaults in the raw text; positional
@@ -264,7 +264,7 @@ test_that("generated configs validate with zero findings for every non-packed fi
 })
 
 # ==============================================================================
-# generate_global_config() (plan step 8)
+# generate_global_config()
 # ==============================================================================
 
 gcfg_dir <- function() {

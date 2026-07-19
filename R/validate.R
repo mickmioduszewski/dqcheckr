@@ -3,8 +3,8 @@
 # file) needs nothing but the config files: vocabulary membership, value
 # types/ranges, positional-list internal consistency, unresolved generator
 # placeholders. The standalone call REPORTS every finding rather than aborting
-# on the first, so one pass shows all problems; the in-run guard added to
-# run_dq_check() later turns error-severity findings into typed aborts.
+# on the first, so one pass shows all problems; run_dq_check()'s in-run guard
+# turns error-severity findings into typed aborts.
 
 # -- reading a config file with typed failure classes --------------------------
 
@@ -78,6 +78,15 @@
 .is_flag    <- function(x) is.logical(x) && length(x) == 1 && !is.na(x)
 # A checker message carrying warning (not error) severity.
 .warn_msg   <- function(m) structure(m, severity = "warning")
+
+# Format as a safe scalar for the STRUCTURAL checks. A malformed value (e.g.
+# the YAML list `format: [csv, fwf]`) has already drawn its finding from the
+# format checker; the structural checks must not crash on it (`fmt == "fwf"`
+# with length 2 is a base R error), so they proceed as if the default.
+.safe_format <- function(cfg) {
+  f <- cfg[["format"]]
+  if (.is_string(f)) tolower(f) else .default_read$format
+}
 # YAML sequences arrive as an atomic vector (uniform) or a list; normalise.
 .as_vec     <- function(x) if (is.list(x)) unlist(x, use.names = FALSE) else x
 .is_str_vec <- function(x) {
@@ -256,7 +265,11 @@
       next
     }
     msg <- .key_checkers[[k]](cfg[[k]])
-    if (!is.null(msg)) add(.vfinding(file, k, "error", paste0("'", k, "' ", msg)))
+    if (!is.null(msg))
+      # Honour .warn_msg() here exactly as the rule-checker site does: a
+      # checker that downgrades must not silently escalate to a blocker.
+      add(.vfinding(file, k, attr(msg, "severity") %||% "error",
+                    paste0("'", k, "' ", msg)))
   }
 
   # Rule maps, wherever they are valid in this scope.
@@ -273,7 +286,7 @@
   }
 
   if (scope == "dataset") {
-    fmt <- tolower(cfg[["format"]] %||% .default_read$format)
+    fmt <- .safe_format(cfg)
 
     # Identity: required present and matching the config filename -- the
     # "config folder is the dataset list" discipline. Warning severity: legacy
@@ -345,6 +358,37 @@
   sub("\r$", "", lines)
 }
 
+# Byte length of the first record after `skip` lines, read RAW (no decoding):
+# the unit read_fwf actually slices by. A trailing \r (CRLF) is excluded.
+# NA when the file has no such record.
+.head_record_bytes <- function(path, skip) {
+  con <- file(path, open = "rb")
+  on.exit(close(con), add = TRUE)
+  line_i <- 0L
+  bytes  <- 0L
+  repeat {
+    chunk <- readBin(con, "raw", 8192L)
+    if (length(chunk) == 0L)
+      return(if (line_i == skip && bytes > 0L) bytes else NA_integer_)
+    nl <- which(chunk == as.raw(0x0A))
+    from <- 1L
+    for (pos in nl) {
+      seg <- pos - from                       # bytes before this newline
+      if (line_i == skip) {
+        n <- bytes + seg
+        # exclude a CR immediately before the LF
+        if (seg > 0L && chunk[pos - 1L] == as.raw(0x0D)) n <- n - 1L
+        else if (seg == 0L && bytes > 0L) n <- n  # CR would have been counted; rare split -- accept
+        return(n)
+      }
+      line_i <- line_i + 1L
+      bytes  <- 0L
+      from   <- pos + 1L
+    }
+    bytes <- bytes + (length(chunk) - from + 1L)
+  }
+}
+
 # Split one delimited line into fields, honouring the quote character.
 .split_fields <- function(line, delim, quote) {
   scan(text = line, what = character(), sep = delim, quote = quote,
@@ -396,7 +440,7 @@
   if (inherits(files, "error"))
     return(list(findings = .no_findings(), skipped = conditionMessage(files)))
 
-  fmt <- tolower(cfg[["format"]] %||% .default_read$format)
+  fmt <- .safe_format(cfg)
   enc <- normalise_encoding(cfg[["encoding"]] %||% .default_read$encoding)
 
   head_read <- tryCatch({
@@ -404,26 +448,30 @@
       skip  <- cfg[["fwf_skip"]] %||% .default_read$fwf_skip
       lines <- .read_head_lines(files$current, skip + 1, enc)
       if (length(lines) < skip + 1) stop("file has no data line to inspect")
-      record <- lines[skip + 1]
 
       findings <- list()
       widths <- .as_vec(cfg[["fwf_widths"]])
       if (is.numeric(widths) && length(widths) > 0 && !anyNA(widths)) {
         total <- sum(widths)
-        # Both directions are warnings (Tier-2 policy): a record-length change
-        # can be delivery drift, which must reach the runtime checks and be
-        # recorded, not abort pre-snapshot. Overshoot still reads as the more
-        # serious message (the reader runs out of characters).
-        if (total > nchar(record))
-          findings <- c(findings, list(.vfinding(
-            file, "fwf_widths", "warning",
-            sprintf("'fwf_widths' sum (%d) exceeds the record length (%d).",
-                    total, nchar(record)))))
-        else if (total < nchar(record))
-          findings <- c(findings, list(.vfinding(
-            file, "fwf_widths", "warning",
-            sprintf("'fwf_widths' sum (%d) is short of the record length (%d).",
-                    total, nchar(record)))))
+        # The comparison is BYTES vs bytes: read_fwf slices records by byte
+        # position, so measuring the decoded line in characters would flag a
+        # multibyte delivery (accented UTF-8/latin1 text) with perfectly
+        # correct widths on every run. Both directions stay warnings (Tier-2
+        # policy): a record-length change can be delivery drift.
+        rec_bytes <- .head_record_bytes(files$current, skip)
+        if (!is.na(rec_bytes)) {
+          if (total > rec_bytes)
+            findings <- c(findings, list(.vfinding(
+              file, "fwf_widths", "warning",
+              sprintf(paste0("'fwf_widths' sum (%d) exceeds the record length ",
+                             "(%d bytes); trailing fields would be silently ",
+                             "truncated or misaligned."), total, rec_bytes))))
+          else if (total < rec_bytes)
+            findings <- c(findings, list(.vfinding(
+              file, "fwf_widths", "warning",
+              sprintf("'fwf_widths' sum (%d) is short of the record length (%d bytes).",
+                      total, rec_bytes))))
+        }
       }
       eff_names <- if (!is.null(cfg[["fwf_col_names"]]))
         .as_vec(cfg[["fwf_col_names"]]) else NULL
@@ -463,6 +511,11 @@
     return(list(findings = .no_findings(),
                 skipped  = paste0("could not read the delivery header: ",
                                   conditionMessage(head_read))))
+  # STRUCTURAL clamp of the tier policy: no Tier-2 finding may block a run,
+  # whatever severity a future check hands in. Delivery-facing cross-checks
+  # can always mean drift, and drift must reach a recorded run.
+  if (nrow(head_read) > 0)
+    head_read$severity[head_read$severity == "error"] <- "warning"
   list(findings = head_read, skipped = NULL)
 }
 
@@ -493,15 +546,22 @@
 #' (\code{tier2_skipped}) and by \code{print()} -- a verdict always says
 #' which tier it reached.
 #'
-#' Findings have three severities: \code{"error"} (the run would misbehave or
-#' abort), \code{"warning"} (suspicious but survivable, e.g. an unknown key,
-#' which is tolerated so hand-kept extra keys round-trip), and \code{"note"}
-#' (informational).
+#' Findings have three severities, split by one rule: \strong{config mistakes
+#' are errors} (wrong types, broken positional lists, misplaced rule keys, a
+#' missing file source — things only an edit can cause) and \strong{
+#' delivery-facing findings are warnings} (a key column absent from the file,
+#' a column-count mismatch — these can equally mean the supplier changed the
+#' delivery, and drift must be recorded by a completed run, not abort it).
+#' \code{"note"} is informational. Unknown keys warn, so hand-kept extra keys
+#' round-trip. All Tier-2 findings are therefore warnings by construction.
 #'
-#' A config file that cannot be read at all aborts with a typed condition
-#' rather than returning findings: \code{dqcheckr_missing_file},
+#' A \emph{dataset} config file that cannot be read at all aborts with a typed
+#' condition rather than returning findings: \code{dqcheckr_missing_file},
 #' \code{dqcheckr_empty_config}, \code{dqcheckr_config_parse_error}, or
-#' \code{dqcheckr_invalid_config} (not a YAML key map).
+#' \code{dqcheckr_invalid_config} (not a YAML key map). An empty or
+#' comments-only \emph{global} \code{dqcheckr.yml} is tolerated as
+#' all-defaults with a warning finding, matching how the package has always
+#' run such deployments.
 #'
 #' @param dataset_name Character. Dataset name; must match
 #'   \code{<dataset_name>.yml} in \code{config_dir}.
@@ -532,17 +592,31 @@ validate_config <- function(dataset_name, config_dir = ".") {
   global_cfg  <- .read_config_file(global_path, allow_empty = TRUE)
   dataset_cfg <- .read_config_file(dataset_path)
 
+  # Defense in depth: the validator's contract is malformed-input-in,
+  # findings-out -- it must NEVER itself crash on a value shape nobody
+  # anticipated. Any internal error becomes an error-severity finding.
+  guard <- function(expr, file) tryCatch(expr, error = function(e)
+    .vfinding(file, "(validator)", "error",
+              paste0("Internal validation error (please report): ",
+                     conditionMessage(e))))
+
   findings <- rbind(
     if (isTRUE(attr(global_cfg, "empty_config")))
       .vfinding(basename(global_path), "(file)", "warning",
                 "Global config is empty or comments-only; all defaults apply.")
     else .no_findings(),
-    .validate_one_config(global_cfg,  "global",  basename(global_path)),
-    .validate_one_config(dataset_cfg, "dataset", basename(dataset_path),
-                         dataset_name = dataset_name)
+    guard(.validate_one_config(global_cfg,  "global",  basename(global_path)),
+          basename(global_path)),
+    guard(.validate_one_config(dataset_cfg, "dataset", basename(dataset_path),
+                               dataset_name = dataset_name),
+          basename(dataset_path))
   )
 
-  tier2    <- .validate_tier2(dataset_cfg, basename(dataset_path))
+  tier2 <- tryCatch(.validate_tier2(dataset_cfg, basename(dataset_path)),
+                    error = function(e) list(
+                      findings = .no_findings(),
+                      skipped  = paste0("internal error during the header ",
+                                        "cross-check: ", conditionMessage(e))))
   findings <- rbind(findings, tier2$findings)
   rownames(findings) <- NULL
 

@@ -9,41 +9,57 @@
   packed-FWF `TODO` and never-overwrite special cases. Because it executes,
   `R CMD check` runs the entire chain as a living test.
 
-* New `validate_config(dataset_name, config_dir)`: config-only validation of
-  the global and dataset YAML against the config vocabulary. Reports every
-  finding in one pass (severities error/warning/note) instead of aborting on
-  the first: unknown keys get a did-you-mean suggestion and are tolerated as
-  warnings so hand-kept extra keys round-trip; wrong types/ranges, misplaced
-  rule keys (rules-level vs per-column), `fwf_col_names`/`fwf_widths` length
-  mismatches, duplicate output column names, unresolved `TODO` width
-  placeholders, and a missing file source are errors. Unreadable config files
-  abort with distinct classes: `dqcheckr_missing_file`,
-  `dqcheckr_empty_config`, `dqcheckr_config_parse_error`,
-  `dqcheckr_invalid_config`.
+* New `validate_config(dataset_name, config_dir)`: validation of the global
+  and dataset YAML against the config vocabulary, reporting every finding in
+  one pass (severities error/warning/note) instead of aborting on the first.
+  The severity rule: **config mistakes are errors** — wrong types/ranges,
+  misplaced rule keys (rules-level vs per-column), `fwf_col_names`/
+  `fwf_widths` length mismatches, duplicate output column names, unresolved
+  `TODO` width placeholders, a missing file source — while **delivery-facing
+  findings are warnings**, because they can equally mean the supplier changed
+  the delivery, and drift must be recorded, not crash the run. Unknown keys
+  get a did-you-mean suggestion and warn, so hand-kept extra keys round-trip.
+  The validator never crashes on malformed values (any internal error becomes
+  an error-severity finding). An unreadable **dataset** config aborts with
+  distinct classes — `dqcheckr_missing_file`, `dqcheckr_empty_config`,
+  `dqcheckr_config_parse_error`, `dqcheckr_invalid_config` — while an empty
+  or comments-only **global** config is tolerated as all-defaults with a
+  warning (matching how the package has always run).
 
   When the delivery file the config points at is resolvable, validation
-  additionally cross-checks the config against the file's *header only* (never
-  the body — cheap even for multi-GB files on a network share): `col_names`
-  length vs the physical column count, `key_columns` (error) and
-  `expected_columns`/`column_types`/`column_rules` (warning) naming columns
-  that exist, and `fwf_widths` summing to the record length (over: error;
-  under: warning). When no delivery is resolvable the header tier is skipped
-  with the reason stated in the result and by `print()` — a verdict always
-  says which tier it reached.
+  additionally cross-checks the config against the file's *header only*
+  (never the body — cheap even for multi-GB files on a network share):
+  `col_names` length vs the physical column count, `key_columns`/
+  `expected_columns`/`column_types`/`column_rules` naming columns that
+  exist, and `fwf_widths` summing to the record length — all warnings, per
+  the severity rule. When no delivery is resolvable the header tier is
+  skipped with the reason stated in the result and by `print()` — a verdict
+  always says which tier it reached.
 
-  `run_dq_check()` now validates first, before any other work: error-severity
-  findings abort with a `dqcheckr_validation_error` whose message lists every
-  finding, and **no snapshot row is written** — an unrunnable config can no
-  longer leave a `pending` orphan in the database. Warning-severity findings
-  are reported via `message()` and the run proceeds. A corrupt, empty, or
-  non-map config file now aborts the run with the typed classes above instead
-  of the YAML parser's raw error. The `description` key the GUI wizard writes
-  is part of the config vocabulary (never read by the checks).
+  `run_dq_check()` validates first, before any other work: error findings
+  abort with a `dqcheckr_validation_error` whose message lists every finding,
+  and **no snapshot row is written** — an unrunnable config can no longer
+  leave a `pending` orphan in the database. Warning findings are printed
+  *and persisted* into the run's results as `VC-01` ("Config validation")
+  WARN checks — they land in the report, the warn counts, and the overall
+  status, so delivery drift the runtime checks cannot see (e.g. a surplus
+  column readr silently auto-names) still leaves a recorded trace. A
+  corrupt dataset config aborts the run with the typed classes above instead
+  of the YAML parser's raw error. The `description` key the GUI wizard
+  writes is part of the config vocabulary (never read by the checks). The
+  two change-thresholds (`max_numeric_mean_shift_pct`,
+  `max_row_count_change_pct`) accept any value >= 0 — they bound an
+  unbounded relative change, and deployed configs legally carry values
+  above 1 — with a warning when a value looks like a raw percentage.
 
 * CP-04 (numeric mean shift) now honours a per-column
   `max_numeric_mean_shift_pct` set in `column_rules`, which the GUI has always
   written but the check silently ignored — the read goes through the same
   column > rules > default resolution as every other per-column threshold.
+  The drift report applies the same per-column values, so the run report and
+  `compare_snapshots()` cannot contradict each other on one snapshot pair;
+  a malformed per-column value draws a warning naming the column and falls
+  back to the rules level rather than crashing the comparison.
 
 * New `list_runs(dataset_name, config_dir, n)`: name-based run history. Resolves
   the snapshot database from the dataset's merged configuration exactly as
@@ -78,12 +94,16 @@
   delivery and writes a fully-optioned, self-documenting YAML config. Every
   config key appears exactly once — detected values live, optional settings
   commented out with their defaults — and each key carries the same
-  description the validator's vocabulary uses. Duplicate header names are
-  renamed positionally with `# was "..."` annotations and `csv_skip: 1`;
-  positional lists are always emitted complete under a do-not-comment
-  warning; fixed-width files get a character-position ruler comment, and a
-  packed file gets explicit `TODO` widths that `validate_config()` refuses to
-  run until filled in. Create-only: an existing config aborts with
+  description the validator's vocabulary uses. Duplicate and *empty* header
+  names (a trailing delimiter) are renamed positionally with `# was "..."`
+  annotations and `csv_skip: 1`, with rename suffixes bumped past any name
+  already in the header; positional lists are always emitted complete under a
+  do-not-comment warning; fixed-width files get a character-position ruler
+  comment, and a packed file gets explicit `TODO` widths that
+  `validate_config()` refuses to run until filled in. Emitted values are
+  YAML-safe (backslashes escaped, map keys quoted, paths in forward-slash
+  form with relative paths kept relative); columns whose sampled type is
+  unknown stay unpinned. Create-only: an existing config aborts with
   `dqcheckr_config_exists` and is never touched (the never-overwrite rule).
 
 * New `generate_global_config(config_dir)`: writes a fully-optioned

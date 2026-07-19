@@ -71,9 +71,9 @@ run_dq_check <- function(dataset_name,
   validation <- validate_config(dataset_name, config_dir)
   errs <- validation$findings[validation$findings$severity == "error", , drop = FALSE]
   if (nrow(errs) > 0)
-    # Abort BEFORE any warning output: the GUI reports a failed run from the
-    # last non-blank log line, so anything printed here would shadow the real
-    # error (which reaches callers only via this condition's message).
+    # Abort BEFORE any warning output: log-tailing consumers surface the last
+    # non-blank line of a failed run, so a warning block printed first would
+    # be what they show instead of this condition's message.
     rlang::abort(
       paste0("Configuration for '", dataset_name, "' failed validation:\n",
              paste0("  - [", errs$file, "] ", errs$message, collapse = "\n")),
@@ -82,6 +82,19 @@ run_dq_check <- function(dataset_name,
   if (nrow(warns) > 0)
     message("[dqcheckr] Config validation warnings for '", dataset_name, "':\n",
             paste0("  - [", warns$file, "] ", warns$message, collapse = "\n"))
+  # Warnings are also PERSISTED as WARN results (VC-01), not just logged: a
+  # log line vanishes with the console, but shape drift the runtime checks
+  # can't see (readr silently auto-names a surplus column when col_names is
+  # short, and check_schema/QC-12 need expected_columns/key_columns to be
+  # configured) must still reach the report, the snapshot counts, and the
+  # overall status -- otherwise a drifted delivery can read as a clean PASS.
+  vc_results <- lapply(seq_len(nrow(warns)), function(i) dq_result(
+    check_id   = "VC-01",
+    check_name = "Config validation",
+    status     = "WARN",
+    observed   = paste0(warns$file[i], ": ", warns$key[i]),
+    message    = warns$message[i]
+  ))
 
   config <- load_config(dataset_name, config_dir)
 
@@ -101,8 +114,9 @@ run_dq_check <- function(dataset_name,
   # Resolve column types once; every type-dependent check shares this map.
   types_curr <- resolve_col_types(df_curr, config)
 
-  qc_results     <- run_qc_checks(df_curr, config, file_path = files$current,
-                                  types = types_curr)
+  qc_results     <- c(vc_results,
+                      run_qc_checks(df_curr, config, file_path = files$current,
+                                    types = types_curr))
   cp_results     <- if (!is.null(df_prev))
     run_comparison_checks(df_curr, df_prev, config, types_current = types_curr)
   else
